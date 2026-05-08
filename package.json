@@ -1,0 +1,83 @@
+{
+  "name": "notion-md-viewer",
+  "displayName": "Notion MD Viewer",
+  "description": "View and edit Markdown files with a Notion-style interface",
+  "version": "0.1.0",
+  "publisher": "notion-md-viewer",
+  "engines": { "vscode": "^1.74.0" },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "notion-md-viewer",
+        "displayName": "Notion MD Viewer",
+        "selector": [{ "filenamePattern": "*.md" }],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "notion-md.openSourceView",
+        "title": "Notion MD: Open Source View"
+      },
+      {
+        "command": "notion-md.openNotionView",
+        "title": "Notion MD: Open Notion View"
+      }
+    ],
+    "configuration": {
+      "title": "Notion MD Viewer",
+      "properties": {
+        "notionMdViewer.theme": {
+          "type": "string",
+          "enum": ["auto", "light", "dark"],
+          "default": "auto",
+          "description": "Color theme override for Notion MD Viewer"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p tsconfig.json && node esbuild.config.js",
+    "watch": "concurrently \"tsc -p tsconfig.json -w\" \"node esbuild.config.js --watch\"",
+    "test": "jest",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "@tiptap/core": "^2.7.0",
+    "@tiptap/starter-kit": "^2.7.0",
+    "@tiptap/extension-task-list": "^2.7.0",
+    "@tiptap/extension-task-item": "^2.7.0",
+    "@tiptap/extension-table": "^2.7.0",
+    "@tiptap/extension-table-row": "^2.7.0",
+    "@tiptap/extension-table-cell": "^2.7.0",
+    "@tiptap/extension-table-header": "^2.7.0",
+    "@tiptap/extension-image": "^2.7.0",
+    "@tiptap/extension-link": "^2.7.0",
+    "@tiptap/extension-code-block-lowlight": "^2.7.0",
+    "lowlight": "^3.1.0",
+    "tiptap-markdown": "^0.8.10"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "esbuild": "^0.21.0",
+    "concurrently": "^8.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "@vscode/vsce": "^2.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.ts"],
+    "moduleNameMapper": { "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js" },
+    "transform": {
+      "^.+\\.tsx?$": ["ts-jest", { "tsconfig": "tsconfig.webview.json" }]
+    }
+  }
+}
