@@ -19,28 +19,82 @@ body {
   gap: 8px;
   padding: 6px 16px;
   background: var(--toolbar-bg);
-  border-bottom: 1px solid var(--toolbar-border);
 }
 
-#toolbar button {
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
+.toolbar-sep {
+  height: 1px;
+  background: var(--toolbar-border);
+  margin: 0 16px;
+}
+
+.toolbar-spacer { flex: 1; }
+
+/* Segmented control — macOS style */
+.segmented {
+  display: inline-flex;
+  background: var(--seg-bg);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 1px;
+}
+
+.seg-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-secondary);
   font-size: 12px;
+  font-family: inherit;
   cursor: pointer;
+  line-height: 1;
+  transition: color 0.1s;
+  white-space: nowrap;
 }
 
-#toolbar button:hover {
-  background: var(--toolbar-btn-hover);
+.seg-btn:hover { color: var(--text-primary); }
+
+.seg-btn.active {
+  background: var(--seg-active-bg);
   color: var(--text-primary);
+  box-shadow: var(--seg-active-shadow);
+  font-weight: 500;
 }
 
 #editor {
-  max-width: 720px;
   margin: 0 auto;
   padding: 48px 24px 96px;
+  max-width: 720px;
+}
+
+#editor.width-medium { max-width: 850px; }
+#editor.width-full   { max-width: 100%; padding: 16px 32px 48px; }
+
+#source-view {
+  display: none;
+  margin: 0 auto;
+  padding: 24px;
+  max-width: 720px;
+}
+#source-view.width-medium { max-width: 850px; }
+#source-view.width-full   { max-width: 100%; }
+
+#source-view pre {
+  background: var(--code-bg);
+  border-radius: 6px;
+  padding: 20px 24px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  min-height: 400px;
 }
 
 .ProseMirror { outline: none; min-height: 200px; }
@@ -49,19 +103,22 @@ body {
   font-family: var(--font-heading);
   font-size: 2rem;
   font-weight: 700;
-  margin: 1.5rem 0 0.5rem;
+  line-height: 1.15;
+  margin: 1.5rem 0 0.4rem;
 }
 .ProseMirror h2 {
   font-family: var(--font-heading);
   font-size: 1.5rem;
   font-weight: 600;
-  margin: 1.25rem 0 0.4rem;
+  line-height: 1.2;
+  margin: 1.25rem 0 0.3rem;
 }
 .ProseMirror h3 {
   font-family: var(--font-heading);
   font-size: 1.2rem;
   font-weight: 600;
-  margin: 1rem 0 0.3rem;
+  line-height: 1.25;
+  margin: 1rem 0 0.25rem;
 }
 
 .ProseMirror p { margin: 0.3rem 0; }
@@ -187,3 +244,99 @@ body {
 }
 .ProseMirror details[open] summary::before { transform: rotate(90deg); }
 .ProseMirror details .toggle-content { padding-left: 1.5rem; margin-top: 4px; }
+
+/* ── Bubble menu ─────────────────────────────────────── */
+.bubble-menu {
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 9px;
+  padding: 5px 6px;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.3);
+  z-index: 999;
+}
+
+.bubble-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.bubble-panel.hidden { display: none; }
+
+.bm-btn {
+  background: transparent;
+  border: none;
+  color: #d0d0d0;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.bm-btn:hover          { background: rgba(255,255,255,0.1);  color: #fff; }
+.bm-btn.active         { background: rgba(255,255,255,0.12); color: #fff; }
+.bm-btn.bm-dim         { color: #555; }
+.bm-btn.bm-dim:hover   { color: #999; background: rgba(255,255,255,0.05); }
+
+.bm-btn.bm-lbl {
+  width: auto;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: -.3px;
+}
+
+.bm-div {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: #333;
+  margin: 0 2px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.bm-swatch-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 6px 8px;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 1000;
+}
+
+.bm-swatch-panel.open { display: flex; }
+
+.bm-swatch-item {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+
+.bm-swatch-item:hover { transform: scale(1.15); }
+
+.bm-swatch-clear {
+  background: transparent !important;
+  color: #666;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #333 !important;
+}
