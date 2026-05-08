@@ -9,10 +9,15 @@ import TableCell from '@tiptap/extension-table-cell';
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Underline from '@tiptap/extension-underline';
+import TextStyle from '@tiptap/extension-text-style';
+import Color from '@tiptap/extension-color';
+import Highlight from '@tiptap/extension-highlight';
 import { common, createLowlight } from 'lowlight';
 import { Markdown } from 'tiptap-markdown';
 import Callout from './extensions/callout';
 import Toggle from './extensions/toggle';
+import { createBubbleMenu } from './bubbleMenu';
 
 const lowlight = createLowlight(common);
 
@@ -24,7 +29,7 @@ export type OnChangeCallback = (markdown: string) => void;
 export function createEditor(
   element: HTMLElement,
   initialMarkdown: string,
-  onChange: OnChangeCallback
+  onChange: OnChangeCallback,
 ): Editor {
   _editor = new Editor({
     element,
@@ -39,6 +44,10 @@ export function createEditor(
       TableCell,
       Image,
       Link.configure({ openOnClick: false }),
+      Underline,
+      TextStyle,
+      Color,
+      Highlight.configure({ multicolor: true }),
       Markdown.configure({ transformCopiedText: true }),
       Callout,
       Toggle,
@@ -53,6 +62,7 @@ export function createEditor(
     },
   });
 
+  createBubbleMenu(_editor);
   return _editor;
 }
 
