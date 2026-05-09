@@ -1,7 +1,7 @@
 import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
-import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setSourceViewSwitcher, setMediaBaseUri } from './editor';
+import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri } from './editor';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { initTooltips } from './tooltip';
 import { common, createLowlight } from 'lowlight';
@@ -259,8 +259,22 @@ function init(): void {
     }
   }
 
-  // Let the editor module switch us to source view (used by the frontmatter pill).
-  setSourceViewSwitcher(() => setView('source'));
+  // Frontmatter badge on the Code view-toggle button. Surfaces that the file
+  // has YAML/TOML frontmatter without putting chrome above the document body.
+  const fmBadge = document.getElementById('fm-badge') as HTMLElement | null;
+  const codeBtn = viewBtns.find(b => b.dataset.view === 'source') ?? null;
+  setFrontmatterChangeListener(({ lines, kind }) => {
+    const present = kind !== 'none' && lines > 0;
+    if (fmBadge) {
+      fmBadge.classList.toggle('hidden', !present);
+      fmBadge.textContent = present ? String(lines) : '';
+    }
+    if (codeBtn) {
+      codeBtn.dataset.tip = present
+        ? `Source view — raw markdown · ${lines} ${lines === 1 ? 'line' : 'lines'} of frontmatter`
+        : 'Source view — raw markdown';
+    }
+  });
 
   function setWidth(mode: WidthMode): void {
     widthMode = mode;

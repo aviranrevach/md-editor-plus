@@ -211,7 +211,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <span class="toolbar-logo" data-tip="MD Editor Plus">${iAppLogo}</span>
     <div class="segmented" id="view-seg">
       <button class="seg-btn active" data-view="preview" data-tip="Notion view — rich rendering">${iEye}<span class="seg-label">Preview</span></button>
-      <button class="seg-btn" data-view="source" data-tip="Source view — raw markdown">${iCode}<span class="seg-label">Code</span></button>
+      <button class="seg-btn" data-view="source" data-tip="Source view — raw markdown">${iCode}<span class="seg-label">Code</span><span class="fm-badge hidden" id="fm-badge" aria-hidden="true"></span></button>
     </div>
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
     <span class="toolbar-spacer"></span>
