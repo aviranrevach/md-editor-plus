@@ -24,3 +24,14 @@ export function countFrontmatterLines(fm: string): number {
   const inner = fm.replace(/^(?:---|\+\+\+)\r?\n/, '').replace(/\r?\n(?:---|\+\+\+)\r?\n?$/, '');
   return inner.split('\n').filter(line => line.length > 0).length;
 }
+
+export function frontmatterInfo(md: string): {
+  lines: number;
+  kind: 'yaml' | 'toml' | 'none';
+} {
+  const split = splitFrontmatter(md);
+  return {
+    kind: split.kind,
+    lines: countFrontmatterLines(split.frontmatter),
+  };
+}
