@@ -7,7 +7,10 @@ export interface BlockDef {
   iconHtml: string;
   section: 'text' | 'lists' | 'media' | 'other';
   aliases?: string[];
-  insert: (editor: Editor, pos: number) => void;
+  // Either inserts directly, or drills down into a sub-list of options.
+  // Items with subItems must omit insert; items with insert must omit subItems.
+  insert?: (editor: Editor, pos: number) => void;
+  subItems?: BlockDef[];
 }
 
 const ICO = {
@@ -116,15 +119,47 @@ export const BLOCK_DEFS: BlockDef[] = [
   {
     id: 'callout',
     label: 'Callout',
-    description: 'Highlighted note block',
+    description: 'Pick a type — Note, Tip, Important, Warning, Caution',
     iconHtml: ICO.callout,
     section: 'media',
-    insert: (editor, pos) =>
-      editor.chain().focus().insertContentAt(pos, {
-        type: 'callout',
-        attrs: { type: 'note', emoji: '💡' },
-        content: [{ type: 'text', text: ' ' }],
-      }).run(),
+    aliases: ['note', 'tip', 'important', 'warning', 'caution'],
+    subItems: [
+      { id: 'callout-note',      label: 'Note',      description: 'Informational',
+        iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="note">💡</span>',
+        section: 'media',
+        insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
+          type: 'callout', attrs: { type: 'note', emoji: '💡' },
+          content: [{ type: 'text', text: ' ' }],
+        }).run() },
+      { id: 'callout-tip',       label: 'Tip',       description: 'Helpful suggestion',
+        iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="tip">✅</span>',
+        section: 'media',
+        insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
+          type: 'callout', attrs: { type: 'tip', emoji: '✅' },
+          content: [{ type: 'text', text: ' ' }],
+        }).run() },
+      { id: 'callout-important', label: 'Important', description: 'Crucial context',
+        iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="important">📌</span>',
+        section: 'media',
+        insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
+          type: 'callout', attrs: { type: 'important', emoji: '📌' },
+          content: [{ type: 'text', text: ' ' }],
+        }).run() },
+      { id: 'callout-warning',   label: 'Warning',   description: 'Heads-up — possible footgun',
+        iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="warning">⚠️</span>',
+        section: 'media',
+        insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
+          type: 'callout', attrs: { type: 'warning', emoji: '⚠️' },
+          content: [{ type: 'text', text: ' ' }],
+        }).run() },
+      { id: 'callout-caution',   label: 'Caution',   description: 'Dangerous — irreversible',
+        iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="caution">🛑</span>',
+        section: 'media',
+        insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
+          type: 'callout', attrs: { type: 'caution', emoji: '🛑' },
+          content: [{ type: 'text', text: ' ' }],
+        }).run() },
+    ],
   },
   {
     id: 'toggle',
@@ -171,10 +206,10 @@ export const BLOCK_DEFS: BlockDef[] = [
   },
 ];
 
-export function filterBlocks(query: string): BlockDef[] {
-  if (!query.trim()) return BLOCK_DEFS;
+export function filterBlocks(query: string, source: BlockDef[] = BLOCK_DEFS): BlockDef[] {
+  if (!query.trim()) return source;
   const q = query.toLowerCase();
-  return BLOCK_DEFS.filter(
+  return source.filter(
     b =>
       b.label.toLowerCase().includes(q) ||
       b.description.toLowerCase().includes(q) ||
@@ -199,6 +234,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   let currentPos = 0;
   let activeIdx  = 0;
   let filtered: BlockDef[] = BLOCK_DEFS;
+  let drillParent: BlockDef | null = null;
 
   const el = document.createElement('div');
   el.className = 'block-picker';
@@ -213,33 +249,68 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   const input = el.querySelector<HTMLInputElement>('.block-picker-input')!;
   const list  = el.querySelector<HTMLElement>('.block-picker-list')!;
 
+  function currentSource(): BlockDef[] {
+    return drillParent?.subItems ?? BLOCK_DEFS;
+  }
+
   function renderList(items: BlockDef[]): void {
     list.innerHTML = '';
     let globalIdx = 0;
-    ((['text', 'lists', 'media', 'other'] as const)).forEach(section => {
-      const sectionItems = items.filter(b => b.section === section);
-      if (!sectionItems.length) return;
-      if (list.childElementCount > 0) {
-        const sep = document.createElement('div');
-        sep.className = 'block-picker-sep';
-        list.appendChild(sep);
-      }
-      const lbl = document.createElement('div');
-      lbl.className = 'block-picker-section-label';
-      lbl.textContent = SECTION_LABELS[section];
-      list.appendChild(lbl);
-      sectionItems.forEach(block => {
-        const row = document.createElement('div');
-        row.className = 'block-picker-item';
-        row.dataset.idx = String(globalIdx);
-        row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>`;
-        row.addEventListener('mousedown', e => { e.preventDefault(); select(block); });
-        list.appendChild(row);
+
+    if (drillParent) {
+      const back = document.createElement('div');
+      back.className = 'block-picker-back';
+      back.innerHTML = `<span class="block-picker-back-icon">‹</span><span class="block-picker-back-label">${drillParent.label}</span>`;
+      back.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        drillParent = null;
+        input.placeholder = 'Filter blocks…';
+        input.value = '';
+        filtered = BLOCK_DEFS;
+        renderList(filtered);
+        input.focus();
+      });
+      list.appendChild(back);
+    }
+
+    if (drillParent) {
+      // Drilled-down view: flat list, no section headers.
+      items.forEach((block) => {
+        list.appendChild(renderRow(block, globalIdx));
         globalIdx++;
       });
-    });
+    } else {
+      ((['text', 'lists', 'media', 'other'] as const)).forEach((section) => {
+        const sectionItems = items.filter((b) => b.section === section);
+        if (!sectionItems.length) return;
+        if (list.childElementCount > (drillParent ? 1 : 0)) {
+          const sep = document.createElement('div');
+          sep.className = 'block-picker-sep';
+          list.appendChild(sep);
+        }
+        const lbl = document.createElement('div');
+        lbl.className = 'block-picker-section-label';
+        lbl.textContent = SECTION_LABELS[section];
+        list.appendChild(lbl);
+        sectionItems.forEach((block) => {
+          list.appendChild(renderRow(block, globalIdx));
+          globalIdx++;
+        });
+      });
+    }
+
     activeIdx = 0;
     updateActive();
+  }
+
+  function renderRow(block: BlockDef, idx: number): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'block-picker-item';
+    row.dataset.idx = String(idx);
+    const drillCaret = block.subItems?.length ? '<span class="block-picker-caret">›</span>' : '';
+    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${drillCaret}`;
+    row.addEventListener('mousedown', (e) => { e.preventDefault(); select(block); });
+    return row;
   }
 
   function updateActive(): void {
@@ -249,9 +320,17 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function select(block: BlockDef): void {
-    block.insert(editor, currentPos);
+    if (block.subItems?.length) {
+      drillParent = block;
+      input.placeholder = `Filter ${block.label.toLowerCase()}…`;
+      input.value = '';
+      filtered = block.subItems;
+      renderList(filtered);
+      input.focus();
+      return;
+    }
+    block.insert?.(editor, currentPos);
     close();
-    // Focus editor and scroll to the newly inserted block so cursor shows insertion point
     setTimeout(() => {
       editor.commands.focus();
       editor.commands.scrollIntoView();
@@ -259,7 +338,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   input.addEventListener('input', () => {
-    filtered = filterBlocks(input.value);
+    filtered = filterBlocks(input.value, currentSource());
     renderList(filtered);
   });
 
@@ -276,12 +355,23 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       e.preventDefault();
       if (filtered[activeIdx]) select(filtered[activeIdx]);
     } else if (e.key === 'Escape') {
-      close();
+      if (drillParent) {
+        drillParent = null;
+        input.placeholder = 'Filter blocks…';
+        input.value = '';
+        filtered = BLOCK_DEFS;
+        renderList(filtered);
+        input.focus();
+      } else {
+        close();
+      }
     }
   });
 
   function open(anchorEl: HTMLElement, insertPos: number): void {
     currentPos = insertPos;
+    drillParent = null;
+    input.placeholder = 'Filter blocks…';
     filtered = BLOCK_DEFS;
     input.value = '';
     renderList(BLOCK_DEFS);
@@ -302,6 +392,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
   function close(): void {
     el.classList.remove('open');
+    drillParent = null;
     input.value = '';
   }
 

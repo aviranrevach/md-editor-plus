@@ -18,29 +18,6 @@ function getInsertPosFromHandle(editor: Editor, handleEl: HTMLElement): number {
   return $pos.end(depth);
 }
 
-function getBlockAtHandle(
-  editor: Editor,
-  handleEl: HTMLElement,
-): { typeName: string; pos: number } | null {
-  try {
-    const rect = handleEl.getBoundingClientRect();
-    const result = editor.view.posAtCoords({
-      left: rect.right + 24,
-      top:  rect.top + rect.height / 2,
-    });
-    if (!result) return null;
-    const $pos = editor.view.state.doc.resolve(result.pos);
-    if ($pos.depth < 1) return null;
-    const blockPos = $pos.before(1);
-    const blockNode = editor.state.doc.nodeAt(blockPos);
-    if (!blockNode) return null;
-    return { typeName: blockNode.type.name, pos: blockPos };
-  } catch (err) {
-    console.error('[md-editor-plus] getBlockAtHandle failed', err);
-    return null;
-  }
-}
-
 function showTooltip(tooltip: HTMLElement, targetEl: HTMLElement, text: string): void {
   tooltip.innerHTML = text;
   tooltip.style.display = 'block';
@@ -60,9 +37,11 @@ function hideTooltip(tooltip: HTMLElement): void {
 
 export function createBlockHandle(editor: Editor): void {
   const picker  = createBlockPicker(editor);
-  let calloutMenu: ReturnType<typeof createCalloutMenu> | null = null;
+  // Initialize the callout popover so its emoji-click trigger gets installed.
+  // The dragger itself always opens the regular block picker — type/emoji
+  // changes for an existing callout happen via clicking the emoji.
   try {
-    calloutMenu = createCalloutMenu(editor);
+    createCalloutMenu(editor);
   } catch (err) {
     console.error('[md-editor-plus] callout menu init failed', err);
   }
@@ -106,28 +85,20 @@ export function createBlockHandle(editor: Editor): void {
     });
     plusBtn.addEventListener('mouseleave', () => hideTooltip(tooltip));
 
-    // drag icon: click without drag → open contextual menu
-    // (callout type switcher for callouts, generic block picker otherwise)
+    // drag icon: click without drag → open block picker
     let dragStarted = false;
     dragIcon.addEventListener('dragstart', () => { dragStarted = true; });
     dragIcon.addEventListener('click', e => {
       if (dragStarted) { dragStarted = false; return; }
       e.preventDefault();
       e.stopPropagation();
-      const block = calloutMenu ? getBlockAtHandle(editor, handleEl) : null;
-      if (calloutMenu && block?.typeName === 'callout') {
-        calloutMenu.open(dragIcon, block.pos);
-        return;
-      }
       picker.open(dragIcon, getInsertPosFromHandle(editor, handleEl));
     });
 
-    // drag icon: tooltip — wording reflects the contextual menu
+    // drag icon: tooltip
     dragIcon.addEventListener('mouseenter', () => {
-      const block = getBlockAtHandle(editor, handleEl);
-      const menuLabel = block?.typeName === 'callout' ? 'change callout type' : 'open menu';
       showTooltip(tooltip, dragIcon,
-        `<strong>Drag</strong> to move<br><strong>Click</strong> to ${menuLabel}`
+        '<strong>Drag</strong> to move<br><strong>Click</strong> or <span class="kbd">⌘/</span> to open menu'
       );
     });
     dragIcon.addEventListener('mouseleave', () => hideTooltip(tooltip));

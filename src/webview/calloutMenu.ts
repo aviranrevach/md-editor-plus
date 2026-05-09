@@ -80,7 +80,7 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
           aria-expanded="${pickerOpen ? 'true' : 'false'}"
         >
           <span class="callout-menu-emoji-current">${escapeHtml(currentEmoji)}</span>
-          <span class="callout-menu-emoji-trigger-label">Choose emoji</span>
+          <span class="callout-menu-emoji-trigger-label">Customize Emoji</span>
           <span class="callout-menu-emoji-trigger-caret">▾</span>
         </button>
         <div class="callout-menu-emoji-grid ${pickerOpen ? 'open' : ''}">
@@ -101,10 +101,19 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
       });
     });
 
-    el.querySelector<HTMLButtonElement>('[data-action="toggle-picker"]')?.addEventListener('mousedown', (e) => {
+    // Toggle the emoji grid by flipping classes on the existing nodes — do
+    // NOT re-render here. Replacing innerHTML detaches the click target from
+    // the DOM before the global mousedown listener runs, which then thinks
+    // the click was outside the menu and closes the whole popover.
+    const trigger = el.querySelector<HTMLElement>('[data-action="toggle-picker"]');
+    const grid = el.querySelector<HTMLElement>('.callout-menu-emoji-grid');
+    trigger?.addEventListener('mousedown', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       pickerOpen = !pickerOpen;
-      render(currentType, currentEmoji);
+      trigger.classList.toggle('open', pickerOpen);
+      trigger.setAttribute('aria-expanded', pickerOpen ? 'true' : 'false');
+      grid?.classList.toggle('open', pickerOpen);
     });
 
     el.querySelectorAll<HTMLButtonElement>('.callout-menu-emoji-cell').forEach((cell) => {
