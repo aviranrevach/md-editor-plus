@@ -1160,7 +1160,20 @@ html.source-full-width #source-view {
   border-color: var(--callout-caution-border, var(--callout-border));
   --callout-accent: var(--callout-caution-accent, var(--callout-caution-border));
 }
-.ProseMirror .callout-emoji { flex-shrink: 0; font-size: 1.1rem; line-height: 1.6; }
+.ProseMirror .callout-emoji {
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  padding: 0 2px;
+  transition: transform 0.1s ease-out, background 0.12s;
+}
+.ProseMirror .callout-emoji:hover {
+  background: var(--block-hover);
+  transform: scale(1.1);
+}
 .ProseMirror .callout-content { flex: 1; }
 
 .ProseMirror details { margin: 0.5rem 0; }
@@ -1245,35 +1258,74 @@ html.source-full-width #source-view {
   color: #ffffff;
 }
 
-/* Link actions popover (shown when an existing link is clicked) */
-.bm-link-actions {
+/* Floating link popover — shown on link hover. Mounted on document.body.
+   Matches the bubble menu's chrome: 14px radius, 6px padding, 38px buttons. */
+.link-pop {
+  position: fixed;
+  z-index: 1100;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10);
+  max-width: 480px;
+}
+.theme-dark .link-pop { box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3); }
+.link-pop-view, .link-pop-edit {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 2px;
-  background: var(--block-hover);
-  border-radius: 9px;
-  min-height: 38px;
-  max-width: 360px;
 }
-.bm-link-actions-href {
+.link-pop-href {
   flex: 1;
   min-width: 0;
+  max-width: 280px;
   padding: 0 10px;
   color: var(--link);
-  font-size: 12px;
-  font-family: inherit;
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
-  outline: none;
-  height: 32px;
+  font-size: 13px;
+  cursor: text;
+  user-select: text;
+  height: 38px;
   display: flex;
   align-items: center;
 }
-.bm-link-actions-href:hover { text-decoration: underline; }
+.link-pop-input {
+  flex: 1;
+  min-width: 240px;
+  padding: 0 10px;
+  border: none;
+  background: var(--block-hover);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  border-radius: 8px;
+  height: 32px;
+}
+.link-pop-input::placeholder { color: var(--text-secondary); opacity: 0.7; }
+.link-pop-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.08s, color 0.08s;
+}
+.link-pop-btn svg { width: 18px; height: 18px; }
+.link-pop-btn:hover { background: var(--block-hover); }
+.link-pop-btn-apply { color: var(--link); }
+.link-pop-btn-apply:hover { background: var(--link); color: #ffffff; }
 
 /* Floating link-URL popover for the source bubble-menu Link button.
    Mounted on document.body so tippy/bubble-menu mounting can't interfere. */
@@ -1919,6 +1971,75 @@ html.source-full-width #source-view {
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
+}
+
+.callout-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 4px;
+}
+
+.callout-menu-emoji-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 6px 6px;
+  align-items: center;
+}
+
+.callout-menu-emoji-input {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.callout-menu-emoji-input:focus {
+  border-color: var(--link);
+  box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.15);
+}
+
+.callout-menu-emoji-apply {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-primary);
+  border-radius: 7px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.08s;
+}
+.callout-menu-emoji-apply:hover {
+  background: var(--block-hover);
+}
+
+.callout-menu-emoji-reset {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 7px;
+  padding: 6px 10px;
+  margin: 0 6px 4px;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  width: calc(100% - 12px);
+  cursor: pointer;
+  transition: background 0.08s, color 0.08s;
+}
+.callout-menu-emoji-reset:hover {
+  background: var(--block-hover);
+  color: var(--text-primary);
 }
 
 .block-picker-sep {
