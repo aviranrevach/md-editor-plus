@@ -7,6 +7,7 @@
   "engines": {
     "vscode": "^1.74.0"
   },
+  "icon": "MDnotion.png",
   "categories": [
     "Other"
   ],
@@ -47,6 +48,11 @@
           ],
           "default": "light",
           "description": "Color theme override for Notion MD Viewer"
+        },
+        "notionMdViewer.alwaysDarkCode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Render code blocks with a dark background regardless of page theme"
         }
       }
     }
