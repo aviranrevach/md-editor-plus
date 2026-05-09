@@ -264,7 +264,7 @@ It listens to TipTap's `selectionUpdate` event, measures the selection's boundin
 <details>
 <summary>What happens to my YAML frontmatter?</summary>
 
-It's stripped out before the editor parses the document, kept in a side buffer, and re-attached on save. The **FRONTMATTER · N lines** pill at the top of the editor jumps you to the Code view positioned right at the frontmatter block.
+It's stripped out before the editor parses the document, kept in a side buffer, and re-attached on save. When a file has frontmatter, a small numeric badge appears on the **Code** view-toggle button showing the line count — click it to jump to Code view and edit the YAML directly.
 
 </details>
 
