@@ -77,7 +77,7 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
         <div class="callout-menu-list">
           ${TYPES.map((t) => `
             <button class="callout-menu-chip ${t.id === currentType ? 'active' : ''}" data-type="${t.id}" data-callout-preview="${t.id}">
-              <span class="callout-menu-chip-emoji">${t.emoji}</span>
+              <span class="callout-menu-chip-emoji">${t.id === currentType ? escapeHtml(currentEmoji) : t.emoji}</span>
               <span class="callout-menu-chip-label">${t.label}</span>
               ${t.id === currentType ? '<span class="callout-menu-chip-check">✓</span>' : ''}
             </button>
@@ -159,8 +159,12 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
     }
 
     function refreshTriggerPreview(): void {
+      const next = input?.value.trim() ?? '';
       const cur = el.querySelector<HTMLElement>('.callout-menu-emoji-current');
-      if (cur && input) cur.textContent = input.value.trim();
+      if (cur) cur.textContent = next;
+      // Also reflect the change on the active type chip in the types view.
+      const activeChipEmoji = el.querySelector<HTMLElement>('.callout-menu-chip.active .callout-menu-chip-emoji');
+      if (activeChipEmoji) activeChipEmoji.textContent = next;
     }
 
     input?.addEventListener('keydown', (e) => {
@@ -197,8 +201,11 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
       e.preventDefault();
       const defaultEmoji = DEFAULT_EMOJI_BY_TYPE[currentType];
       setAttrs(null, defaultEmoji);
+      if (input) input.value = defaultEmoji;
       const cur = el.querySelector<HTMLElement>('.callout-menu-emoji-current');
       if (cur) cur.textContent = defaultEmoji;
+      const activeChipEmoji = el.querySelector<HTMLElement>('.callout-menu-chip.active .callout-menu-chip-emoji');
+      if (activeChipEmoji) activeChipEmoji.textContent = defaultEmoji;
     });
   }
 

@@ -1898,6 +1898,26 @@ html.source-full-width #source-view {
   padding-left: 6px;
 }
 
+.block-picker-current-mark {
+  color: var(--link);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  padding-left: 6px;
+}
+
+.block-picker-item.current {
+  background: color-mix(in srgb, var(--link) 12%, transparent);
+}
+.block-picker-item.current .block-picker-icon {
+  border-color: var(--link);
+  color: var(--link);
+}
+.block-picker-item.current .block-picker-label {
+  color: var(--link);
+  font-weight: 500;
+}
+
 .block-picker-back {
   display: flex;
   align-items: center;

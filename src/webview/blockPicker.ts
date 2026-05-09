@@ -11,6 +11,60 @@ export interface BlockDef {
   // Items with subItems must omit insert; items with insert must omit subItems.
   insert?: (editor: Editor, pos: number) => void;
   subItems?: BlockDef[];
+  // For "convert this block" mode: matches the current top-level node,
+  // and replaces it with a new node of this type preserving inline content.
+  isActive?: (typeName: string, attrs: Record<string, unknown>) => boolean;
+  convert?: (editor: Editor, blockPos: number) => void;
+}
+
+// Replace the block at `blockPos` with a new node of `schemaNodeName`,
+// preserving the original block's inline content where possible. Used for
+// "turn into" conversions from the dragger menu.
+function replaceBlockWith(
+  editor: Editor,
+  blockPos: number,
+  schemaNodeName: string,
+  attrs: Record<string, unknown> | null = null,
+): void {
+  editor.chain().focus().command(({ tr, state, dispatch }) => {
+    const node = tr.doc.nodeAt(blockPos);
+    if (!node) return false;
+    const targetType = state.schema.nodes[schemaNodeName];
+    if (!targetType) return false;
+    let newNode;
+    try {
+      newNode = targetType.create(attrs, node.content);
+    } catch {
+      try { newNode = targetType.create(attrs); } catch { return false; }
+    }
+    if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, newNode);
+    return true;
+  }).run();
+}
+
+// Wrap the block's inline content in a list (bulletList / orderedList /
+// taskList). Lists nest inline content inside listItem > paragraph, so a
+// plain replaceBlockWith doesn't work for them.
+function convertToList(
+  editor: Editor,
+  blockPos: number,
+  listName: 'bulletList' | 'orderedList' | 'taskList',
+): void {
+  editor.chain().focus().command(({ tr, state, dispatch }) => {
+    const node = tr.doc.nodeAt(blockPos);
+    if (!node) return false;
+    const listType = state.schema.nodes[listName];
+    const itemName = listName === 'taskList' ? 'taskItem' : 'listItem';
+    const itemType = state.schema.nodes[itemName];
+    const paraType = state.schema.nodes.paragraph;
+    if (!listType || !itemType || !paraType) return false;
+    const paraNode = paraType.create(null, node.content);
+    const itemAttrs = listName === 'taskList' ? { checked: false } : null;
+    const itemNode = itemType.create(itemAttrs, paraNode);
+    const listNode = listType.create(null, itemNode);
+    if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, listNode);
+    return true;
+  }).run();
 }
 
 const ICO = {
@@ -36,8 +90,10 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Plain text block',
     iconHtml: ICO.paragraph,
     section: 'text',
+    isActive: (t) => t === 'paragraph',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'paragraph', content: [] }).run(),
+    convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'paragraph'),
   },
   {
     id: 'heading1',
@@ -46,8 +102,10 @@ export const BLOCK_DEFS: BlockDef[] = [
     iconHtml: ICO.h1,
     section: 'text',
     aliases: ['h1'],
+    isActive: (t, a) => t === 'heading' && a.level === 1,
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'heading', attrs: { level: 1 }, content: [] }).run(),
+    convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'heading', { level: 1 }),
   },
   {
     id: 'heading2',
@@ -56,8 +114,10 @@ export const BLOCK_DEFS: BlockDef[] = [
     iconHtml: ICO.h2,
     section: 'text',
     aliases: ['h2'],
+    isActive: (t, a) => t === 'heading' && a.level === 2,
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'heading', attrs: { level: 2 }, content: [] }).run(),
+    convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'heading', { level: 2 }),
   },
   {
     id: 'heading3',
@@ -66,8 +126,10 @@ export const BLOCK_DEFS: BlockDef[] = [
     iconHtml: ICO.h3,
     section: 'text',
     aliases: ['h3'],
+    isActive: (t, a) => t === 'heading' && a.level === 3,
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'heading', attrs: { level: 3 }, content: [] }).run(),
+    convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'heading', { level: 3 }),
   },
   {
     id: 'bulletList',
@@ -75,11 +137,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Unordered list',
     iconHtml: ICO.bullet,
     section: 'lists',
+    isActive: (t) => t === 'bulletList',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, {
         type: 'bulletList',
         content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [] }] }],
       }).run(),
+    convert: (editor, blockPos) => convertToList(editor, blockPos, 'bulletList'),
   },
   {
     id: 'orderedList',
@@ -87,11 +151,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Ordered list',
     iconHtml: ICO.ordered,
     section: 'lists',
+    isActive: (t) => t === 'orderedList',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, {
         type: 'orderedList',
         content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [] }] }],
       }).run(),
+    convert: (editor, blockPos) => convertToList(editor, blockPos, 'orderedList'),
   },
   {
     id: 'taskList',
@@ -99,11 +165,13 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Checkbox list',
     iconHtml: ICO.task,
     section: 'lists',
+    isActive: (t) => t === 'taskList',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, {
         type: 'taskList',
         content: [{ type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph', content: [] }] }],
       }).run(),
+    convert: (editor, blockPos) => convertToList(editor, blockPos, 'taskList'),
   },
   {
     id: 'image',
@@ -111,6 +179,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Paste URL or drag & drop',
     iconHtml: ICO.image,
     section: 'media',
+    isActive: (t) => t === 'image',
     insert: (editor, pos) => {
       const url = window.prompt('Image URL:');
       if (url) editor.chain().focus().insertContentAt(pos, { type: 'image', attrs: { src: url, alt: '' } }).run();
@@ -123,42 +192,53 @@ export const BLOCK_DEFS: BlockDef[] = [
     iconHtml: ICO.callout,
     section: 'media',
     aliases: ['note', 'tip', 'important', 'warning', 'caution'],
+    isActive: (t) => t === 'callout',
     subItems: [
       { id: 'callout-note',      label: 'Note',      description: 'Informational',
         iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="note">💡</span>',
         section: 'media',
+        isActive: (t, a) => t === 'callout' && a.type === 'note',
         insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
           type: 'callout', attrs: { type: 'note', emoji: '💡' },
           content: [{ type: 'text', text: ' ' }],
-        }).run() },
+        }).run(),
+        convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'callout', { type: 'note', emoji: '💡' }) },
       { id: 'callout-tip',       label: 'Tip',       description: 'Helpful suggestion',
         iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="tip">✅</span>',
         section: 'media',
+        isActive: (t, a) => t === 'callout' && a.type === 'tip',
         insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
           type: 'callout', attrs: { type: 'tip', emoji: '✅' },
           content: [{ type: 'text', text: ' ' }],
-        }).run() },
+        }).run(),
+        convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'callout', { type: 'tip', emoji: '✅' }) },
       { id: 'callout-important', label: 'Important', description: 'Crucial context',
         iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="important">📌</span>',
         section: 'media',
+        isActive: (t, a) => t === 'callout' && a.type === 'important',
         insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
           type: 'callout', attrs: { type: 'important', emoji: '📌' },
           content: [{ type: 'text', text: ' ' }],
-        }).run() },
+        }).run(),
+        convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'callout', { type: 'important', emoji: '📌' }) },
       { id: 'callout-warning',   label: 'Warning',   description: 'Heads-up — possible footgun',
         iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="warning">⚠️</span>',
         section: 'media',
+        isActive: (t, a) => t === 'callout' && a.type === 'warning',
         insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
           type: 'callout', attrs: { type: 'warning', emoji: '⚠️' },
           content: [{ type: 'text', text: ' ' }],
-        }).run() },
+        }).run(),
+        convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'callout', { type: 'warning', emoji: '⚠️' }) },
       { id: 'callout-caution',   label: 'Caution',   description: 'Dangerous — irreversible',
         iconHtml: '<span class="block-picker-emoji-icon" data-callout-preview="caution">🛑</span>',
         section: 'media',
+        isActive: (t, a) => t === 'callout' && a.type === 'caution',
         insert: (editor, pos) => editor.chain().focus().insertContentAt(pos, {
           type: 'callout', attrs: { type: 'caution', emoji: '🛑' },
           content: [{ type: 'text', text: ' ' }],
-        }).run() },
+        }).run(),
+        convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'callout', { type: 'caution', emoji: '🛑' }) },
     ],
   },
   {
@@ -167,6 +247,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Collapsible section',
     iconHtml: ICO.toggle,
     section: 'media',
+    isActive: (t) => t === 'toggle',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, {
         type: 'toggle',
@@ -180,11 +261,26 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Quoted text',
     iconHtml: ICO.quote,
     section: 'other',
+    isActive: (t) => t === 'blockquote',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, {
         type: 'blockquote',
         content: [{ type: 'paragraph', content: [] }],
       }).run(),
+    convert: (editor, blockPos) => {
+      // Blockquote wraps paragraph(s); preserve inline content via paragraph wrapper.
+      editor.chain().focus().command(({ tr, state, dispatch }) => {
+        const node = tr.doc.nodeAt(blockPos);
+        if (!node) return false;
+        const bqType = state.schema.nodes.blockquote;
+        const paraType = state.schema.nodes.paragraph;
+        if (!bqType || !paraType) return false;
+        const paraNode = paraType.create(null, node.content);
+        const bqNode = bqType.create(null, paraNode);
+        if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, bqNode);
+        return true;
+      }).run();
+    },
   },
   {
     id: 'codeBlock',
@@ -192,8 +288,10 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Syntax-highlighted code',
     iconHtml: ICO.code,
     section: 'other',
+    isActive: (t) => t === 'codeBlock',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'codeBlock', attrs: { language: null } }).run(),
+    convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'codeBlock', { language: null }),
   },
   {
     id: 'horizontalRule',
@@ -201,6 +299,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Horizontal rule',
     iconHtml: ICO.hr,
     section: 'other',
+    isActive: (t) => t === 'horizontalRule',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'horizontalRule' }).run(),
   },
@@ -225,8 +324,20 @@ const SECTION_LABELS: Record<BlockDef['section'], string> = {
   other: 'Other',
 };
 
+export interface PickerContext {
+  // When set, the picker is in "convert this block" mode: items whose
+  // isActive matches the node are highlighted, and clicking calls convert
+  // (falling back to insert below at blockPos if no convert is defined).
+  activeBlock?: {
+    typeName: string;
+    attrs: Record<string, unknown>;
+    blockPos: number;
+    blockEnd: number;
+  };
+}
+
 export interface BlockPicker {
-  open: (anchorEl: HTMLElement, insertPos: number) => void;
+  open: (anchorEl: HTMLElement, insertPos: number, context?: PickerContext) => void;
   close: () => void;
 }
 
@@ -235,6 +346,13 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   let activeIdx  = 0;
   let filtered: BlockDef[] = BLOCK_DEFS;
   let drillParent: BlockDef | null = null;
+  let context: PickerContext = {};
+
+  function isActiveItem(block: BlockDef): boolean {
+    const ab = context.activeBlock;
+    if (!ab || !block.isActive) return false;
+    return block.isActive(ab.typeName, ab.attrs);
+  }
 
   const el = document.createElement('div');
   el.className = 'block-picker';
@@ -306,9 +424,11 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   function renderRow(block: BlockDef, idx: number): HTMLElement {
     const row = document.createElement('div');
     row.className = 'block-picker-item';
+    if (isActiveItem(block)) row.classList.add('current');
     row.dataset.idx = String(idx);
     const drillCaret = block.subItems?.length ? '<span class="block-picker-caret">›</span>' : '';
-    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${drillCaret}`;
+    const checkMark = isActiveItem(block) ? '<span class="block-picker-current-mark">✓</span>' : '';
+    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${checkMark}${drillCaret}`;
     row.addEventListener('mousedown', (e) => { e.preventDefault(); select(block); });
     return row;
   }
@@ -327,6 +447,27 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       filtered = block.subItems;
       renderList(filtered);
       input.focus();
+      return;
+    }
+    // Convert mode: use the item's convert function if available. Falls back
+    // to insert (below the active block) when convert isn't defined for this
+    // block type — that way Image / Toggle / HR still work from the dragger.
+    if (context.activeBlock) {
+      if (isActiveItem(block)) {
+        // Already that type — nothing to do.
+        close();
+        return;
+      }
+      if (block.convert) {
+        block.convert(editor, context.activeBlock.blockPos);
+      } else if (block.insert) {
+        block.insert(editor, context.activeBlock.blockEnd);
+      }
+      close();
+      setTimeout(() => {
+        editor.commands.focus();
+        editor.commands.scrollIntoView();
+      }, 30);
       return;
     }
     block.insert?.(editor, currentPos);
@@ -368,19 +509,38 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     }
   });
 
-  function open(anchorEl: HTMLElement, insertPos: number): void {
+  function open(anchorEl: HTMLElement, insertPos: number, ctx: PickerContext = {}): void {
     currentPos = insertPos;
+    context = ctx;
     drillParent = null;
+    // If the user clicked the dragger over a callout, drill straight into the
+    // callout sub-list so they see the five type options with the current one
+    // highlighted instead of the top-level Callout entry.
+    if (ctx.activeBlock?.typeName === 'callout') {
+      const calloutItem = BLOCK_DEFS.find((b) => b.id === 'callout');
+      if (calloutItem?.subItems?.length) {
+        drillParent = calloutItem;
+        input.placeholder = `Filter ${calloutItem.label.toLowerCase()}…`;
+        filtered = calloutItem.subItems;
+        input.value = '';
+        renderList(filtered);
+        el.classList.add('open');
+        positionPopover(anchorEl);
+        return;
+      }
+    }
     input.placeholder = 'Filter blocks…';
     filtered = BLOCK_DEFS;
     input.value = '';
     renderList(BLOCK_DEFS);
     el.classList.add('open');
+    positionPopover(anchorEl);
+  }
 
+  function positionPopover(anchorEl: HTMLElement): void {
     const rect = anchorEl.getBoundingClientRect();
     el.style.left = `${rect.left + window.scrollX}px`;
     el.style.top  = `${rect.bottom + window.scrollY + 6}px`;
-
     requestAnimationFrame(() => {
       const pickerRect = el.getBoundingClientRect();
       if (pickerRect.bottom > window.innerHeight - 12) {
@@ -393,6 +553,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   function close(): void {
     el.classList.remove('open');
     drillParent = null;
+    context = {};
     input.value = '';
   }
 

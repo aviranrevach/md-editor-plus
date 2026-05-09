@@ -18,6 +18,38 @@ function getInsertPosFromHandle(editor: Editor, handleEl: HTMLElement): number {
   return $pos.end(depth);
 }
 
+interface BlockUnderHandle {
+  typeName: string;
+  attrs: Record<string, unknown>;
+  blockPos: number;
+  blockEnd: number;
+}
+
+function getBlockAtHandle(editor: Editor, handleEl: HTMLElement): BlockUnderHandle | null {
+  try {
+    const rect = handleEl.getBoundingClientRect();
+    const result = editor.view.posAtCoords({
+      left: rect.right + 24,
+      top:  rect.top + rect.height / 2,
+    });
+    if (!result) return null;
+    const $pos = editor.view.state.doc.resolve(result.pos);
+    if ($pos.depth < 1) return null;
+    const blockPos = $pos.before(1);
+    const node = editor.state.doc.nodeAt(blockPos);
+    if (!node) return null;
+    return {
+      typeName: node.type.name,
+      attrs: { ...node.attrs },
+      blockPos,
+      blockEnd: blockPos + node.nodeSize,
+    };
+  } catch (err) {
+    console.error('[md-editor-plus] getBlockAtHandle failed', err);
+    return null;
+  }
+}
+
 function showTooltip(tooltip: HTMLElement, targetEl: HTMLElement, text: string): void {
   tooltip.innerHTML = text;
   tooltip.style.display = 'block';
@@ -85,14 +117,32 @@ export function createBlockHandle(editor: Editor): void {
     });
     plusBtn.addEventListener('mouseleave', () => hideTooltip(tooltip));
 
-    // drag icon: click without drag → open block picker
+    // drag icon: click without drag → open block picker in "convert this
+    // block" mode. The current block is highlighted as active and clicking
+    // a different type converts in place. Also place the editor selection
+    // inside the block so the user sees it as "selected" and the view
+    // scrolls if needed.
     let dragStarted = false;
     dragIcon.addEventListener('dragstart', () => { dragStarted = true; });
     dragIcon.addEventListener('click', e => {
       if (dragStarted) { dragStarted = false; return; }
       e.preventDefault();
       e.stopPropagation();
-      picker.open(dragIcon, getInsertPosFromHandle(editor, handleEl));
+      const block = getBlockAtHandle(editor, handleEl);
+      if (block) {
+        try {
+          editor
+            .chain()
+            .setTextSelection(block.blockPos + 1)
+            .scrollIntoView()
+            .run();
+        } catch { /* ignore — selection may not be valid for atomic nodes */ }
+      }
+      picker.open(
+        dragIcon,
+        getInsertPosFromHandle(editor, handleEl),
+        block ? { activeBlock: block } : undefined,
+      );
     });
 
     // drag icon: tooltip
