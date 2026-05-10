@@ -19,6 +19,7 @@ import { common, createLowlight } from 'lowlight';
 import { Markdown } from 'tiptap-markdown';
 import Callout, { preprocessMarkdownCallouts } from './extensions/callout';
 import Toggle from './extensions/toggle';
+import BlockDirection from './extensions/blockDirection';
 import { createBubbleMenu } from './bubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
@@ -97,7 +98,7 @@ export function createEditor(
         codeBlock: false,
         dropcursor: { color: '#2383e2', width: 3 },
       }),
-      CodeBlock.configure({ lowlight }),
+      CodeBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }),
@@ -113,6 +114,7 @@ export function createEditor(
       Markdown.configure({ transformCopiedText: true }),
       Callout,
       Toggle,
+      BlockDirection,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
     ],
     content: body,
@@ -202,7 +204,7 @@ export function createSourceEditor(
       SourceDocument,
       Text,
       HardBreak,
-      CodeBlock.configure({ lowlight, defaultLanguage: 'markdown' }),
+      CodeBlock.configure({ lowlight, defaultLanguage: 'markdown', HTMLAttributes: { dir: 'ltr' } }),
     ],
     content: buildSourceContent(initialMarkdown),
     onUpdate({ editor }) {

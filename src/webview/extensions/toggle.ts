@@ -36,20 +36,23 @@ const Toggle = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     return [
       'details',
-      mergeAttributes(HTMLAttributes),
-      ['summary', { contenteditable: 'false' }, node.attrs.summary as string],
-      ['div', { class: 'toggle-content' }, 0],
+      mergeAttributes(HTMLAttributes, { dir: 'auto' }),
+      ['summary', { contenteditable: 'false', dir: 'auto' }, node.attrs.summary as string],
+      ['div', { class: 'toggle-content', dir: 'auto' }, 0],
     ];
   },
 
   addNodeView() {
     return ({ node }) => {
       const dom = document.createElement('details');
+      dom.setAttribute('dir', 'auto');
       const summary = document.createElement('summary');
       summary.contentEditable = 'false';
+      summary.setAttribute('dir', 'auto');
       summary.textContent = (node.attrs.summary as string) || 'Toggle';
       const content = document.createElement('div');
       content.className = 'toggle-content';
+      content.setAttribute('dir', 'auto');
       dom.appendChild(summary);
       dom.appendChild(content);
 

@@ -666,7 +666,7 @@ body {
 .ProseMirror p { margin: 0.3rem 0; }
 
 .ProseMirror blockquote {
-  border-left: 3px solid var(--blockquote-border);
+  border-inline-start: 3px solid var(--blockquote-border);
   background: var(--bg-secondary);
   border-radius: 0 4px 4px 0;
   margin: 0.5rem 0;
@@ -1063,13 +1063,13 @@ html.source-full-width #source-view {
 }
 
 .ProseMirror ul, .ProseMirror ol {
-  padding-left: 1.5rem;
+  padding-inline-start: 1.5rem;
   margin: 0.3rem 0;
 }
 
 .ProseMirror ul[data-type="taskList"] {
   list-style: none;
-  padding-left: 0.25rem;
+  padding-inline-start: 0.25rem;
 }
 .ProseMirror ul[data-type="taskList"] li {
   display: flex;
@@ -1119,7 +1119,7 @@ html.source-full-width #source-view {
 .ProseMirror th {
   background: var(--table-header-bg);
   font-weight: 600;
-  text-align: left;
+  text-align: start;
   padding: 8px 12px;
   border: 1px solid var(--table-border);
 }
@@ -1142,7 +1142,7 @@ html.source-full-width #source-view {
   gap: 10px;
   background: var(--callout-bg);
   border: 1px solid var(--callout-border);
-  border-left: 3px solid var(--callout-accent, var(--callout-border));
+  border-inline-start: 3px solid var(--callout-accent, var(--callout-border));
   border-radius: 5px;
   padding: 12px 16px;
   margin: 0.75rem 0;
@@ -1205,7 +1205,30 @@ html.source-full-width #source-view {
   color: var(--text-secondary);
 }
 .ProseMirror details[open] summary::before { transform: rotate(90deg); }
-.ProseMirror details .toggle-content { padding-left: 1.5rem; margin-top: 4px; }
+.ProseMirror details .toggle-content { padding-inline-start: 1.5rem; margin-top: 4px; }
+.ProseMirror details:dir(rtl) summary::before { content: '◀'; }
+.ProseMirror details[open]:dir(rtl) summary::before { transform: rotate(-90deg); }
+
+/* ── RTL layout overrides ─────────────────────────────────────────────────
+   Block-level direction is set explicitly via the BlockDirection extension's
+   ProseMirror decorations (per-block for paragraphs/headings/etc., or once
+   per list based on the first item's text). Use plain attribute selectors
+   so layout direction is asserted regardless of `:dir()` quirks. */
+.ProseMirror [dir="rtl"] {
+  direction: rtl;
+  text-align: start;
+}
+.ProseMirror [dir="ltr"] {
+  direction: ltr;
+  text-align: start;
+}
+/* List items inherit direction from their parent list (we don't tag items
+   individually — markers should follow the list "title" direction). */
+.ProseMirror ul[dir] > li,
+.ProseMirror ol[dir] > li,
+.ProseMirror ul[data-type="taskList"][dir] > li {
+  direction: inherit;
+}
 
 /* ── Bubble menu — theme-matched, two rows ──────────── */
 .bubble-menu {
@@ -2023,7 +2046,7 @@ html.source-full-width #source-view {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--callout-border);
-  border-left: 3px solid var(--callout-accent, var(--callout-border));
+  border-inline-start: 3px solid var(--callout-accent, var(--callout-border));
   background: var(--callout-bg);
   border-radius: 7px;
   padding: 8px 10px;

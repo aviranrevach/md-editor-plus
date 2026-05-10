@@ -78,6 +78,10 @@ export function preprocessMarkdownCallouts(markdown: string): string {
     const body: string[] = [];
     let j = i + 1;
     while (j < lines.length) {
+      // Stop if this line begins a NEW callout — covers files where adjacent
+      // callouts weren't separated by a blank line (the markdown serializer
+      // didn't always emit one).
+      if (parseCalloutLine(lines[j])) break;
       const m = lines[j].match(BLOCK_LINE_RE);
       if (!m) break;
       body.push(m[1]);
@@ -127,11 +131,11 @@ const Callout = Node.create({
     return [
       'div',
       mergeAttributes(
-        { 'data-callout': '', class: 'callout' },
+        { 'data-callout': '', class: 'callout', dir: 'auto' },
         HTMLAttributes,
       ),
       ['span', { class: 'callout-emoji', contenteditable: 'false' }, node.attrs.emoji as string],
-      ['div', { class: 'callout-content' }, 0],
+      ['div', { class: 'callout-content', dir: 'auto' }, 0],
     ];
   },
 
@@ -142,6 +146,7 @@ const Callout = Node.create({
           const content = node.textContent as string;
           state.write(calloutToMarkdown(node.attrs.type, node.attrs.emoji, content));
           state.ensureNewLine();
+          state.write('\n');
         },
       },
     };
