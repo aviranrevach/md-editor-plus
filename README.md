@@ -39,7 +39,8 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 ### Display settings (Aa panel)
 
-- **Four themes** — Light, Claude, Sepia, Dark — plus **Sync with system**
+- **Four themes** — Light, Claude, Sepia, Dark — plus a **Sync with** selector (Off / OS / IDE) that follows your system or editor's light/dark mode
+- **RTL aware** — Hebrew/Arabic content auto-detected per block; lists keep all bullets on the title side, Markdown stays plain on disk
 - **Page width slider** — magnetic snap stops at 600 / 800 / 1000 / 1200 / 1400 px, or full-window override
 - **Text size** — S / M / L / XL with live "quick brown fox" tooltip previews
 - **Font family** — Sans / Serif / Mono with live previews
@@ -118,7 +119,7 @@ Filename hover and ⋯ click open the same actions list, but each anchors its ow
 
 ### Theme
 
-Four hand-tuned themes, plus **Sync with system** to follow VS Code's color theme automatically.
+Four hand-tuned themes:
 
 | Theme | Vibe |
 | --- | --- |
@@ -128,6 +129,16 @@ Four hand-tuned themes, plus **Sync with system** to follow VS Code's color them
 | **Dark** | Deep neutrals, comfortable at night |
 
 Hover any theme button for a live color-swatch preview.
+
+Below the theme buttons, the **Sync with** row offers three modes:
+
+| Mode | Behavior |
+| --- | --- |
+| **Off** | Use the manually selected theme above. |
+| **OS** | Follow the operating system's light/dark mode (`prefers-color-scheme`). Updates live. |
+| **IDE** | Follow the host editor's color theme (light vs dark). Picks up theme switches in real time. |
+
+Picking any of the four manual themes automatically flips Sync back to **Off**.
 
 ### Page width
 
@@ -305,6 +316,20 @@ MD Editor Plus reads and writes **CommonMark** plus the GitHub-flavored extensio
 - YAML / TOML frontmatter (preserved, not rendered)
 
 Open the bundled `demo.md` to see every supported block in one place.
+
+---
+
+## RTL / bidirectional content
+
+Hebrew, Arabic, and other RTL scripts are auto-detected per block. Direction is computed from the first strong character and applied as an explicit `dir="ltr"` / `dir="rtl"` on every paragraph, heading, blockquote, callout, table cell, and toggle. No setting to flip — it just works.
+
+**Lists keep coherence**: bullets, numbers, and task checkboxes stay on the same side throughout a single list, set by the **first item's** direction. So a list whose first item is English keeps every marker on the left, even when later items are Hebrew (their characters still render right-to-left within the line). Flip the first item to Hebrew and every marker moves to the right. The rule is "no list ever shows mixed-side markers".
+
+**Code stays LTR**: fenced code blocks and the source view are forced to `dir="ltr"` regardless of the surrounding document direction — code is always left-to-right. Inline `<code>` inside an RTL paragraph inherits paragraph direction (which is the right behavior for embedded technical terms).
+
+**Toggles**: the disclosure caret renders as `▶` in LTR contexts and `◀` in RTL contexts, with the open-state rotation flipped accordingly.
+
+Storage is plain Markdown — no special tokens, no frontmatter required. Direction lives in the rendered view only, computed each load.
 
 ---
 

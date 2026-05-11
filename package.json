@@ -2,7 +2,7 @@
   "name": "md-editor-plus",
   "displayName": "MD Editor Plus",
   "description": "Notion-style block editor for Markdown. Edit .md files inline with rich blocks, drag-to-reorder, slash commands, callouts, and polished light/dark themes.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "AviranRevach",
   "license": "MIT",
   "author": {

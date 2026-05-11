@@ -4,6 +4,26 @@ All notable changes to **MD Editor Plus** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-10
+
+### Added
+
+- **RTL / bidirectional support** — Hebrew, Arabic, and other RTL scripts auto-detected per block. Standalone paragraphs, headings, blockquotes, callouts, table cells, and toggles get their own direction based on the first strong character. Lists detect once at the list level so all bullets, numbers, and task checkboxes stay on the same side as the first item — no mixed-side markers within a single list. Toggle disclosure caret swaps from `▶` to `◀` in RTL contexts. Code blocks and the source view stay forced to LTR.
+- **Sync with selector** — replaces the old "Sync with system" toggle with a 3-way **Off / OS / IDE** segmented control in the Aa panel. **OS** follows `prefers-color-scheme`, **IDE** follows the host editor's color theme. Existing `mdEditorPlus.theme = "auto"` settings are silently migrated to **IDE**.
+
+### Fixed
+
+- **Toggle disclosure click** — `<details>` now opens and stays open when its triangle is clicked. Was previously intercepted by ProseMirror's edit handling and snapped closed by the mutation observer.
+- **Block picker / callout menu / drag-handle tooltip positioning** — popovers now appear correctly even after the document has been scrolled. Fixed coordinate math that incorrectly added `window.scrollX/Y` to `position: fixed` element coordinates.
+- **Block picker scroll dismiss** — wheel-scrolling inside the block picker's own list no longer dismisses it. The capture-phase scroll listener now ignores events whose target is inside the picker, plus `overscroll-behavior: contain` keeps the scroll from chaining to the document.
+- **Adjacent callouts merging** — back-to-back GFM callouts (`> [!NOTE]` blocks) no longer collapse into a single block when separated by no blank line. The preprocessor stops body collection at a new `[!TYPE]` header, and the serializer now emits a blank line after each callout so saved files round-trip correctly.
+
+## [0.1.1] - 2026-05-09
+
+### Changed
+
+- README rewrite — adds hero screenshot, three feature shots (display settings, code blocks, bubble menu), a structured Features section, and folds the "Coming from Notion" subsection into the "Why use it" bullets.
+
 ## [0.1.0] - 2026-05-09
 
 ### Added

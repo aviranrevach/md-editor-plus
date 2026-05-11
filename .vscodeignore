@@ -17,6 +17,8 @@ esbuild.config.js
 .eslintrc*
 package-lock.json
 demo.md
+demo-rtl.md
+demo-tester.md
 PUBLISHING.md
 media/icon.svg
 media/header.svg
