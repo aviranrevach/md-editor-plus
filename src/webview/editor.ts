@@ -19,6 +19,7 @@ import { common, createLowlight } from 'lowlight';
 import { Markdown } from 'tiptap-markdown';
 import Callout, { preprocessMarkdownCallouts } from './extensions/callout';
 import Toggle from './extensions/toggle';
+import MermaidBlock, { preprocessMermaidBlocks } from './extensions/mermaidBlock';
 import BlockDirection from './extensions/blockDirection';
 import BlockOutline from './extensions/outline';
 import { createBubbleMenu } from './bubbleMenu';
@@ -86,9 +87,10 @@ export function createEditor(
   _frontmatter = split.frontmatter;
   let body: string;
   try {
-    body = preprocessMarkdownCallouts(split.body);
+    body = preprocessMermaidBlocks(split.body);
+    body = preprocessMarkdownCallouts(body);
   } catch (err) {
-    console.error('[md-editor-plus] callout preprocess failed', err);
+    console.error('[md-editor-plus] preprocess failed', err);
     body = split.body;
   }
 
@@ -115,6 +117,7 @@ export function createEditor(
       Markdown.configure({ transformCopiedText: true }),
       Callout,
       Toggle,
+      MermaidBlock,
       BlockDirection,
       BlockOutline,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
@@ -144,9 +147,10 @@ export function updateContent(markdown: string): void {
   _frontmatter = split.frontmatter;
   let next: string;
   try {
-    next = preprocessMarkdownCallouts(split.body);
+    next = preprocessMermaidBlocks(split.body);
+    next = preprocessMarkdownCallouts(next);
   } catch (err) {
-    console.error('[md-editor-plus] callout preprocess failed', err);
+    console.error('[md-editor-plus] preprocess failed', err);
     next = split.body;
   }
   // Preserve viewport scroll and best-effort cursor across the re-set. setContent
