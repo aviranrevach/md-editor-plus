@@ -2635,3 +2635,92 @@ html.read-only .ProseMirror { caret-color: transparent; }
 html.read-only .global-drag-handle,
 html.read-only .ProseMirror-menubar,
 html.read-only .block-handle { display: none !important; }
+
+/* ---------- Mermaid diagram blocks ------------------------------------ */
+.ProseMirror .mermaid-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  background: var(--code-bg, var(--bg));
+}
+.ProseMirror .mermaid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--toolbar-bg, var(--bg));
+}
+.ProseMirror .mermaid-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #666);
+  user-select: none;
+}
+.ProseMirror .mermaid-edit-btn {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.ProseMirror .mermaid-edit-btn:hover {
+  background: var(--block-hover, #f0f0f0);
+  color: var(--text-primary);
+}
+.ProseMirror .mermaid-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  min-height: 80px;
+  overflow-x: auto;
+}
+.ProseMirror .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.ProseMirror .mermaid-diagram.mermaid-error {
+  background: var(--callout-caution-bg, #fff5f5);
+}
+.ProseMirror .mermaid-error-msg {
+  font-size: 13px;
+  color: var(--danger, #d32f2f);
+  margin: 0;
+  padding: 8px;
+  font-family: var(--font-mono, monospace);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ProseMirror .mermaid-placeholder {
+  font-size: 13px;
+  color: var(--text-secondary, #999);
+  margin: 0;
+  font-style: italic;
+}
+.ProseMirror .mermaid-source {
+  border-top: 1px solid var(--border);
+}
+.ProseMirror .mermaid-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 16px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: var(--font-mono, 'Fira Code', 'JetBrains Mono', monospace);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--code-bg, #f7f7f7);
+  color: var(--text-primary);
+  tab-size: 2;
+}
+.ProseMirror .mermaid-textarea:focus {
+  background: var(--code-bg, #f4f4f4);
+}
