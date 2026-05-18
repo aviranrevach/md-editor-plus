@@ -2724,3 +2724,17 @@ html.read-only .block-handle { display: none !important; }
 .ProseMirror .mermaid-textarea:focus {
   background: var(--code-bg, #f4f4f4);
 }
+
+.settings-action.act-toggle-readonly.active {
+  color: var(--link);
+}
+.settings-action.act-toggle-readonly.active svg {
+  color: var(--link);
+}
+
+/* ---------- Source-view word wrap ------------------------------------- */
+html.source-word-wrap #source-view .cb-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: hidden;
+}

@@ -69,6 +69,7 @@ interface SavedDefaults {
   shortenCodeSnippets?: boolean;
   outlineVisible?: boolean;
   readOnly?: boolean;
+  sourceWordWrap?: boolean;
 }
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
@@ -165,7 +166,8 @@ function init(): void {
   const alwaysDarkSourceToggle = document.getElementById('always-dark-source-toggle') as HTMLElement;
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
-  const readOnlyToggle        = document.getElementById('read-only-toggle')        as HTMLElement | null;
+  const readOnlyActionBtn     = document.getElementById('act-toggle-readonly')     as HTMLElement | null;
+  const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
   const openVscodeBtn         = document.getElementById('open-vscode-btn')          as HTMLElement | null;
 
@@ -213,10 +215,23 @@ function init(): void {
     setShortenSnippets(!shortenSnippetsToggle.classList.contains('on'));
   });
 
-  readOnlyToggle?.addEventListener('click', () => {
-    const next = !readOnlyToggle.classList.contains('on');
+  readOnlyActionBtn?.addEventListener('click', () => {
+    const next = !readOnlyActionBtn.classList.contains('active');
     applyReadOnly(next);
     vscode.postMessage({ type: 'saveReadOnly', value: next });
+  });
+
+  function applySourceWordWrap(on: boolean): void {
+    document.documentElement.classList.toggle('source-word-wrap', on);
+    if (sourceWordWrapToggle) {
+      sourceWordWrapToggle.classList.toggle('on', on);
+      sourceWordWrapToggle.setAttribute('aria-checked', String(on));
+    }
+  }
+  sourceWordWrapToggle?.addEventListener('click', () => {
+    const next = !sourceWordWrapToggle.classList.contains('on');
+    applySourceWordWrap(next);
+    vscode.postMessage({ type: 'saveSourceWordWrap', value: next });
   });
 
   refreshBtn?.addEventListener('click', () => {
@@ -740,13 +755,14 @@ function init(): void {
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
     applyReadOnly(Boolean(d.readOnly));
+    applySourceWordWrap(Boolean(d.sourceWordWrap));
   }
 
   function applyReadOnly(on: boolean): void {
     document.documentElement.classList.toggle('read-only', on);
-    if (readOnlyToggle) {
-      readOnlyToggle.classList.toggle('on', on);
-      readOnlyToggle.setAttribute('aria-checked', String(on));
+    if (readOnlyActionBtn) {
+      readOnlyActionBtn.classList.toggle('active', on);
+      readOnlyActionBtn.setAttribute('aria-pressed', String(on));
     }
     setReadOnly(on);
   }
@@ -817,6 +833,7 @@ function init(): void {
     const msg = event.data;
 
     if (msg.type === 'init') {
+      try {
       currentMarkdown = msg.markdown;
       if (msg.mediaBaseUri) setMediaBaseUri(msg.mediaBaseUri);
       savedDefaults = { ...FACTORY_DEFAULTS, ...(msg.defaults ?? {}) };
@@ -854,6 +871,10 @@ function init(): void {
         }
       } catch (err) {
         console.error('[md-editor-plus] outline init failed', err);
+      }
+      } catch (err) {
+        console.error('[md-editor-plus] INIT FAILED', err);
+        document.body.innerHTML = '<pre style="padding:20px;color:#c44">md-editor-plus init failed:\n\n' + String(err && (err as Error).stack || err) + '</pre>';
       }
     }
 
