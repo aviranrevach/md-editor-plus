@@ -1,6 +1,7 @@
 // src/webview/boardBlock.ts
 import { parseBoardSource, serializeBoard, type Board, type Card, type FieldDef, type ColorToken } from './boardModel';
 import { openBoardSidePanel } from './boardSidePanel';
+import { openPropertiesMenu } from './boardProperties';
 
 export interface BoardView {
   dom: HTMLElement;
@@ -63,6 +64,14 @@ function renderChrome(board: Board, mutate: (next: Board) => void): HTMLElement 
     }
   });
   chrome.appendChild(name);
+
+  const props = document.createElement('button');
+  props.type = 'button';
+  props.className = 'board-properties-btn';
+  props.textContent = 'Properties';
+  props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
+  chrome.appendChild(props);
+
   return chrome;
 }
 
