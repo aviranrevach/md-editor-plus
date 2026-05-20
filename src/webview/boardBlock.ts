@@ -43,8 +43,13 @@ function renderChrome(board: Board): HTMLElement {
 function renderColumns(board: Board): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-columns';
+  const validNames = new Set(board.columns.map((c) => c.name));
   for (const col of board.columns) {
     row.appendChild(renderColumn(board, col));
+  }
+  const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
+  if (orphans.length) {
+    row.appendChild(renderUncategorized(board, orphans));
   }
   return row;
 }
@@ -70,6 +75,25 @@ function renderColumn(board: Board, col: { name: string; color: string }): HTMLE
   for (const card of cards) {
     list.appendChild(renderCard(board, card));
   }
+  el.appendChild(list);
+  return el;
+}
+
+function renderUncategorized(board: Board, cards: Card[]): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'board-column color-gray board-column-uncategorized';
+  el.dataset.column = '';
+  const head = document.createElement('div');
+  head.className = 'board-column-head';
+  head.innerHTML = `
+    <span class="board-column-dot" style="background:var(--color-gray)"></span>
+    <span class="board-column-name">Uncategorized</span>
+    <span class="board-column-count">${cards.length}</span>
+  `;
+  el.appendChild(head);
+  const list = document.createElement('div');
+  list.className = 'board-card-list';
+  for (const card of cards) list.appendChild(renderCard(board, card));
   el.appendChild(list);
   return el;
 }
