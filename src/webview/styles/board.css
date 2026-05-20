@@ -298,3 +298,54 @@
 .board-properties-handle:active { cursor: grabbing; }
 .board-properties-row.is-dragging { opacity: 0.5; }
 .board-properties-row.is-drop-target { background: var(--block-bg, #f7f6f3); }
+
+.board-add-field-picker {
+  background: var(--block-bg-2, #fff);
+  border: 1px solid var(--block-border, #e3e2de);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 12px;
+  font-size: 13px;
+  z-index: 120;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.board-add-field-name {
+  padding: 4px 8px;
+  border: 1px solid var(--block-border, #e3e2de);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--block-bg, #f7f6f3);
+}
+.board-add-field-name.is-error { border-color: #b91c1c; }
+.board-add-field-type {
+  padding: 4px 8px;
+  border: 1px solid var(--block-border, #e3e2de);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--block-bg, #f7f6f3);
+}
+.board-add-field-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.board-add-field-confirm,
+.board-add-field-cancel {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--block-border, #e3e2de);
+  cursor: pointer;
+  font-size: 12px;
+}
+.board-add-field-confirm {
+  background: var(--color-blue, #2383e2);
+  color: #fff;
+  border-color: var(--color-blue, #2383e2);
+}
+.board-add-field-cancel {
+  background: transparent;
+  color: var(--text, #1f1f1c);
+}

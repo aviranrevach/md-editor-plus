@@ -25,7 +25,7 @@ export function openPropertiesMenu(
   add.type = 'button';
   add.className = 'board-properties-add';
   add.textContent = '+ Add field';
-  add.addEventListener('click', () => promptNewField(board, onChange));
+  add.addEventListener('click', () => promptNewField(add, board, onChange));
   menu.appendChild(add);
 
   function onOutside(e: MouseEvent) {
@@ -157,22 +157,85 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
   return row;
 }
 
-function promptNewField(board: Board, onChange: (next: Board) => void): void {
-  const name = prompt('Field name');
-  if (!name) return;
-  if (board.fields.some((f) => f.name === name)) {
-    alert('A field with that name already exists.');
-    return;
+function promptNewField(anchor: HTMLElement, board: Board, onChange: (next: Board) => void): void {
+  // Close any existing pickers first
+  document.querySelectorAll('.board-add-field-picker').forEach((n) => n.remove());
+
+  const pop = document.createElement('div');
+  pop.className = 'board-add-field-picker';
+  document.body.appendChild(pop);
+
+  const rect = anchor.getBoundingClientRect();
+  pop.style.position = 'absolute';
+  pop.style.top = `${rect.top + window.scrollY}px`;
+  pop.style.left = `${rect.right + window.scrollX + 8}px`;
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Field name';
+  nameInput.className = 'board-add-field-name';
+
+  const typeSelect = document.createElement('select');
+  typeSelect.className = 'board-add-field-type';
+  const types: FieldType[] = ['text', 'status', 'date', 'person', 'tags'];
+  for (const t of types) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    typeSelect.appendChild(opt);
   }
-  const typeInput = prompt('Type (text / status / date / person / tags)', 'text');
-  const allowed: FieldType[] = ['text', 'status', 'date', 'person', 'tags'];
-  if (!typeInput || !allowed.includes(typeInput as FieldType)) return;
-  const type = typeInput as FieldType;
-  onChange({
-    ...board,
-    fields: [...board.fields, { name, type, visibleOnCard: true }],
-    cards: board.cards.map((c) => ({ ...c, values: { ...c.values, [name]: '' } })),
+
+  const actions = document.createElement('div');
+  actions.className = 'board-add-field-actions';
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.textContent = 'Add';
+  addBtn.className = 'board-add-field-confirm';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.className = 'board-add-field-cancel';
+  actions.append(addBtn, cancelBtn);
+
+  pop.append(nameInput, typeSelect, actions);
+
+  const commit = () => {
+    const name = nameInput.value.trim();
+    if (!name) { nameInput.focus(); return; }
+    if (board.fields.some((f) => f.name === name)) {
+      nameInput.classList.add('is-error');
+      return;
+    }
+    const type = typeSelect.value as FieldType;
+    onChange({
+      ...board,
+      fields: [...board.fields, { name, type, visibleOnCard: true }],
+      cards: board.cards.map((c) => ({ ...c, values: { ...c.values, [name]: '' } })),
+    });
+    closePop();
+  };
+
+  addBtn.addEventListener('click', commit);
+  cancelBtn.addEventListener('click', closePop);
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); closePop(); }
   });
+  nameInput.addEventListener('input', () => nameInput.classList.remove('is-error'));
+
+  function onOutside(e: MouseEvent) {
+    if (!pop.contains(e.target as Node) && e.target !== anchor) {
+      closePop();
+    }
+  }
+  function closePop() {
+    pop.remove();
+    document.removeEventListener('mousedown', onOutside, true);
+  }
+  setTimeout(() => {
+    document.addEventListener('mousedown', onOutside, true);
+    nameInput.focus();
+  }, 0);
 }
 
 function positionAnchored(menu: HTMLElement, anchor: HTMLElement): void {
