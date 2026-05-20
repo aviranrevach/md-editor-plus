@@ -15,6 +15,7 @@ A board is a region of the document delimited by HTML comment markers. Inside, a
 ~~~markdown
 <!-- board:start
      id="b-a3f2"
+     name="Sprint 12"
      columns="Todo|Doing|Done"
      column-colors="blue|amber|emerald"
      field-types="Title=text,Status=status,Owner=person,Due=date,Tags=tags"
@@ -44,6 +45,7 @@ Brief notes for c2.
 
 **`board:start`** attributes:
 - `id` (required) — short slug, unique per file. Used by drag-drop, body linking, and disambiguation across multiple boards.
+- `name` — user-visible board name shown in the board chrome. Free text. Optional in the source; on new boards the UI defaults it to "Untitled board" and an empty `name=""` is treated as "Untitled board" at render time.
 - `columns` — pipe-separated status option names, in display order. Renaming an option here also renames the value in every card row at save time.
 - `column-colors` — pipe-separated color tokens, index-aligned with `columns`. Tokens: `gray | blue | amber | emerald | red | purple` (same palette as callouts). Missing entries fall back to a deterministic auto-color (hash of column name).
 - `field-types` — comma-separated `Name=type` pairs. Valid types: `text`, `status`, `date`, `person`, `tags`. Defaults: `Title=text`, `Status=status`; any field without an explicit type defaults to `text`.
@@ -81,6 +83,7 @@ interface Card {
 
 interface Board {
   id: string;
+  name: string;                    // '' means render as 'Untitled board'
   columns: ColumnDef[];
   fields: FieldDef[];              // includes Title (first) and Status; always present
   cards: Card[];
@@ -104,7 +107,7 @@ interface Board {
 ### Board chrome (block view)
 
 - A board renders as a self-contained block inside the editor — paragraphs above and below it are unaffected.
-- Header row: a small `id` badge on the left (v1 has no user-visible board name — see Open questions); **Properties** button on the right.
+- Header row: **Board name** on the left (16 px, semibold; inline-editable on click; placeholder text "Untitled board" when empty, dimmed). **Properties** button on the right.
 - Columns laid out horizontally inside a horizontally-scrollable container. Each column has:
   - Color dot + name + count chip + `⋯` menu (rename, change color, delete, sort cards by…)
   - Stacked cards (vertically scrollable inside the column when overflow)
@@ -147,12 +150,13 @@ interface Board {
 
 ### Slash command and block picker
 
-- `/board` inserts an empty board: 3 columns (Todo, Doing, Done) with auto colors, fields = `[Title, Status]`, one placeholder card titled "New card" in Todo.
+- `/board` inserts an empty board: name "Untitled board", 3 columns (Todo, Doing, Done) with auto colors, fields = `[Title, Status]`, one placeholder card titled "New card" in Todo. The name input is focused on insert so the user can rename immediately.
 - The same entry appears in the existing block picker alongside `/callout`, `/toggle`.
 
 ### Read-only mode
 
 - Cards are not draggable; the drag handle is hidden.
+- The board name is not editable.
 - Fields in the side panel render as static text; the **Add card**, **Add field**, **+** column, and `⋯` menus are hidden.
 - The board chrome still allows scrolling and opening the side panel for read access.
 
@@ -244,6 +248,4 @@ No host-side changes are expected in `src/mdEditorPlusProvider.ts` or `package.j
 
 ## Open questions
 
-- **Board name** — v1 has no user-visible board name (just the `id` badge). Worth adding a `name="..."` attribute on `board:start` and rendering it in the chrome? Low-risk to defer to v1.1.
 - **Side panel width** — Fixed 420 px in v1. If users frequently write long card bodies, a resize handle (similar to the outline panel's pin behavior) is a natural follow-up.
-- **Mobile / narrow webview** — When the webview width is < 600 px, the side panel covers most of the screen. Should it open as a full-screen modal instead in that case? Defer until we hear feedback.
