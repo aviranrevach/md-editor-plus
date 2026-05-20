@@ -124,3 +124,18 @@
   font-size: 13px;
   line-height: 1.5;
 }
+.board-tag-input { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.board-tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--block-bg, #f7f6f3); border-radius: 10px; padding: 1px 8px;
+  font-size: 12px;
+}
+.board-tag-chip button {
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 14px; line-height: 1; color: var(--text-muted, #6b6b66);
+}
+.board-tag-input input {
+  border: 0; flex: 1; min-width: 60px; background: transparent;
+  font-size: 12px;
+}
+.board-tag-input input:focus { outline: none; }

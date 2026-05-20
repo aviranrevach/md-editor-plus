@@ -113,8 +113,52 @@ function renderPanel(): void {
         currentOnChange(next);
       });
       row.appendChild(select);
+    } else if (field.type === 'tags') {
+      const wrap = document.createElement('div');
+      wrap.className = 'board-tag-input';
+      const tags = (card.values[field.name] || '').split(',').map((t) => t.trim()).filter(Boolean);
+      const renderChips = () => {
+        // Remove existing chips before re-rendering
+        wrap.querySelectorAll('.board-tag-chip').forEach((n) => n.remove());
+        tags.forEach((tag, i) => {
+          const chip = document.createElement('span');
+          chip.className = 'board-tag-chip';
+          chip.textContent = tag;
+          const x = document.createElement('button');
+          x.type = 'button';
+          x.setAttribute('aria-label', 'Remove');
+          x.textContent = '×';
+          x.addEventListener('click', () => {
+            tags.splice(i, 1);
+            commit();
+          });
+          chip.appendChild(x);
+          wrap.insertBefore(chip, input);
+        });
+      };
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Add tag…';
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const t = input.value.replace(/,/g, '').trim();
+          if (t && !tags.includes(t)) tags.push(t);
+          input.value = '';
+          commit();
+        }
+      });
+      const commit = () => {
+        if (!currentOnChange) return;
+        const next: Card = { ...card, values: { ...card.values, [field.name]: tags.join(', ') } };
+        currentOnChange(next);
+        renderChips();
+      };
+      wrap.appendChild(input);
+      renderChips();
+      row.appendChild(wrap);
     } else {
-      // text or person (and tags for now — Task 20 will replace)
+      // text or person
       const value = document.createElement('span');
       value.className = 'board-panel-field-value';
       value.contentEditable = 'true';
