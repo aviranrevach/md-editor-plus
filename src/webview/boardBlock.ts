@@ -79,6 +79,34 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
     <span class="board-column-name">${escapeHtml(col.name)}</span>
     <span class="board-column-count">${cards.length}</span>
   `;
+
+  el.draggable = true;
+  el.addEventListener('dragstart', (e) => {
+    // Only fire column-drag from the column root, not from cards inside it.
+    if ((e.target as HTMLElement).closest('.board-card')) return;
+    e.dataTransfer!.setData('text/board-column-name', col.name);
+    e.dataTransfer!.effectAllowed = 'move';
+  });
+  el.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types.includes('text/board-column-name')) {
+      e.preventDefault();
+    }
+  });
+  el.addEventListener('drop', (e) => {
+    if (!e.dataTransfer?.types.includes('text/board-column-name')) return;
+    const draggedName = e.dataTransfer.getData('text/board-column-name');
+    if (!draggedName || draggedName === col.name) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cols = [...board.columns];
+    const fromIdx = cols.findIndex((c) => c.name === draggedName);
+    const toIdx = cols.findIndex((c) => c.name === col.name);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = cols.splice(fromIdx, 1);
+    cols.splice(toIdx, 0, moved);
+    mutate({ ...board, columns: cols });
+  });
+
   el.appendChild(head);
 
   const list = document.createElement('div');
