@@ -45,8 +45,45 @@ export function openPropertiesMenu(
 function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) => void): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-properties-row';
+  row.dataset.fieldName = field.name;
 
   const isLocked = field.name === 'Title' || field.name === 'Status';
+
+  const handle = document.createElement('span');
+  handle.className = 'board-properties-handle';
+  handle.textContent = '⋮⋮';
+  handle.title = 'Drag to reorder';
+  handle.draggable = !isLocked;
+  if (!isLocked) {
+    handle.addEventListener('dragstart', (e) => {
+      e.dataTransfer!.setData('text/board-field-name', field.name);
+      e.dataTransfer!.effectAllowed = 'move';
+      row.classList.add('is-dragging');
+    });
+    handle.addEventListener('dragend', () => row.classList.remove('is-dragging'));
+  }
+  row.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types.includes('text/board-field-name')) return;
+    e.preventDefault();
+    row.classList.add('is-drop-target');
+  });
+  row.addEventListener('dragleave', () => row.classList.remove('is-drop-target'));
+  row.addEventListener('drop', (e) => {
+    if (!e.dataTransfer?.types.includes('text/board-field-name')) return;
+    e.preventDefault();
+    row.classList.remove('is-drop-target');
+    const from = e.dataTransfer.getData('text/board-field-name');
+    if (!from || from === field.name) return;
+    // Title must always be first; Status must be second; can't move them.
+    if (from === 'Title' || from === 'Status' || field.name === 'Title' || field.name === 'Status') return;
+    const fields = [...board.fields];
+    const fromIdx = fields.findIndex((f) => f.name === from);
+    const toIdx = fields.findIndex((f) => f.name === field.name);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = fields.splice(fromIdx, 1);
+    fields.splice(toIdx, 0, moved);
+    onChange({ ...board, fields });
+  });
 
   const name = document.createElement('span');
   name.className = 'board-properties-name';
@@ -116,7 +153,7 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
     onChange({ ...board, fields, cards });
   });
 
-  row.append(name, type, visToggle, del);
+  row.append(handle, name, type, visToggle, del);
   return row;
 }
 
