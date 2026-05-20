@@ -67,3 +67,76 @@ describe('parseBoardSource — start attributes', () => {
     expect(idField).toEqual({ name: 'id', type: 'text', visibleOnCard: false });
   });
 });
+
+describe('parseBoardSource — table rows', () => {
+  const source = [
+    `<!-- board:start id="b1" columns="Todo|Doing|Done"`,
+    `     field-types="Title=text,Status=status,Owner=person,Due=date,Tags=tags"`,
+    `     hidden-fields="id" -->`,
+    ``,
+    `| id | Title       | Status | Owner   | Due        | Tags         |`,
+    `|----|-------------|--------|---------|------------|--------------|`,
+    `| c1 | First card  | Doing  | @aviran | 2026-06-01 | feature, ui  |`,
+    `| c2 | Second card | Todo   |         |            |              |`,
+    ``,
+    `<!-- board:end -->`,
+  ].join('\n');
+
+  it('parses two cards with field values', () => {
+    const board = parseBoardSource(source);
+    expect(board.cards).toEqual([
+      {
+        id: 'c1',
+        values: {
+          id: 'c1',
+          Title: 'First card',
+          Status: 'Doing',
+          Owner: '@aviran',
+          Due: '2026-06-01',
+          Tags: 'feature, ui',
+        },
+        body: '',
+      },
+      {
+        id: 'c2',
+        values: {
+          id: 'c2',
+          Title: 'Second card',
+          Status: 'Todo',
+          Owner: '',
+          Due: '',
+          Tags: '',
+        },
+        body: '',
+      },
+    ]);
+  });
+
+  it('unescapes pipe characters in cell content', () => {
+    const src = [
+      `<!-- board:start id="b1" -->`,
+      ``,
+      `| id | Title              |`,
+      `|----|--------------------|`,
+      `| c1 | a \\| b \\| c        |`,
+      ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const board = parseBoardSource(src);
+    expect(board.cards[0].values.Title).toBe('a | b | c');
+  });
+
+  it('converts <br> in cells back to newlines', () => {
+    const src = [
+      `<!-- board:start id="b1" -->`,
+      ``,
+      `| id | Title           |`,
+      `|----|-----------------|`,
+      `| c1 | line1<br>line2  |`,
+      ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const board = parseBoardSource(src);
+    expect(board.cards[0].values.Title).toBe('line1\nline2');
+  });
+});
