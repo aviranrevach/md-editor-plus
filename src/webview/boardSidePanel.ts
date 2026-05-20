@@ -2,15 +2,10 @@
 import type { Board, Card } from './boardModel';
 import { createEditor } from './editor';
 
-export interface SidePanelHost {
-  // Called when the panel mutates the card (Phase 6 wires this up).
-  onChange?: (next: Card) => void;
-}
-
 let panel: HTMLElement | null = null;
 let currentBoard: Board | null = null;
 let currentCard: Card | null = null;
-let host: SidePanelHost | null = null;
+let currentOnChange: ((next: Card) => void) | null = null;
 
 export function initBoardSidePanel(): void {
   if (panel) return;
@@ -35,11 +30,15 @@ export function initBoardSidePanel(): void {
   });
 }
 
-export function openBoardSidePanel(board: Board, card: Card, h?: SidePanelHost): void {
+export function openBoardSidePanel(
+  board: Board,
+  card: Card,
+  onChange: (next: Card) => void,
+): void {
   initBoardSidePanel();
   currentBoard = board;
   currentCard = card;
-  host = h ?? null;
+  currentOnChange = onChange;
   renderPanel();
   panel!.style.display = 'block';
 }
@@ -49,7 +48,7 @@ export function closeBoardSidePanel(): void {
   panel.style.display = 'none';
   currentBoard = null;
   currentCard = null;
-  host = null;
+  currentOnChange = null;
 }
 
 function renderPanel(): void {
@@ -67,7 +66,14 @@ function renderPanel(): void {
 
   const title = document.createElement('div');
   title.className = 'board-panel-title';
-  title.textContent = card.values.Title || 'Untitled';
+  title.contentEditable = 'true';
+  title.textContent = card.values.Title || '';
+  title.dataset.placeholder = 'Untitled';
+  title.addEventListener('blur', () => {
+    if (!currentOnChange) return;
+    const next: Card = { ...card, values: { ...card.values, Title: title.textContent || '' } };
+    currentOnChange(next);
+  });
   panel.appendChild(title);
 
   for (const field of board.fields) {
@@ -78,10 +84,32 @@ function renderPanel(): void {
     const label = document.createElement('span');
     label.className = 'board-panel-field-label';
     label.textContent = field.name;
-    const value = document.createElement('span');
-    value.className = 'board-panel-field-value';
-    value.textContent = card.values[field.name] || '';
-    row.append(label, value);
+    row.appendChild(label);
+
+    if (field.type === 'date') {
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.className = 'board-panel-field-value';
+      input.value = card.values[field.name] || '';
+      input.addEventListener('change', () => {
+        if (!currentOnChange) return;
+        const next: Card = { ...card, values: { ...card.values, [field.name]: input.value } };
+        currentOnChange(next);
+      });
+      row.appendChild(input);
+    } else {
+      // text or person — single-line contenteditable
+      const value = document.createElement('span');
+      value.className = 'board-panel-field-value';
+      value.contentEditable = 'true';
+      value.textContent = card.values[field.name] || '';
+      value.addEventListener('blur', () => {
+        if (!currentOnChange) return;
+        const next: Card = { ...card, values: { ...card.values, [field.name]: value.textContent || '' } };
+        currentOnChange(next);
+      });
+      row.appendChild(value);
+    }
     panel.appendChild(row);
   }
 

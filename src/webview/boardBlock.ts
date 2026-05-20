@@ -131,7 +131,13 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void): HT
   if (chips) el.appendChild(chips);
 
   el.addEventListener('click', () => {
-    openBoardSidePanel(board, card);
+    openBoardSidePanel(board, card, (nextCard) => {
+      const next: Board = {
+        ...board,
+        cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
+      };
+      mutate(next);
+    });
   });
 
   return el;
