@@ -156,6 +156,40 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void): HT
   });
   el.addEventListener('dragend', () => el.classList.remove('is-dragging'));
 
+  el.addEventListener('dragover', (e) => {
+    // Only react to card drags.
+    if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
+    e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    el.classList.toggle('drop-before', before);
+    el.classList.toggle('drop-after', !before);
+  });
+  el.addEventListener('dragleave', () => {
+    el.classList.remove('drop-before', 'drop-after');
+  });
+  el.addEventListener('drop', (e) => {
+    if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
+    e.preventDefault();
+    e.stopPropagation();  // prevent the column-list drop handler from also firing
+    const id = e.dataTransfer.getData('text/board-card-id');
+    if (!id || id === card.id) {
+      el.classList.remove('drop-before', 'drop-after');
+      return;
+    }
+    const before = el.classList.contains('drop-before');
+    el.classList.remove('drop-before', 'drop-after');
+    // Compute new ordering: remove dragged, re-insert relative to current card.
+    const others = board.cards.filter((c) => c.id !== id);
+    const targetIdx = others.findIndex((c) => c.id === card.id);
+    const insertAt = before ? targetIdx : targetIdx + 1;
+    const dragged = board.cards.find((c) => c.id === id);
+    if (!dragged) return;
+    const movedStatus = { ...dragged, values: { ...dragged.values, Status: card.values.Status || '' } };
+    others.splice(insertAt, 0, movedStatus);
+    mutate({ ...board, cards: others });
+  });
+
   el.addEventListener('click', () => {
     openBoardSidePanel(board, card, (nextCard) => {
       const next: Board = {

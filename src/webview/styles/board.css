@@ -145,3 +145,5 @@
   outline-offset: -4px;
   border-radius: 4px;
 }
+.board-card.drop-before { border-top: 2px solid var(--color-blue, #2383e2); }
+.board-card.drop-after  { border-bottom: 2px solid var(--color-blue, #2383e2); }
