@@ -1,5 +1,5 @@
 // src/webview/boardBlock.ts
-import { parseBoardSource, serializeBoard, type Board, type Card, type FieldDef } from './boardModel';
+import { parseBoardSource, serializeBoard, type Board, type Card, type FieldDef, type ColorToken } from './boardModel';
 import { openBoardSidePanel } from './boardSidePanel';
 
 export interface BoardView {
@@ -62,6 +62,22 @@ function renderColumns(board: Board, mutate: (next: Board) => void): HTMLElement
   if (orphans.length) {
     row.appendChild(renderUncategorized(board, orphans, mutate));
   }
+  const addCol = document.createElement('button');
+  addCol.type = 'button';
+  addCol.className = 'board-add-column';
+  addCol.textContent = '+';
+  addCol.title = 'Add column';
+  addCol.addEventListener('click', () => {
+    const name = prompt('Column name', 'New');
+    if (!name) return;
+    if (board.columns.some((c) => c.name === name)) {
+      alert('A column with that name already exists.');
+      return;
+    }
+    const color = nextColor(board.columns.map((c) => c.color));
+    mutate({ ...board, columns: [...board.columns, { name, color }] });
+  });
+  row.appendChild(addCol);
   return row;
 }
 
@@ -323,4 +339,9 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function nextColor(used: string[]): ColorToken {
+  const all: ColorToken[] = ['blue', 'amber', 'emerald', 'red', 'purple', 'gray'];
+  return all.find((c) => !used.includes(c)) ?? 'gray';
 }

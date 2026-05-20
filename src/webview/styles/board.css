@@ -160,3 +160,16 @@
   cursor: pointer;
 }
 .board-add-card:hover { background: var(--block-bg, #f7f6f3); }
+.board-add-column {
+  flex: 0 0 40px;
+  background: transparent;
+  border: 1px dashed var(--block-border, #e3e2de);
+  border-radius: 6px;
+  color: var(--text-muted, #6b6b66);
+  font-size: 18px;
+  cursor: pointer;
+}
+.board-add-column:hover {
+  background: var(--block-bg, #f7f6f3);
+  color: var(--text, #1f1f1c);
+}
