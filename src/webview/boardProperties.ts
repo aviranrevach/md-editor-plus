@@ -46,9 +46,42 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
   const row = document.createElement('div');
   row.className = 'board-properties-row';
 
+  const isLocked = field.name === 'Title' || field.name === 'Status';
+
   const name = document.createElement('span');
   name.className = 'board-properties-name';
+  name.contentEditable = isLocked ? 'false' : 'true';
   name.textContent = field.name;
+  if (!isLocked) {
+    name.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        name.blur();
+      }
+    });
+    name.addEventListener('blur', () => {
+      const next = name.textContent?.trim();
+      if (!next || next === field.name) {
+        name.textContent = field.name;
+        return;
+      }
+      if (board.fields.some((f) => f.name === next)) {
+        name.textContent = field.name;
+        return;
+      }
+      // Rename field across the model.
+      const fields = board.fields.map((f) =>
+        f.name === field.name ? { ...f, name: next } : f,
+      );
+      const cards = board.cards.map((c) => {
+        const v: Record<string, string> = { ...c.values };
+        v[next] = v[field.name] || '';
+        delete v[field.name];
+        return { ...c, values: v };
+      });
+      onChange({ ...board, fields, cards });
+    });
+  }
 
   const type = document.createElement('span');
   type.className = 'board-properties-type';
@@ -57,7 +90,7 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
   const visToggle = document.createElement('input');
   visToggle.type = 'checkbox';
   visToggle.checked = field.visibleOnCard;
-  visToggle.disabled = field.name === 'Title' || field.name === 'Status';
+  visToggle.disabled = isLocked;
   visToggle.title = 'Show on card';
   visToggle.addEventListener('change', () => {
     const fields = board.fields.map((f) =>
@@ -66,7 +99,24 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
     onChange({ ...board, fields });
   });
 
-  row.append(name, type, visToggle);
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'board-properties-delete';
+  del.textContent = '×';
+  del.title = 'Delete field';
+  del.disabled = isLocked;
+  del.addEventListener('click', () => {
+    if (!confirm(`Delete field "${field.name}"? Values will be lost.`)) return;
+    const fields = board.fields.filter((f) => f.name !== field.name);
+    const cards = board.cards.map((c) => {
+      const v: Record<string, string> = { ...c.values };
+      delete v[field.name];
+      return { ...c, values: v };
+    });
+    onChange({ ...board, fields, cards });
+  });
+
+  row.append(name, type, visToggle, del);
   return row;
 }
 

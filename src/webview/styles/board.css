@@ -274,4 +274,16 @@
   font-size: 13px;
   color: var(--text-muted, #6b6b66);
 }
+.board-properties-delete {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted, #6b6b66);
+  padding: 0 4px;
+}
+.board-properties-delete:hover:not(:disabled) { color: #b91c1c; }
+.board-properties-delete:disabled { opacity: 0.3; cursor: not-allowed; }
+.board-properties-name[contenteditable="true"]:focus { outline: 1px solid var(--color-blue, #2383e2); border-radius: 2px; }
 .board-properties-add:hover { background: var(--block-bg, #f7f6f3); }
