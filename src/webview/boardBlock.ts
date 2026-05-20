@@ -86,6 +86,24 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   for (const card of cards) {
     list.appendChild(renderCard(board, card, mutate));
   }
+  list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    list.classList.add('is-drop-target');
+  });
+  list.addEventListener('dragleave', () => list.classList.remove('is-drop-target'));
+  list.addEventListener('drop', (e) => {
+    e.preventDefault();
+    list.classList.remove('is-drop-target');
+    const id = e.dataTransfer!.getData('text/board-card-id');
+    if (!id) return;
+    const next: Board = {
+      ...board,
+      cards: board.cards.map((c) =>
+        c.id === id ? { ...c, values: { ...c.values, Status: col.name } } : c,
+      ),
+    };
+    mutate(next);
+  });
   el.appendChild(list);
   return el;
 }
@@ -129,6 +147,14 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void): HT
 
   const chips = renderChips(board, card);
   if (chips) el.appendChild(chips);
+
+  el.draggable = true;
+  el.addEventListener('dragstart', (e) => {
+    e.dataTransfer!.setData('text/board-card-id', card.id);
+    e.dataTransfer!.effectAllowed = 'move';
+    el.classList.add('is-dragging');
+  });
+  el.addEventListener('dragend', () => el.classList.remove('is-dragging'));
 
   el.addEventListener('click', () => {
     openBoardSidePanel(board, card, (nextCard) => {

@@ -139,3 +139,9 @@
   font-size: 12px;
 }
 .board-tag-input input:focus { outline: none; }
+.board-card.is-dragging { opacity: 0.5; }
+.board-card-list.is-drop-target {
+  outline: 2px dashed var(--color-blue, #2383e2);
+  outline-offset: -4px;
+  border-radius: 4px;
+}
