@@ -237,13 +237,29 @@ function serializeBodies(board: Board): string {
 }
 
 export function serializeBoard(board: Board): string {
+  // De-duplicate card ids: first occurrence wins; later occurrences get -N suffix.
+  const seen = new Set<string>();
+  const normalizedCards = board.cards.map((c) => {
+    let id = c.id || `c-${Math.random().toString(36).slice(2, 6)}`;
+    if (!seen.has(id)) {
+      seen.add(id);
+      return { ...c, id, values: { ...c.values, id } };
+    }
+    let n = 2;
+    while (seen.has(`${id}-${n}`)) n++;
+    const next = `${id}-${n}`;
+    seen.add(next);
+    return { ...c, id: next, values: { ...c.values, id: next } };
+  });
+  const normalized: Board = { ...board, cards: normalizedCards };
+
   const sections: string[] = [
-    serializeStartMarker(board),
+    serializeStartMarker(normalized),
     '',
-    serializeTable(board),
+    serializeTable(normalized),
     '',
   ];
-  const bodies = serializeBodies(board);
+  const bodies = serializeBodies(normalized);
   if (bodies) {
     sections.push(bodies);
   }

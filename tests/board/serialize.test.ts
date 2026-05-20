@@ -60,4 +60,24 @@ describe('serializeBoard', () => {
     const out = serializeBoard(board);
     expect(out).toContain('a \\| b<br>c');
   });
+
+  it('auto-suffixes duplicate ids on serialize', () => {
+    const board: Board = {
+      id: 'b1', name: '', columns: [],
+      fields: [
+        { name: 'Title', type: 'text', visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'id', type: 'text', visibleOnCard: false },
+      ],
+      cards: [
+        { id: 'c1', values: { id: 'c1', Title: 'A', Status: '' }, body: '' },
+        { id: 'c1', values: { id: 'c1', Title: 'B', Status: '' }, body: '' },
+        { id: 'c1', values: { id: 'c1', Title: 'C', Status: '' }, body: '' },
+      ],
+    };
+    const out = serializeBoard(board);
+    expect(out).toMatch(/\|\s*A\s*\|\s*\|\s*c1\s*\|/);
+    expect(out).toMatch(/\|\s*B\s*\|\s*\|\s*c1-2\s*\|/);
+    expect(out).toMatch(/\|\s*C\s*\|\s*\|\s*c1-3\s*\|/);
+  });
 });
