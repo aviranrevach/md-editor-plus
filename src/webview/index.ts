@@ -7,6 +7,7 @@ import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
+import { initBoardSidePanel } from './boardSidePanel';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -842,6 +843,7 @@ function init(): void {
         vscode.postMessage({ type: 'edit', markdown });
       });
       editorReady = true;
+      initBoardSidePanel();
 
       try {
         const outlineBtn   = document.getElementById('outline-btn') as HTMLElement | null;

@@ -1,5 +1,6 @@
 // src/webview/boardBlock.ts
 import { parseBoardSource, serializeBoard, type Board, type Card, type FieldDef } from './boardModel';
+import { openBoardSidePanel } from './boardSidePanel';
 
 export interface BoardView {
   dom: HTMLElement;
@@ -118,6 +119,9 @@ function renderCard(board: Board, card: Card): HTMLElement {
 
   const chips = renderChips(board, card);
   if (chips) el.appendChild(chips);
+  el.addEventListener('click', () => {
+    openBoardSidePanel(board, card);
+  });
   return el;
 }
 
