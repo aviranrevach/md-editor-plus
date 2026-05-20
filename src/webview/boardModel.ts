@@ -189,3 +189,64 @@ export function parseBoardSource(source: string): Board {
     cards,
   };
 }
+
+function escapeCell(s: string): string {
+  return s.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+}
+
+function serializeStartMarker(board: Board): string {
+  const fieldNames = board.fields.map((f) => f.name);
+  const hidden = board.fields.filter((f) => !f.visibleOnCard).map((f) => f.name);
+  const colors = board.columns.map((c) => c.color).join('|');
+  const fieldTypes = board.fields.map((f) => `${f.name}=${f.type}`).join(',');
+
+  const attrs: string[] = [`id="${board.id}"`];
+  if (board.name) attrs.push(`name="${board.name}"`);
+  if (board.columns.length) {
+    attrs.push(`columns="${board.columns.map((c) => c.name).join('|')}"`);
+    attrs.push(`column-colors="${colors}"`);
+  }
+  if (fieldNames.length) attrs.push(`field-types="${fieldTypes}"`);
+  if (hidden.length) attrs.push(`hidden-fields="${hidden.join(',')}"`);
+
+  return `<!-- board:start ${attrs.join(' ')} -->`;
+}
+
+function serializeTable(board: Board): string {
+  const headers = board.fields.map((f) => f.name);
+  const header = `| ${headers.join(' | ')} |`;
+  const sep = `|${headers.map(() => '---').join('|')}|`;
+  const rows = board.cards.map((card) => {
+    const cells = headers.map((h) => escapeCell(card.values[h] ?? ''));
+    return `| ${cells.join(' | ')} |`;
+  });
+  return [header, sep, ...rows].join('\n');
+}
+
+function serializeBodies(board: Board): string {
+  const parts: string[] = [];
+  for (const card of board.cards) {
+    const body = card.body.trim();
+    if (!body) continue;
+    parts.push(`<!-- board:body id="${card.id}" -->`);
+    parts.push('');
+    parts.push(body);
+    parts.push('');
+  }
+  return parts.join('\n');
+}
+
+export function serializeBoard(board: Board): string {
+  const sections: string[] = [
+    serializeStartMarker(board),
+    '',
+    serializeTable(board),
+    '',
+  ];
+  const bodies = serializeBodies(board);
+  if (bodies) {
+    sections.push(bodies);
+  }
+  sections.push('<!-- board:end -->');
+  return sections.join('\n');
+}
