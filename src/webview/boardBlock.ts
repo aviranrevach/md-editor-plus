@@ -7,7 +7,11 @@ export interface BoardView {
   update(source: string): void;
 }
 
-export function createBoardView(initialSource: string): BoardView {
+export interface BoardViewOptions {
+  onMutate(nextSource: string): void;
+}
+
+export function createBoardView(initialSource: string, opts: BoardViewOptions): BoardView {
   const dom = document.createElement('div');
   dom.className = 'board-block';
   dom.setAttribute('contenteditable', 'false');
@@ -15,10 +19,16 @@ export function createBoardView(initialSource: string): BoardView {
   let board = parseBoardSource(initialSource);
   render();
 
+  function mutate(next: Board): void {
+    board = next;
+    opts.onMutate(serializeBoard(board));
+    render();
+  }
+
   function render(): void {
     dom.innerHTML = '';
     dom.appendChild(renderChrome(board));
-    dom.appendChild(renderColumns(board));
+    dom.appendChild(renderColumns(board, mutate));
   }
 
   return {
@@ -41,21 +51,21 @@ function renderChrome(board: Board): HTMLElement {
   return chrome;
 }
 
-function renderColumns(board: Board): HTMLElement {
+function renderColumns(board: Board, mutate: (next: Board) => void): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-columns';
   const validNames = new Set(board.columns.map((c) => c.name));
   for (const col of board.columns) {
-    row.appendChild(renderColumn(board, col));
+    row.appendChild(renderColumn(board, col, mutate));
   }
   const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
   if (orphans.length) {
-    row.appendChild(renderUncategorized(board, orphans));
+    row.appendChild(renderUncategorized(board, orphans, mutate));
   }
   return row;
 }
 
-function renderColumn(board: Board, col: { name: string; color: string }): HTMLElement {
+function renderColumn(board: Board, col: { name: string; color: string }, mutate: (next: Board) => void): HTMLElement {
   const el = document.createElement('div');
   el.className = `board-column color-${col.color}`;
   el.dataset.column = col.name;
@@ -74,13 +84,13 @@ function renderColumn(board: Board, col: { name: string; color: string }): HTMLE
   const list = document.createElement('div');
   list.className = 'board-card-list';
   for (const card of cards) {
-    list.appendChild(renderCard(board, card));
+    list.appendChild(renderCard(board, card, mutate));
   }
   el.appendChild(list);
   return el;
 }
 
-function renderUncategorized(board: Board, cards: Card[]): HTMLElement {
+function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) => void): HTMLElement {
   const el = document.createElement('div');
   el.className = 'board-column color-gray board-column-uncategorized';
   el.dataset.column = '';
@@ -94,12 +104,12 @@ function renderUncategorized(board: Board, cards: Card[]): HTMLElement {
   el.appendChild(head);
   const list = document.createElement('div');
   list.className = 'board-card-list';
-  for (const card of cards) list.appendChild(renderCard(board, card));
+  for (const card of cards) list.appendChild(renderCard(board, card, mutate));
   el.appendChild(list);
   return el;
 }
 
-function renderCard(board: Board, card: Card): HTMLElement {
+function renderCard(board: Board, card: Card, mutate: (next: Board) => void): HTMLElement {
   const el = document.createElement('div');
   el.className = 'board-card';
   el.dataset.cardId = card.id;
@@ -119,9 +129,11 @@ function renderCard(board: Board, card: Card): HTMLElement {
 
   const chips = renderChips(board, card);
   if (chips) el.appendChild(chips);
+
   el.addEventListener('click', () => {
     openBoardSidePanel(board, card);
   });
+
   return el;
 }
 

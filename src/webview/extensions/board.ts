@@ -48,8 +48,17 @@ const Board = Node.create({
   },
 
   addNodeView() {
-    return ({ node }) => {
-      const view = createBoardView(node.attrs.source as string);
+    return ({ node, editor, getPos }) => {
+      const view = createBoardView(node.attrs.source as string, {
+        onMutate(nextSource) {
+          const pos = typeof getPos === 'function' ? getPos() : null;
+          if (pos == null) return;
+          editor.commands.command(({ tr }) => {
+            tr.setNodeAttribute(pos, 'source', nextSource);
+            return true;
+          });
+        },
+      });
       return {
         dom: view.dom,
         update(updatedNode) {
