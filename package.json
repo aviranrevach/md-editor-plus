@@ -198,7 +198,8 @@
       "**/tests/**/*.test.ts"
     ],
     "moduleNameMapper": {
-      "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js"
+      "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js",
+      "^(\\.{1,2}/)*editor$": "<rootDir>/tests/__mocks__/editorMock.js"
     },
     "transform": {
       "^.+\\.tsx?$": [

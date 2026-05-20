@@ -1,5 +1,6 @@
 // src/webview/boardSidePanel.ts
 import type { Board, Card } from './boardModel';
+import { createEditor } from './editor';
 
 export interface SidePanelHost {
   // Called when the panel mutates the card (Phase 6 wires this up).
@@ -86,6 +87,12 @@ function renderPanel(): void {
 
   const body = document.createElement('div');
   body.className = 'board-panel-body';
-  body.textContent = card.body || 'No description.';
   panel.appendChild(body);
+  if (card.body.trim()) {
+    const sub = createEditor(body, card.body, (() => { /* no-op for read-only */ }) as (markdown: string) => void);
+    sub.setEditable(false);
+  } else {
+    body.textContent = 'No description.';
+    body.classList.add('is-empty');
+  }
 }
