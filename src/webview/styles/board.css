@@ -220,3 +220,8 @@
   padding: 0;
 }
 .board-color-swatch.is-selected { border-color: var(--text, #1f1f1c); }
+.board-name.is-placeholder::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted, #9b9b97);
+}
+.board-name.is-placeholder { color: transparent; }

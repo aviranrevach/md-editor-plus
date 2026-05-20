@@ -27,7 +27,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
 
   function render(): void {
     dom.innerHTML = '';
-    dom.appendChild(renderChrome(board));
+    dom.appendChild(renderChrome(board, mutate));
     dom.appendChild(renderColumns(board, mutate));
   }
 
@@ -40,13 +40,28 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   };
 }
 
-function renderChrome(board: Board): HTMLElement {
+function renderChrome(board: Board, mutate: (next: Board) => void): HTMLElement {
   const chrome = document.createElement('div');
   chrome.className = 'board-chrome';
   const name = document.createElement('div');
   name.className = 'board-name';
-  name.textContent = board.name || 'Untitled board';
+  name.contentEditable = 'true';
+  name.textContent = board.name || '';
+  name.dataset.placeholder = 'Untitled board';
   if (!board.name) name.classList.add('is-placeholder');
+  name.addEventListener('input', () => {
+    name.classList.toggle('is-placeholder', !name.textContent);
+  });
+  name.addEventListener('blur', () => {
+    const next = name.textContent || '';
+    if (next !== board.name) mutate({ ...board, name: next });
+  });
+  name.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      name.blur();
+    }
+  });
   chrome.appendChild(name);
   return chrome;
 }
