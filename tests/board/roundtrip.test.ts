@@ -47,4 +47,28 @@ describe('board source round-trip', () => {
       expect(b).toEqual(a);
     });
   }
+
+  it('preserves orphan board:body blocks on round-trip', () => {
+    const source = [
+      `<!-- board:start id="b1" -->`,
+      ``,
+      `| id | Title | Status |`,
+      `|---|---|---|`,
+      `| c1 | First | Todo |`,
+      ``,
+      `<!-- board:body id="c1" -->`,
+      ``,
+      `Body for c1`,
+      ``,
+      `<!-- board:body id="ghost" -->`,
+      ``,
+      `Body for a deleted card`,
+      ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const a = parseBoardSource(source);
+    const out = serializeBoard(a);
+    expect(out).toContain('<!-- board:body id="ghost" -->');
+    expect(out).toContain('Body for a deleted card');
+  });
 });

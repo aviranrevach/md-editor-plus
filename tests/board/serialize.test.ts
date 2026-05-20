@@ -19,6 +19,7 @@ describe('serializeBoard', () => {
         { id: 'c1', values: { id: 'c1', Title: 'First', Status: 'Doing' }, body: '## Goal\nDo it.' },
         { id: 'c2', values: { id: 'c2', Title: 'Second', Status: 'Todo'  }, body: '' },
       ],
+      orphanBodies: [],
     };
 
     const out = serializeBoard(board);
@@ -56,6 +57,7 @@ describe('serializeBoard', () => {
       cards: [
         { id: 'c1', values: { Title: 'a | b\nc', Status: 'Todo' }, body: '' },
       ],
+      orphanBodies: [],
     };
     const out = serializeBoard(board);
     expect(out).toContain('a \\| b<br>c');
@@ -74,6 +76,7 @@ describe('serializeBoard', () => {
         { id: 'c1', values: { id: 'c1', Title: 'B', Status: '' }, body: '' },
         { id: 'c1', values: { id: 'c1', Title: 'C', Status: '' }, body: '' },
       ],
+      orphanBodies: [],
     };
     const out = serializeBoard(board);
     expect(out).toMatch(/\|\s*A\s*\|\s*\|\s*c1\s*\|/);

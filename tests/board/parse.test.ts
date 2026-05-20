@@ -13,6 +13,7 @@ describe('parseBoardSource — minimal', () => {
         { name: 'Status', type: 'status', visibleOnCard: true },
       ],
       cards: [],
+      orphanBodies: [],
     });
   });
 });

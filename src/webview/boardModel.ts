@@ -26,6 +26,7 @@ export interface Board {
   columns: ColumnDef[];
   fields: FieldDef[];
   cards: Card[];
+  orphanBodies: { id: string; body: string }[];  // preserved verbatim on round-trip
 }
 
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
@@ -181,12 +182,23 @@ export function parseBoardSource(source: string): Board {
     }
   }
 
+  const cardIds = new Set(cards.map((c) => c.id));
+  const orphanBodies: { id: string; body: string }[] = [];
+  for (const [bid, bodyText] of bodyById.entries()) {
+    if (!cardIds.has(bid)) {
+      orphanBodies.push({ id: bid, body: bodyText });
+      // eslint-disable-next-line no-console
+      console.warn(`[board] orphan board:body id="${bid}" (no matching card row)`);
+    }
+  }
+
   return {
     id: attrs.id ?? '',
     name: attrs.name ?? '',
     columns,
     fields,
     cards,
+    orphanBodies,
   };
 }
 
@@ -229,6 +241,14 @@ function serializeBodies(board: Board): string {
     const body = card.body.trim();
     if (!body) continue;
     parts.push(`<!-- board:body id="${card.id}" -->`);
+    parts.push('');
+    parts.push(body);
+    parts.push('');
+  }
+  for (const orphan of board.orphanBodies) {
+    const body = orphan.body.trim();
+    if (!body) continue;
+    parts.push(`<!-- board:body id="${orphan.id}" -->`);
     parts.push('');
     parts.push(body);
     parts.push('');
