@@ -16,3 +16,48 @@ export function preprocessMarkdownBoards(markdown: string): string {
     return `<div data-board source="${htmlEscape(region)}"></div>`;
   });
 }
+
+const Board = Node.create({
+  name: 'board',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  selectable: true,
+
+  addAttributes() {
+    return {
+      source: {
+        default: '',
+        parseHTML: (el: HTMLElement) =>
+          el.getAttribute('source') ?? '',
+        renderHTML: (attrs) => ({ source: attrs.source }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'div[data-board]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'div',
+      mergeAttributes({ 'data-board': '' }, HTMLAttributes),
+    ];
+  },
+
+  addStorage() {
+    return {
+      markdown: {
+        serialize(state: any, node: any) {
+          const source = (node.attrs.source as string) || '';
+          state.write(source);
+          state.ensureNewLine();
+          state.write('\n');
+        },
+      },
+    };
+  },
+});
+
+export default Board;
