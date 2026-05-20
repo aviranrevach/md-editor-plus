@@ -173,3 +173,50 @@
   background: var(--block-bg, #f7f6f3);
   color: var(--text, #1f1f1c);
 }
+.board-column-dots {
+  margin-left: 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--text-muted, #6b6b66);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.board-column-dots:hover { color: var(--text, #1f1f1c); }
+.board-column-menu {
+  background: var(--block-bg-2, #fff);
+  border: 1px solid var(--block-border, #e3e2de);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  font-size: 13px;
+  z-index: 110;
+  min-width: 160px;
+}
+.board-column-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text, #1f1f1c);
+}
+.board-column-menu button:hover { background: var(--block-bg, #f7f6f3); }
+.board-color-swatches {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+}
+.board-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.board-color-swatch.is-selected { border-color: var(--text, #1f1f1c); }

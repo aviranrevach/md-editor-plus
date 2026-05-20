@@ -133,6 +133,17 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   count.textContent = String(cards.length);
   head.appendChild(count);
 
+  const dots = document.createElement('button');
+  dots.type = 'button';
+  dots.className = 'board-column-dots';
+  dots.textContent = '⋯';
+  dots.title = 'Column options';
+  dots.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openColumnMenu(dots, board, col, mutate);
+  });
+  head.appendChild(dots);
+
   el.draggable = true;
   el.addEventListener('dragstart', (e) => {
     // Only fire column-drag from the column root, not from cards inside it.
@@ -381,4 +392,109 @@ function escapeHtml(s: string): string {
 function nextColor(used: string[]): ColorToken {
   const all: ColorToken[] = ['blue', 'amber', 'emerald', 'red', 'purple', 'gray'];
   return all.find((c) => !used.includes(c)) ?? 'gray';
+}
+
+const COLOR_PALETTE: ColorToken[] =
+  ['gray', 'blue', 'amber', 'emerald', 'red', 'purple'];
+
+function openColumnMenu(
+  anchor: HTMLElement,
+  board: Board,
+  col: { name: string; color: string },
+  mutate: (next: Board) => void,
+): void {
+  // Close any existing menu first
+  document.querySelectorAll('.board-column-menu').forEach((n) => n.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'board-column-menu';
+  document.body.appendChild(menu);
+
+  const rect = anchor.getBoundingClientRect();
+  menu.style.position = 'absolute';
+  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+  menu.style.left = `${rect.left + window.scrollX}px`;
+
+  // Row 1: color swatches
+  const colorRow = document.createElement('div');
+  colorRow.className = 'board-color-swatches';
+  for (const tok of COLOR_PALETTE) {
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = 'board-color-swatch';
+    swatch.style.background = `var(--color-${tok})`;
+    swatch.title = tok;
+    if (col.color === tok) swatch.classList.add('is-selected');
+    swatch.addEventListener('click', () => {
+      const cols = board.columns.map((c) =>
+        c.name === col.name ? { ...c, color: tok } : c,
+      );
+      mutate({ ...board, columns: cols });
+      closeMenu();
+    });
+    colorRow.appendChild(swatch);
+  }
+  menu.appendChild(colorRow);
+
+  // Row 2: sort cards by title
+  const sortBtn = document.createElement('button');
+  sortBtn.type = 'button';
+  sortBtn.textContent = 'Sort cards by title';
+  sortBtn.addEventListener('click', () => {
+    const inCol = board.cards.filter((c) => (c.values.Status || '') === col.name);
+    const others = board.cards.filter((c) => (c.values.Status || '') !== col.name);
+    inCol.sort((a, b) => (a.values.Title || '').localeCompare(b.values.Title || ''));
+    mutate({ ...board, cards: [...others, ...inCol] });
+    closeMenu();
+  });
+  menu.appendChild(sortBtn);
+
+  // Row 3: delete column
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.textContent = 'Delete column';
+  delBtn.addEventListener('click', () => {
+    const cardsInCol = board.cards.filter((c) => (c.values.Status || '') === col.name);
+    if (cardsInCol.length > 0) {
+      const otherCols = board.columns.filter((c) => c.name !== col.name);
+      const choice = prompt(
+        `Column "${col.name}" has ${cardsInCol.length} card(s). Move to which column? (Leave empty to delete cards.) Options: ${otherCols.map((c) => c.name).join(', ')}`,
+        otherCols[0]?.name || '',
+      );
+      if (choice === null) {
+        closeMenu();
+        return; // canceled
+      }
+      let nextCards: Card[];
+      if (choice && otherCols.some((c) => c.name === choice)) {
+        nextCards = board.cards.map((c) =>
+          (c.values.Status || '') === col.name
+            ? { ...c, values: { ...c.values, Status: choice } }
+            : c,
+        );
+      } else {
+        nextCards = board.cards.filter((c) => (c.values.Status || '') !== col.name);
+      }
+      const nextCols = board.columns.filter((c) => c.name !== col.name);
+      mutate({ ...board, columns: nextCols, cards: nextCards });
+    } else {
+      mutate({ ...board, columns: board.columns.filter((c) => c.name !== col.name) });
+    }
+    closeMenu();
+  });
+  menu.appendChild(delBtn);
+
+  function closeMenu(): void {
+    menu.remove();
+    document.removeEventListener('mousedown', onOutside, true);
+  }
+  function onOutside(e: MouseEvent): void {
+    if (!menu.contains(e.target as Node) && e.target !== anchor) {
+      closeMenu();
+    }
+  }
+  // Defer attaching so the current click doesn't immediately close the menu
+  setTimeout(() => {
+    document.addEventListener('mousedown', onOutside, true);
+  }, 0);
 }
