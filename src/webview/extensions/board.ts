@@ -58,6 +58,9 @@ const Board = Node.create({
             return true;
           });
         },
+        isReadOnly() {
+          return !editor.isEditable;
+        },
       });
       return {
         dom: view.dom,
