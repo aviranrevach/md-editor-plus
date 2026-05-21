@@ -34,6 +34,16 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     }
   }, true);
 
+  // Keep board-internal drag events out of Tiptap's global drag-handle gutter,
+  // which would otherwise also show a (wrong) block-level insertion line outside
+  // the board. Bubble phase: target's own dragstart/dragover/etc. fire first,
+  // then we cut the event off before it reaches the editor root.
+  for (const t of ['dragstart', 'dragend', 'dragenter', 'dragleave', 'dragover', 'drop'] as const) {
+    dom.addEventListener(t, (e) => {
+      e.stopPropagation();
+    });
+  }
+
   let board = parseBoardSource(initialSource);
   render();
 
@@ -82,6 +92,12 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
         e.preventDefault();
         name.blur();
       }
+    });
+    // On click, ensure the caret lands inside the element AND select the
+    // current text so the user can immediately type to replace.
+    name.addEventListener('click', () => {
+      if (document.activeElement !== name) name.focus();
+      selectAllText(name);
     });
   }
   chrome.appendChild(name);
@@ -236,6 +252,12 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
         nameEl.blur();
       }
     });
+    // Select-all on click so the user sees that the title is now editable
+    // and a single keystroke replaces it.
+    nameEl.addEventListener('click', () => {
+      if (document.activeElement !== nameEl) nameEl.focus();
+      selectAllText(nameEl);
+    });
   }
   chip.appendChild(nameEl);
   head.appendChild(chip);
@@ -276,21 +298,29 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
     body.addEventListener('dragover', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
+      // If the cursor is NOT over a card, show the indicator at the end of the
+      // list. The card-level dragover handler will take over (and place the
+      // indicator above/below itself) when the cursor is over a card.
+      const overCard = (e.target as HTMLElement | null)?.closest('.board-card');
+      if (!overCard) showEndOfListDropIndicator(list);
     });
     body.addEventListener('drop', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
       const id = e.dataTransfer.getData('text/board-card-id');
       if (!id) return;
-      // Don't double-fire if a card.drop handler already moved it.
-      if (e.defaultPrevented && (e as any).__cardDropHandled) return;
-      const next: Board = {
-        ...board,
-        cards: board.cards.map((c) =>
-          c.id === id ? { ...c, values: { ...c.values, Status: col.name } } : c,
-        ),
-      };
-      mutate(next);
+      if ((e as any).__cardDropHandled) {
+        removeAllDropIndicators();
+        return;
+      }
+      // No specific card target → drop at end of this column.
+      removeAllDropIndicators();
+      const others = board.cards.filter((c) => c.id !== id);
+      const dragged = board.cards.find((c) => c.id === id);
+      if (!dragged) return;
+      const moved = { ...dragged, values: { ...dragged.values, Status: col.name } };
+      others.push(moved);
+      mutate({ ...board, cards: others });
     });
   }
   body.appendChild(list);
@@ -446,17 +476,18 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
       e.dataTransfer!.effectAllowed = 'move';
       el.classList.add('is-dragging');
     });
-    el.addEventListener('dragend', () => el.classList.remove('is-dragging'));
+    el.addEventListener('dragend', () => {
+      el.classList.remove('is-dragging');
+      removeAllDropIndicators();
+    });
     el.addEventListener('dragover', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
+      // Decide whether the indicator goes before or after this card based on
+      // where the cursor sits within the card's height.
       const rect = el.getBoundingClientRect();
       const before = (e.clientY - rect.top) < rect.height / 2;
-      el.classList.toggle('drop-before', before);
-      el.classList.toggle('drop-after', !before);
-    });
-    el.addEventListener('dragleave', () => {
-      el.classList.remove('drop-before', 'drop-after');
+      showCardDropIndicator(el, before);
     });
     el.addEventListener('drop', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
@@ -466,11 +497,12 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
       (e as any).__cardDropHandled = true;
       const id = e.dataTransfer.getData('text/board-card-id');
       if (!id || id === card.id) {
-        el.classList.remove('drop-before', 'drop-after');
+        removeAllDropIndicators();
         return;
       }
-      const before = el.classList.contains('drop-before');
-      el.classList.remove('drop-before', 'drop-after');
+      const rect = el.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      removeAllDropIndicators();
       const others = board.cards.filter((c) => c.id !== id);
       const targetIdx = others.findIndex((c) => c.id === card.id);
       const insertAt = before ? targetIdx : targetIdx + 1;
@@ -578,6 +610,46 @@ function startInlineTitleEdit(
     }
   });
   input.addEventListener('blur', () => setTimeout(commit, 50));
+}
+
+// Selects the full text content of a contenteditable element so the user can
+// type to replace it immediately on focus (Notion-style title rename UX).
+function selectAllText(el: HTMLElement): void {
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  if (!sel) return;
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+// Drop indicators: a single thin blue line element that lives in the DOM at the
+// position where the dragged card would land. Card-level dragover places it
+// above/below the hovered card; column-body dragover places it at the end of
+// the list when there's no card under the cursor (covers empty columns).
+function removeAllDropIndicators(): void {
+  document.querySelectorAll('.board-drop-indicator').forEach((n) => n.remove());
+}
+function showCardDropIndicator(targetCard: HTMLElement, before: boolean): void {
+  removeAllDropIndicators();
+  const parent = targetCard.parentElement;
+  if (!parent) return;
+  const indicator = document.createElement('div');
+  indicator.className = 'board-drop-indicator';
+  if (before) {
+    parent.insertBefore(indicator, targetCard);
+  } else {
+    parent.insertBefore(indicator, targetCard.nextSibling);
+  }
+}
+function showEndOfListDropIndicator(list: HTMLElement): void {
+  // Reuse the existing indicator inside this list if present.
+  const existing = list.querySelector(':scope > .board-drop-indicator');
+  if (existing && existing === list.lastChild) return;
+  removeAllDropIndicators();
+  const indicator = document.createElement('div');
+  indicator.className = 'board-drop-indicator';
+  list.appendChild(indicator);
 }
 
 function bodyPreview(body: string): string {

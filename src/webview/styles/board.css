@@ -115,6 +115,8 @@
   flex: 1;
   min-width: 0;
   outline: none;
+  caret-color: var(--board-text);
+  cursor: text;
 }
 .board-name:focus {
   outline: 1px solid var(--board-chip-blue-dot);
@@ -226,6 +228,8 @@
 }
 .board-column-name {
   outline: none;
+  caret-color: var(--board-text);
+  cursor: text;
 }
 .board-column-name:focus {
   outline: 1px solid var(--board-chip-blue-dot);
@@ -305,8 +309,16 @@
   border-color: var(--board-border);
 }
 .board-card.is-dragging { opacity: 0.5; }
-.board-card.drop-before { border-top: 2px solid var(--board-chip-blue-dot); }
-.board-card.drop-after  { border-bottom: 2px solid var(--board-chip-blue-dot); }
+
+/* Separate drop indicator — a free-standing horizontal line that appears in
+   the card list at the precise insertion point. Works for empty columns too. */
+.board-drop-indicator {
+  height: 3px;
+  background: var(--board-chip-blue-dot);
+  border-radius: 2px;
+  margin: 1px 0;
+  pointer-events: none;
+}
 
 .board-card-title {
   font-size: 14px;
