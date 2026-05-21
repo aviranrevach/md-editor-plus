@@ -22,7 +22,10 @@ const Board = Node.create({
   name: 'board',
   group: 'block',
   atom: true,
-  draggable: true,
+  // draggable is intentionally false: the board has its own internal drag-drop for
+  // cards/columns. If we set draggable:true here, ProseMirror's global drag-handle
+  // gutter would intercept all drag events from within the block.
+  draggable: false,
   selectable: true,
 
   addAttributes() {
@@ -77,6 +80,22 @@ const Board = Node.create({
           return true;
         },
         ignoreMutation() { return true; },
+        // Tell ProseMirror to stay out of the way for events that hit our
+        // interactive children. Without this, PM treats clicks/keys/drags on
+        // the atom block as "select the node" and swallows them, breaking
+        // contenteditable spans, buttons, inputs, and our custom drag handlers.
+        stopEvent(event: Event) {
+          const target = event.target as HTMLElement | null;
+          if (!target) return false;
+          if (target.closest('[contenteditable="true"], button, input, select, textarea, [data-board-drag]')) {
+            return true;
+          }
+          // Allow drag events on cards/columns (they carry their own drag handlers).
+          if (event.type === 'dragstart' || event.type === 'dragover' || event.type === 'drop' || event.type === 'dragend' || event.type === 'dragleave') {
+            return true;
+          }
+          return false;
+        },
       };
     };
   },

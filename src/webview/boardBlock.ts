@@ -74,7 +74,17 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
     const props = document.createElement('button');
     props.type = 'button';
     props.className = 'board-properties-btn';
-    props.textContent = 'Properties';
+    props.title = 'Properties';
+    props.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="2" y1="4" x2="14" y2="4"/>
+        <line x1="2" y1="8" x2="14" y2="8"/>
+        <line x1="2" y1="12" x2="14" y2="12"/>
+        <circle cx="5" cy="4" r="1.5" fill="currentColor"/>
+        <circle cx="10" cy="8" r="1.5" fill="currentColor"/>
+        <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
+      </svg>
+    `;
     props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
     chrome.appendChild(props);
   }
@@ -148,13 +158,16 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
     });
   }
 
+  // Column head: [chip(dot + name)] [count outside] [⋯ on hover]
   const head = document.createElement('div');
   head.className = 'board-column-head';
 
+  const chip = document.createElement('span');
+  chip.className = 'board-column-chip';
+
   const dot = document.createElement('span');
-  dot.className = 'board-column-dot';
-  dot.style.background = `var(--color-${col.color})`;
-  head.appendChild(dot);
+  dot.className = 'board-column-chip-dot';
+  chip.appendChild(dot);
 
   const nameEl = document.createElement('span');
   nameEl.className = 'board-column-name';
@@ -188,7 +201,8 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
       }
     });
   }
-  head.appendChild(nameEl);
+  chip.appendChild(nameEl);
+  head.appendChild(chip);
 
   const count = document.createElement('span');
   count.className = 'board-column-count';
@@ -209,6 +223,10 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   }
 
   el.appendChild(head);
+
+  // Column body: card list + + New card button inside the rounded gray panel
+  const body = document.createElement('div');
+  body.className = 'board-column-body';
 
   const list = document.createElement('div');
   list.className = 'board-card-list';
@@ -235,53 +253,125 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
       mutate(next);
     });
   }
-  el.appendChild(list);
+  body.appendChild(list);
 
   if (!readOnly) {
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'board-add-card';
-    add.textContent = '+ Add card';
+    add.textContent = '+ New card';
     add.addEventListener('click', () => {
-      const id = `c-${Math.random().toString(36).slice(2, 6)}`;
-      const newCard: Card = {
-        id,
-        values: { id, Title: '', Status: col.name },
-        body: '',
-      };
-      const nextBoard: Board = { ...board, cards: [...board.cards, newCard] };
-      mutate(nextBoard);
-      queueMicrotask(() => {
-        openBoardSidePanel(nextBoard, newCard, (next) => {
-          mutate({
-            ...nextBoard,
-            cards: nextBoard.cards.map((c) => (c.id === id ? next : c)),
-          });
-        });
-      });
+      startInlineNewCard(list, add, col.name, board, mutate);
     });
-    el.appendChild(add);
+    body.appendChild(add);
   }
 
+  el.appendChild(body);
+
   return el;
+}
+
+// Inline new-card editing: append a draft card with a focused input to the
+// card list (NOT yet in the board model). Commits on Enter or blur with content;
+// discards on Escape or blur with empty content. Avoids a full re-render so
+// focus stays in the input as the user types.
+function startInlineNewCard(
+  list: HTMLElement,
+  addBtn: HTMLElement,
+  columnName: string,
+  board: Board,
+  mutate: (next: Board) => void,
+): void {
+  // Don't stack multiple drafts.
+  if (list.querySelector('.board-card.is-new')) {
+    const existing = list.querySelector('.board-card.is-new input') as HTMLInputElement | null;
+    existing?.focus();
+    return;
+  }
+
+  const draft = document.createElement('div');
+  draft.className = 'board-card is-new';
+  const input = document.createElement('input');
+  input.className = 'board-card-title-input';
+  input.type = 'text';
+  input.placeholder = 'Type a name…';
+  draft.appendChild(input);
+  list.appendChild(draft);
+  // Hide the add button while editing so the draft is the visible action.
+  addBtn.style.display = 'none';
+
+  let committed = false;
+  const commit = () => {
+    if (committed) return;
+    const title = input.value.trim();
+    if (!title) {
+      cancel();
+      return;
+    }
+    committed = true;
+    const id = `c-${Math.random().toString(36).slice(2, 6)}`;
+    const newCard: Card = {
+      id,
+      values: { id, Title: title, Status: columnName },
+      body: '',
+    };
+    mutate({ ...board, cards: [...board.cards, newCard] });
+    // mutate() triggers a full re-render; nothing else to clean up locally.
+  };
+  const cancel = () => {
+    if (committed) return;
+    committed = true;
+    draft.remove();
+    addBtn.style.display = '';
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancel();
+    }
+  });
+  input.addEventListener('blur', () => {
+    // Use setTimeout so a click on the same column doesn't race against blur.
+    setTimeout(commit, 50);
+  });
+
+  input.focus();
 }
 
 function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
   const el = document.createElement('div');
   el.className = 'board-column color-gray board-column-uncategorized';
   el.dataset.column = '';
+
   const head = document.createElement('div');
   head.className = 'board-column-head';
-  head.innerHTML = `
-    <span class="board-column-dot" style="background:var(--color-gray)"></span>
-    <span class="board-column-name">Uncategorized</span>
-    <span class="board-column-count">${cards.length}</span>
-  `;
+  const chip = document.createElement('span');
+  chip.className = 'board-column-chip';
+  const dot = document.createElement('span');
+  dot.className = 'board-column-chip-dot';
+  chip.appendChild(dot);
+  const nameEl = document.createElement('span');
+  nameEl.className = 'board-column-name';
+  nameEl.textContent = 'Uncategorized';
+  chip.appendChild(nameEl);
+  head.appendChild(chip);
+  const count = document.createElement('span');
+  count.className = 'board-column-count';
+  count.textContent = String(cards.length);
+  head.appendChild(count);
   el.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'board-column-body';
   const list = document.createElement('div');
   list.className = 'board-card-list';
   for (const card of cards) list.appendChild(renderCard(board, card, mutate, readOnly));
-  el.appendChild(list);
+  body.appendChild(list);
+  el.appendChild(body);
   return el;
 }
 
