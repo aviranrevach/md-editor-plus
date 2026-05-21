@@ -49,10 +49,14 @@ const Board = Node.create({
 
   addNodeView() {
     return ({ node, editor, getPos }) => {
-      const view = createBoardView(node.attrs.source as string, {
+      let lastSource = node.attrs.source as string;
+      const view = createBoardView(lastSource, {
         onMutate(nextSource) {
           const pos = typeof getPos === 'function' ? getPos() : null;
           if (pos == null) return;
+          // Update lastSource locally so the update() callback doesn't re-render
+          // on the same content we just produced.
+          lastSource = nextSource;
           editor.commands.command(({ tr }) => {
             tr.setNodeAttribute(pos, 'source', nextSource);
             return true;
@@ -66,12 +70,13 @@ const Board = Node.create({
         dom: view.dom,
         update(updatedNode) {
           if (updatedNode.type !== node.type) return false;
-          view.update(updatedNode.attrs.source as string);
+          const next = updatedNode.attrs.source as string;
+          if (next === lastSource) return true; // no-op when source hasn't changed
+          lastSource = next;
+          view.update(next);
           return true;
         },
-        ignoreMutation() {
-          return true;
-        },
+        ignoreMutation() { return true; },
       };
     };
   },
