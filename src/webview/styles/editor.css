@@ -3355,3 +3355,52 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 .ProseMirror .mb-vCtx-swatch:hover { transform: scale(1.1); }
 .ProseMirror .mb-vCtx-dup svg { width: 11px; height: 11px; }
+
+/* ===========================================================================
+   Phase 7: zoom + pan viewport
+   =========================================================================== */
+
+/* Zoom controls bottom-right. */
+.ProseMirror .mb-vZoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  z-index: 31;
+  font-family: var(--font-body);
+}
+.ProseMirror .mb-vZoom-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+}
+.ProseMirror .mb-vZoom-btn:hover { background: var(--block-hover); color: var(--text-primary); }
+.ProseMirror .mb-vZoom-readout {
+  font: 500 11px var(--font-mono);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: center;
+}
+.ProseMirror .mb-vZoom-fit { font-size: 14px; }
+
+/* Pan cursors. */
+.ProseMirror .mb-pan-temp,
+.ProseMirror .mb-pan-temp * { cursor: grab !important; }
+.ProseMirror .mb-panning,
+.ProseMirror .mb-panning * { cursor: grabbing !important; }
+
+/* When Pan tool is active in toolbar, .mb-svg-host area shows grab cursor. */
+.ProseMirror .mb-visual .mb-vTb-btn[data-tool="pan"].mb-vTb-active ~ * { /* no-op selector */ }

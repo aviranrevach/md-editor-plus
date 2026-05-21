@@ -17,7 +17,7 @@ import {
   getStyles, getNodeStyle, setNodeStyle, NodeStyle, StyleMap,
 } from './mermaidVisualEdit';
 
-export type Tool = 'select' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text' | 'sticky';
+export type Tool = 'select' | 'pan' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text' | 'sticky';
 
 export interface VisualEditorOptions {
   /** The block's outer DOM element (we own absolute overlays inside it). */
@@ -39,7 +39,7 @@ export interface VisualEditorHandle {
   destroy: () => void;
 }
 
-const SHAPE_FOR_TOOL: Record<Exclude<Tool, 'select' | 'arrow' | 'sticky'>, NodeShape> = {
+const SHAPE_FOR_TOOL: Record<Exclude<Tool, 'select' | 'arrow' | 'sticky' | 'pan'>, NodeShape> = {
   rect:    'rect',
   pill:    'pill',
   circle:  'circle',
@@ -50,6 +50,7 @@ const SHAPE_FOR_TOOL: Record<Exclude<Tool, 'select' | 'arrow' | 'sticky'>, NodeS
 // SVG icons used by the toolbar. Stroke-based, currentColor — tint via CSS.
 const ICONS: Record<string, string> = {
   select:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18l4-4h12L5 3z"/></svg>`,
+  pan:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-5.99-3.5l-3.4-5.9a2 2 0 1 1 3.4-2l1.99 3.4"/></svg>`,
   rect:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="2"/></svg>`,
   pill:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="4"/></svg>`,
   circle:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/></svg>`,
@@ -63,6 +64,7 @@ const ICONS: Record<string, string> = {
 
 const TOOL_HOTKEYS: Record<string, Tool> = {
   v: 'select',
+  h: 'pan',
   r: 'rect',
   p: 'pill',
   c: 'circle',
@@ -97,6 +99,59 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // ── Phase 3 state ──────────────────────────────────────────────────────
   let gridSnapEnabled = false;
   const guideLayer = createGuideLayer(opts.previewPane);
+
+  // ── Phase 7: viewport (zoom + pan) ─────────────────────────────────────
+  const viewport = { scale: 1, tx: 0, ty: 0 };
+  function getSvgHost(): HTMLElement | null {
+    return opts.previewPane.querySelector<HTMLElement>('.mb-svg-host');
+  }
+  function applyViewport(): void {
+    const host = getSvgHost();
+    if (!host) return;
+    host.style.transformOrigin = '0 0';
+    host.style.transform = `translate(${viewport.tx}px, ${viewport.ty}px) scale(${viewport.scale})`;
+    zoomReadout?.update(viewport.scale);
+    // Selection overlays use getBoundingClientRect which already accounts for
+    // CSS transforms, so they follow automatically — just refresh.
+    refreshSelectionUI();
+  }
+  function setZoom(next: number, anchor?: { x: number; y: number }): void {
+    const clamped = Math.max(0.2, Math.min(4, next));
+    if (anchor) {
+      // Keep the anchor point fixed under the cursor by adjusting tx/ty.
+      const host = getSvgHost();
+      if (host) {
+        const hostRect = host.getBoundingClientRect();
+        const hostX = anchor.x - hostRect.left;
+        const hostY = anchor.y - hostRect.top;
+        // Position of the anchor in pre-transform svg coords.
+        const preX = (hostX) / viewport.scale;
+        const preY = (hostY) / viewport.scale;
+        // After zoom, we want preX,preY to land back at hostX,hostY.
+        // New transform: host_orig + (preX*newScale, preY*newScale)
+        // host_orig = (tx, ty) since transform-origin is 0,0.
+        // So new tx = anchor.x - hostRect.left + (oldHostRect.left - newHostRect.left)... easier:
+        // newAnchorScreenX = hostRect.left - tx + tx_new + preX*clamped
+        // We want newAnchorScreenX = anchor.x.
+        // Solving: tx_new = anchor.x - hostRect.left - preX*clamped + tx
+        viewport.tx = viewport.tx + (hostX - preX * clamped);
+        viewport.ty = viewport.ty + (hostY - preY * clamped);
+      }
+    }
+    viewport.scale = clamped;
+    applyViewport();
+  }
+  function panBy(dx: number, dy: number): void {
+    viewport.tx += dx;
+    viewport.ty += dy;
+    applyViewport();
+  }
+  function resetViewport(): void {
+    viewport.scale = 1;
+    viewport.tx    = 0;
+    viewport.ty    = 0;
+    applyViewport();
+  }
 
   const toolbar = buildToolbar({
     onPick: (tool) => setTool(tool),
@@ -204,6 +259,30 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // Lock badge pool (one per visible locked node).
   const lockBadges: HTMLElement[] = [];
 
+  // Phase 7: zoom controls in the bottom-right corner.
+  const zoomCtrl = document.createElement('div');
+  zoomCtrl.className = 'mb-vZoom';
+  zoomCtrl.contentEditable = 'false';
+  zoomCtrl.innerHTML = `
+    <button type="button" class="mb-vZoom-btn" data-act="out" aria-label="Zoom out">−</button>
+    <span class="mb-vZoom-readout" aria-live="polite">100%</span>
+    <button type="button" class="mb-vZoom-btn" data-act="in"  aria-label="Zoom in">+</button>
+    <button type="button" class="mb-vZoom-btn mb-vZoom-fit" data-act="fit" aria-label="Reset view">⌂</button>
+  `;
+  zoomCtrl.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  zoomCtrl.addEventListener('click', (e) => {
+    const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
+    if (!act) return;
+    e.preventDefault(); e.stopPropagation();
+    if (act === 'in')  setZoom(viewport.scale + 0.1);
+    if (act === 'out') setZoom(viewport.scale - 0.1);
+    if (act === 'fit') resetViewport();
+  });
+  const zoomReadout = {
+    el: zoomCtrl.querySelector<HTMLElement>('.mb-vZoom-readout'),
+    update(scale: number) { if (this.el) this.el.textContent = `${Math.round(scale * 100)}%`; },
+  };
+
   // All overlays live in the preview pane so the NodeView's ignoreMutation
   // hook (which already trusts preview-pane mutations) doesn't fight us.
   opts.previewPane.appendChild(toolbar.el);
@@ -213,6 +292,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   opts.previewPane.appendChild(contextTip.el);
   opts.previewPane.appendChild(renameOverlay.el);
   opts.previewPane.appendChild(pendingPin);
+  opts.previewPane.appendChild(zoomCtrl);
 
   // ── Listeners ───────────────────────────────────────────────────────────
   const onPreviewClick = (e: MouseEvent) => {
@@ -379,6 +459,19 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       return;
     }
 
+    // Phase 7: zoom keys.
+    if (meta && (e.key === '=' || e.key === '+')) { e.preventDefault(); setZoom(viewport.scale + 0.1); return; }
+    if (meta && (e.key === '-' || e.key === '_')) { e.preventDefault(); setZoom(viewport.scale - 0.1); return; }
+    if (meta &&  e.key === '0')                   { e.preventDefault(); resetViewport();                 return; }
+
+    // Space — temporary Pan grab cursor (matches Figma / Miro).
+    if (e.key === ' ' && !e.repeat && !meta && !e.altKey) {
+      e.preventDefault();
+      spaceHeld = true;
+      opts.previewPane.classList.add('mb-pan-temp');
+      return;
+    }
+
     // Phase 3: arrow-key nudge of selected node.
     if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
@@ -481,12 +574,32 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   let drag: DragCandidate | null = null;
   let marquee: { x1: number; y1: number; x2: number; y2: number; additive: boolean } | null = null;
   let edgeDraft: { fromId: string; fromX: number; fromY: number; pathEl: SVGPathElement | null } | null = null;
+  let pan: { startX: number; startY: number; originTx: number; originTy: number } | null = null;
+  let spaceHeld = false;
   let suppressNextClick = false;
   const DRAG_THRESHOLD = 4;
 
   function onDragMouseDown(e: MouseEvent): void {
-    if (activeTool !== 'select') return;
     if (e.button !== 0) return; // left button only
+
+    // Pan tool, space-drag, or middle-click → pan the viewport.
+    if (activeTool === 'pan' || spaceHeld) {
+      // Don't pan if click landed on our own UI overlays (toolbar, etc.).
+      const inOverlay = (e.target as Element).closest('.mb-vTb, .mb-vCtx, .mb-vZoom, .mb-snackbar, .mb-vRename, .mb-vPin');
+      if (inOverlay) return;
+      pan = {
+        startX:   e.clientX,
+        startY:   e.clientY,
+        originTx: viewport.tx,
+        originTy: viewport.ty,
+      };
+      opts.previewPane.classList.add('mb-panning');
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    if (activeTool !== 'select') return;
 
     // Connection-point dot → start edge draft.
     const dotEl = (e.target as Element).closest?.('.mb-vConn-dot');
@@ -548,6 +661,12 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   }
 
   function onDragMouseMove(e: MouseEvent): void {
+    if (pan) {
+      viewport.tx = pan.originTx + (e.clientX - pan.startX);
+      viewport.ty = pan.originTy + (e.clientY - pan.startY);
+      applyViewport();
+      return;
+    }
     // Edge draft path
     if (edgeDraft) {
       const svgPt = clientToSvgPoint(e.clientX, e.clientY, opts.previewPane);
@@ -623,6 +742,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   }
 
   function onDragMouseUp(e: MouseEvent): void {
+    if (pan) {
+      pan = null;
+      opts.previewPane.classList.remove('mb-panning');
+      return;
+    }
     // Edge draft → commit if landed on a node.
     if (edgeDraft) {
       const hit = findMermaidNode(e.target as Element, opts.previewPane);
@@ -714,6 +838,23 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   opts.previewPane.addEventListener('mousedown', onDragMouseDown, true);
   document.addEventListener('mousemove', onDragMouseMove, true);
   document.addEventListener('mouseup',   onDragMouseUp,   true);
+
+  // Phase 7: wheel zoom (Ctrl/Cmd + wheel) and keyup for space-release.
+  function onWheel(e: WheelEvent): void {
+    if (!e.ctrlKey && !e.metaKey) return;
+    if (!opts.previewPane.contains(e.target as Node)) return;
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 0.1 : -0.1;
+    setZoom(viewport.scale + factor, { x: e.clientX, y: e.clientY });
+  }
+  function onKeyUp(e: KeyboardEvent): void {
+    if (e.key === ' ' && spaceHeld) {
+      spaceHeld = false;
+      opts.previewPane.classList.remove('mb-pan-temp');
+    }
+  }
+  opts.previewPane.addEventListener('wheel', onWheel, { passive: false });
+  document.addEventListener('keyup', onKeyUp, true);
 
   // ── Tool / selection / rename / mutation plumbing ────────────────────────
   function setTool(tool: Tool): void {
@@ -917,10 +1058,15 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       opts.block.classList.remove('mb-visual-active');
       opts.previewPane.removeEventListener('click', onPreviewClick);
       opts.previewPane.removeEventListener('mousedown', onDragMouseDown, true);
+      opts.previewPane.removeEventListener('wheel',     onWheel);
       document.removeEventListener('keydown',     onKeyDown,     true);
+      document.removeEventListener('keyup',       onKeyUp,       true);
       document.removeEventListener('mousedown',   onOutsideClick, true);
       document.removeEventListener('mousemove',   onDragMouseMove, true);
       document.removeEventListener('mouseup',     onDragMouseUp,   true);
+      // Reset host transform so a future visual session starts clean.
+      const host = getSvgHost();
+      if (host) host.style.transform = '';
       toolbar.el.remove();
       selectionRing.remove();
       for (const r of extraRings) r.remove();
@@ -929,6 +1075,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       pendingPin.remove();
       connectionLayer.remove();
       marqueeEl.remove();
+      zoomCtrl.remove();
       for (const b of lockBadges) b.remove();
       guideLayer.destroy();
       if (nudgeTimer) clearTimeout(nudgeTimer);
@@ -960,7 +1107,7 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
   el.contentEditable = 'false';
 
   const groups: Array<{ tools: Tool[] }> = [
-    { tools: ['select'] },
+    { tools: ['select', 'pan'] },
     { tools: ['rect', 'pill', 'circle', 'diamond'] },
     { tools: ['arrow'] },
     { tools: ['text', 'sticky'] },
@@ -968,6 +1115,7 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
 
   const tipMap: Record<Tool, string> = {
     select:  'Select (V)',
+    pan:     'Pan (H)',
     rect:    'Rectangle (R)',
     pill:    'Pill (P)',
     circle:  'Circle (C)',
