@@ -77,11 +77,25 @@
   border: 0;
   padding: 0;
 }
-/* Suppress ProseMirror's atom-selection outline; the board manages its own focus. */
+/* Suppress ProseMirror's atom-selection outline / hover bg.
+   Tiptap can apply .ProseMirror-selectednode either on the NodeView root
+   (the .board-block itself) or on a wrapping container. Also kill any
+   block-handle hover styling the editor's global drag-handle gutter
+   might apply for atom blocks. */
 .board-block.ProseMirror-selectednode,
-.ProseMirror-selectednode > .board-block {
-  outline: none;
-  background: transparent;
+.ProseMirror-selectednode > .board-block,
+.ProseMirror-selectednode .board-block {
+  outline: none !important;
+  background: transparent !important;
+}
+/* Defensive: kill any hover fill set by the editor's outer rendering
+   on the board-block or its immediate Tiptap wrapper. */
+.board-block,
+.board-block:hover,
+[data-board],
+[data-board]:hover {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* ===== Chrome (top header: name + Properties icon) ===== */
@@ -162,7 +176,23 @@
   background: transparent;
   border: 0;
   padding: 0;
+  position: relative;       /* anchor for column drop indicator */
 }
+.board-column.is-dragging { opacity: 0.5; }
+/* Vertical drop indicator between columns when dragging a column header. */
+.board-column.drop-col-before::before,
+.board-column.drop-col-after::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--board-chip-blue-dot);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.board-column.drop-col-before::before { left: -7px; }
+.board-column.drop-col-after::after { right: -7px; }
 
 /* Column header row: [chip] [count] (filler) [⋯ on hover] — lives inside .board-column-body */
 .board-column-head {

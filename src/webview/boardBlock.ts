@@ -18,19 +18,21 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   dom.className = 'board-block';
   dom.setAttribute('contenteditable', 'false');
 
-  // Stop interactive events from bubbling up to ProseMirror's editor root, which
-  // would otherwise convert the click into a NodeSelection on the atom block
-  // (preventing inline edits, button clicks, etc.). Capture phase ensures we run
-  // before any listener attached at the editor root.
-  const swallowInteractive = (e: Event) => {
+  // Stop mousedown from bubbling up to ProseMirror, which would call
+  // preventDefault on it (to keep the editor focused) and kill the resulting
+  // click event on buttons/cards, AND would also set a NodeSelection that
+  // steals focus from inline editable spans.
+  //
+  // IMPORTANT: stop ONLY mousedown (not click). Stopping click in the capture
+  // phase prevents the click from ever reaching the target's listener, which
+  // breaks every button and card inside the board.
+  dom.addEventListener('mousedown', (e: Event) => {
     const t = e.target as HTMLElement | null;
     if (!t) return;
-    if (t.closest('[contenteditable="true"], button, input, select, textarea, .board-card')) {
+    if (t.closest('[contenteditable="true"], button, input, select, textarea, .board-card, .board-column')) {
       e.stopPropagation();
     }
-  };
-  dom.addEventListener('mousedown', swallowInteractive, true);
-  dom.addEventListener('click', swallowInteractive, true);
+  }, true);
 
   let board = parseBoardSource(initialSource);
   render();
@@ -150,25 +152,45 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
       if ((e.target as HTMLElement).closest('.board-card')) return;
       e.dataTransfer!.setData('text/board-column-name', col.name);
       e.dataTransfer!.effectAllowed = 'move';
+      el.classList.add('is-dragging');
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('is-dragging');
     });
     el.addEventListener('dragover', (e) => {
-      if (e.dataTransfer?.types.includes('text/board-column-name')) {
-        e.preventDefault();
-      }
+      if (!e.dataTransfer?.types.includes('text/board-column-name')) return;
+      e.preventDefault();
+      // Visual indicator: vertical blue line on left or right depending on cursor side.
+      const rect = el.getBoundingClientRect();
+      const before = (e.clientX - rect.left) < rect.width / 2;
+      el.classList.toggle('drop-col-before', before);
+      el.classList.toggle('drop-col-after', !before);
+    });
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('drop-col-before', 'drop-col-after');
     });
     el.addEventListener('drop', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-column-name')) return;
       const draggedName = e.dataTransfer.getData('text/board-column-name');
+      el.classList.remove('drop-col-before', 'drop-col-after');
       if (!draggedName || draggedName === col.name) return;
       e.preventDefault();
       e.stopPropagation();
+      const before = el.classList.contains('drop-col-before');  // already removed above, recompute from cursor
+      // Recompute side from event position (the classes were just cleared above for cleanup).
+      const rect = el.getBoundingClientRect();
+      const dropBefore = (e.clientX - rect.left) < rect.width / 2;
       const cols = [...board.columns];
       const fromIdx = cols.findIndex((c) => c.name === draggedName);
       const toIdx = cols.findIndex((c) => c.name === col.name);
       if (fromIdx < 0 || toIdx < 0) return;
       const [moved] = cols.splice(fromIdx, 1);
-      cols.splice(toIdx, 0, moved);
+      // Recompute target index since splice may have shifted it.
+      const adjustedTo = cols.findIndex((c) => c.name === col.name);
+      const insertAt = dropBefore ? adjustedTo : adjustedTo + 1;
+      cols.splice(insertAt, 0, moved);
       mutate({ ...board, columns: cols });
+      void before;  // referenced but unused
     });
   }
 
