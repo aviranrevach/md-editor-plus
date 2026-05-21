@@ -201,7 +201,7 @@ function renderPanel(): void {
   // Empty-state placeholder overlay
   const placeholder = document.createElement('div');
   placeholder.className = 'board-panel-body-placeholder';
-  placeholder.innerHTML = `Press <kbd>/</kbd> for commands or just start typing…`;
+  placeholder.innerHTML = `Add a description… or press <kbd>/</kbd> for commands`;
   bodyWrap.appendChild(placeholder);
   updateBodyPlaceholderVisibility(bodyWrap, card.body || '');
 }

@@ -109,26 +109,10 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
   }
   chrome.appendChild(name);
 
-  // Properties button no longer lives in the chrome — it sits in the columns
-  // row alongside the "+" so both align with the column headers.
-  return chrome;
-}
-
-function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'board-columns';
-  const validNames = new Set(board.columns.map((c) => c.name));
-  for (const col of board.columns) {
-    row.appendChild(renderColumn(board, col, mutate, readOnly));
-  }
-  const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
-  if (orphans.length) {
-    row.appendChild(renderUncategorized(board, orphans, mutate, readOnly));
-  }
   if (!readOnly) {
-    // Right-side action cluster: [+] [Properties], aligned with the chip header.
+    // Right-side action cluster, ABOVE the columns: [+] [Properties].
     const actions = document.createElement('div');
-    actions.className = 'board-columns-actions';
+    actions.className = 'board-chrome-actions';
 
     const addCol = document.createElement('button');
     addCol.type = 'button';
@@ -140,15 +124,15 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
       // name + an auto-incrementing suffix and focus its inline name span for
       // immediate rename. Mirrors the "+ New card" UX.
       const base = 'New';
-      let name = base;
+      let nm = base;
       let n = 2;
-      while (board.columns.some((c) => c.name === name)) name = `${base} ${n++}`;
+      while (board.columns.some((c) => c.name === nm)) nm = `${base} ${n++}`;
       const color = nextColor(board.columns.map((c) => c.color));
-      mutate({ ...board, columns: [...board.columns, { name, color }] });
+      mutate({ ...board, columns: [...board.columns, { name: nm, color }] });
       requestAnimationFrame(() => {
-        const boardDom = row.closest('.board-block');
+        const boardDom = chrome.closest('.board-block');
         const newColDom = boardDom?.querySelector(
-          `.board-column[data-column="${cssEscape(name)}"]`,
+          `.board-column[data-column="${cssEscape(nm)}"]`,
         ) as HTMLElement | null;
         const nameEl = newColDom?.querySelector('.board-column-name') as HTMLElement | null;
         if (!nameEl) return;
@@ -162,20 +146,33 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
     props.type = 'button';
     props.className = 'board-properties-btn';
     props.title = 'Properties';
+    // Phosphor Icons — sliders-horizontal, bold weight (256x256 viewBox).
     props.innerHTML = `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <line x1="2" y1="4" x2="14" y2="4"/>
-        <line x1="2" y1="8" x2="14" y2="8"/>
-        <line x1="2" y1="12" x2="14" y2="12"/>
-        <circle cx="5" cy="4" r="1.5" fill="currentColor"/>
-        <circle cx="10" cy="8" r="1.5" fill="currentColor"/>
-        <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
+      <svg viewBox="0 0 256 256" fill="currentColor">
+        <path d="M40,80H79.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24H140.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24Zm70-20a8,8,0,1,1-8,8A8,8,0,0,1,110,60Z"/>
+        <path d="M216,116H176.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24h75.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24Zm-70,20a8,8,0,1,1,8-8A8,8,0,0,1,146,136Z"/>
+        <path d="M216,180H112.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24H51.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24ZM82,200a8,8,0,1,1,8-8A8,8,0,0,1,82,200Z"/>
       </svg>
     `;
     props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
     actions.appendChild(props);
 
-    row.appendChild(actions);
+    chrome.appendChild(actions);
+  }
+
+  return chrome;
+}
+
+function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'board-columns';
+  const validNames = new Set(board.columns.map((c) => c.name));
+  for (const col of board.columns) {
+    row.appendChild(renderColumn(board, col, mutate, readOnly));
+  }
+  const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
+  if (orphans.length) {
+    row.appendChild(renderUncategorized(board, orphans, mutate, readOnly));
   }
   return row;
 }

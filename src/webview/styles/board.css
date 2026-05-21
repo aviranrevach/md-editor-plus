@@ -412,15 +412,12 @@
   color: var(--board-text-light);
 }
 
-/* ===== Right-edge actions cluster — [+] [Properties], aligned with column heads ===== */
-.board-columns-actions {
+/* ===== Right-edge actions cluster in the CHROME row — [+] [Properties] ===== */
+.board-chrome-actions {
   display: flex;
   align-items: center;
   gap: 2px;
-  align-self: flex-start;
-  height: 28px;
-  margin-left: 4px;
-  padding-top: 0;
+  flex-shrink: 0;
 }
 .board-add-column {
   width: 28px;
