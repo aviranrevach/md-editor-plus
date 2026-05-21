@@ -157,7 +157,7 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
   return row;
 }
 
-function promptNewField(anchor: HTMLElement, board: Board, onChange: (next: Board) => void): void {
+export function promptNewField(anchor: HTMLElement, board: Board, onChange: (next: Board) => void): void {
   // Close any existing pickers first
   document.querySelectorAll('.board-add-field-picker').forEach((n) => n.remove());
 

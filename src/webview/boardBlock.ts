@@ -571,6 +571,7 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
               mutate(next);
             },
         readOnly,
+        readOnly ? undefined : (nextBoard) => mutate(nextBoard),
       );
     }, 180);
   });
