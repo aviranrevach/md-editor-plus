@@ -4,6 +4,7 @@ import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
 import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly } from './editor';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
+import { setAlwaysDarkDiagram } from './mermaidRenderer';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
@@ -66,6 +67,7 @@ interface SavedDefaults {
   pageWidth?: number;
   fullWidth?: boolean;
   alwaysDarkCode?: boolean;
+  alwaysDarkDiagram?: boolean;
   alwaysDarkSource?: boolean;
   sourceFullWidth?: boolean;
   shortenCodeSnippets?: boolean;
@@ -96,6 +98,7 @@ const FACTORY_DEFAULTS = {
   pageWidth:           DEFAULT_WIDTH_PX,
   fullWidth:           false,
   alwaysDarkCode:      false,
+  alwaysDarkDiagram:   false,
   alwaysDarkSource:    false,
   sourceFullWidth:     false,
   shortenCodeSnippets: false,
@@ -103,7 +106,7 @@ const FACTORY_DEFAULTS = {
 
 const DEFAULT_KEYS = [
   'theme', 'font', 'textSize', 'pageWidth', 'fullWidth',
-  'alwaysDarkCode', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets',
+  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets',
 ] as const;
 
 function injectStyles(): void {
@@ -165,6 +168,7 @@ function init(): void {
   const pageWidthRow  = document.getElementById('page-width-row') as HTMLElement;
 
   const alwaysDarkCodeToggle = document.getElementById('always-dark-code-toggle') as HTMLElement;
+  const alwaysDarkDiagramToggle = document.getElementById('always-dark-diagram-toggle') as HTMLElement;
   const alwaysDarkSourceToggle = document.getElementById('always-dark-source-toggle') as HTMLElement;
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
@@ -176,6 +180,14 @@ function init(): void {
     document.documentElement.classList.toggle('code-always-dark', on);
     alwaysDarkCodeToggle.classList.toggle('on', on);
     alwaysDarkCodeToggle.setAttribute('aria-checked', String(on));
+    refreshDefaultsButtons();
+  }
+
+  function setAlwaysDarkDiagramState(on: boolean): void {
+    document.documentElement.classList.toggle('diagram-always-dark', on);
+    alwaysDarkDiagramToggle.classList.toggle('on', on);
+    alwaysDarkDiagramToggle.setAttribute('aria-checked', String(on));
+    setAlwaysDarkDiagram(on);
     refreshDefaultsButtons();
   }
 
@@ -205,6 +217,9 @@ function init(): void {
 
   alwaysDarkCodeToggle.addEventListener('click', () => {
     setAlwaysDarkCode(!alwaysDarkCodeToggle.classList.contains('on'));
+  });
+  alwaysDarkDiagramToggle.addEventListener('click', () => {
+    setAlwaysDarkDiagramState(!alwaysDarkDiagramToggle.classList.contains('on'));
   });
   alwaysDarkSourceToggle.addEventListener('click', () => {
     setAlwaysDarkSource(!alwaysDarkSourceToggle.classList.contains('on'));
@@ -748,6 +763,7 @@ function init(): void {
     applyPageWidth();
     setWidth(d.fullWidth ? 'full' : 'normal');
     setAlwaysDarkCode(Boolean(d.alwaysDarkCode));
+    setAlwaysDarkDiagramState(Boolean(d.alwaysDarkDiagram));
     setAlwaysDarkSource(Boolean(d.alwaysDarkSource));
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
@@ -805,6 +821,7 @@ function init(): void {
       pageWidth:           parseInt(widthSlider.value, 10) || DEFAULT_WIDTH_PX,
       fullWidth:           widthMode === 'full',
       alwaysDarkCode:      alwaysDarkCodeToggle.classList.contains('on'),
+      alwaysDarkDiagram:   alwaysDarkDiagramToggle.classList.contains('on'),
       alwaysDarkSource:    alwaysDarkSourceToggle.classList.contains('on'),
       sourceFullWidth:     sourceFullWidthToggle.classList.contains('on'),
       shortenCodeSnippets: shortenSnippetsToggle.classList.contains('on'),

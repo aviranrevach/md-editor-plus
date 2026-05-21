@@ -2648,3 +2648,374 @@ html.source-word-wrap #source-view .cb-content {
   word-break: break-word;
   overflow-x: hidden;
 }
+
+/* ===========================================================================
+   Mermaid block (.mb-*)
+   Preview-first rendered diagram blocks with edit toggle, error placeholder,
+   copy/export menu, and fullscreen modal.
+   =========================================================================== */
+
+.ProseMirror .mb {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0.75em 0;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.ProseMirror .mb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  font-family: var(--font-body);
+  user-select: none;
+}
+
+.ProseMirror .mb-lang {
+  font: 500 11px var(--font-mono);
+  color: var(--text-secondary);
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.ProseMirror .mb-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Toggle switch ───────────────────────────────────────────────────── */
+.ProseMirror .mb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+}
+.ProseMirror .mb-toggle:hover { background: var(--block-hover); color: var(--text-primary); }
+
+.ProseMirror .mb-toggle-label { font-size: 11px; font-weight: 500; }
+
+.ProseMirror .mb-toggle-track {
+  width: 26px;
+  height: 14px;
+  background: var(--border);
+  border-radius: 999px;
+  position: relative;
+  transition: background 120ms ease;
+}
+.ProseMirror .mb-toggle-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 120ms ease;
+}
+.ProseMirror .mb-toggle.mb-toggle-on .mb-toggle-track { background: var(--link); }
+.ProseMirror .mb-toggle.mb-toggle-on .mb-toggle-thumb { transform: translateX(12px); }
+.ProseMirror .mb-toggle.mb-toggle-on .mb-toggle-label { color: var(--link); }
+
+/* ── Icon button (Expand) ────────────────────────────────────────────── */
+.ProseMirror .mb-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-body);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
+}
+.ProseMirror .mb-iconbtn:hover { background: var(--block-hover); color: var(--text-primary); }
+.ProseMirror .mb-iconbtn svg { width: 12px; height: 12px; }
+.ProseMirror .mb-iconbtn.mb-disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+
+/* ── Copy split-button ───────────────────────────────────────────────── */
+.ProseMirror .mb-copy {
+  position: relative;
+  display: inline-flex;
+  border-radius: 5px;
+  overflow: visible;
+}
+.ProseMirror .mb-copy-main,
+.ProseMirror .mb-copy-caret {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-body);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.ProseMirror .mb-copy-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 5px 0 0 5px;
+}
+.ProseMirror .mb-copy-main svg { width: 11px; height: 11px; }
+.ProseMirror .mb-copy-caret {
+  padding: 3px 4px;
+  border-radius: 0 5px 5px 0;
+  border-left: 1px solid var(--border);
+}
+.ProseMirror .mb-copy-caret svg { width: 12px; height: 12px; }
+.ProseMirror .mb-copy:hover .mb-copy-main,
+.ProseMirror .mb-copy:hover .mb-copy-caret { background: var(--block-hover); color: var(--text-primary); }
+
+.ProseMirror .mb-copy-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 5px;
+  min-width: 180px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+}
+.ProseMirror .mb-copy-menu.mb-hidden { display: none; }
+.ProseMirror .mb-copy-menu button {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 7px 10px;
+  font: 500 12px var(--font-body);
+  color: var(--text-primary);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ProseMirror .mb-copy-menu button:hover { background: var(--block-hover); }
+.ProseMirror .mb-copy-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}
+
+/* ── Preview pane ────────────────────────────────────────────────────── */
+.ProseMirror .mb-preview {
+  padding: 22px 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  background: var(--bg);
+}
+.ProseMirror .mb-preview > svg { max-width: 100%; height: auto; }
+.ProseMirror .mb-empty {
+  font: 400 13px var(--font-body);
+  color: var(--text-secondary);
+  text-align: center;
+}
+.ProseMirror .mb-empty strong { color: var(--text-primary); font-weight: 600; }
+
+.ProseMirror .mb-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: mb-spin 800ms linear infinite;
+}
+@keyframes mb-spin { to { transform: rotate(360deg); } }
+
+/* ── Error placeholder ───────────────────────────────────────────────── */
+.ProseMirror .mb-err {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 8px;
+  max-width: 360px;
+}
+.ProseMirror .mb-err-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--callout-caution-bg);
+  color: var(--callout-caution-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.ProseMirror .mb-err-icon svg { width: 16px; height: 16px; }
+.ProseMirror .mb-err-title {
+  font: 600 13px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-err-meta {
+  font: 500 12px var(--font-mono);
+  color: var(--callout-caution-accent);
+}
+.ProseMirror .mb-err-msg {
+  font: 400 12px var(--font-mono);
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.ProseMirror .mb-err-fix {
+  margin-top: 6px;
+  padding: 5px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font: 500 12px var(--font-body);
+  cursor: pointer;
+}
+.ProseMirror .mb-err-fix:hover { background: var(--block-hover); }
+
+/* ── Source pane ─────────────────────────────────────────────────────── */
+.ProseMirror .mb-source { display: none; }
+.ProseMirror .mb-source-pre {
+  margin: 0;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  background: var(--bg);
+  white-space: pre;
+  overflow-x: auto;
+}
+.ProseMirror .mb-source-code {
+  font-family: inherit;
+  outline: none;
+  display: block;
+}
+
+/* Editing state: hide preview, show source (with subtle accent outline) */
+.ProseMirror .mb.mb-editing .mb-preview { display: none; }
+.ProseMirror .mb.mb-editing .mb-source  { display: block; }
+.ProseMirror .mb.mb-editing { outline: 2px solid var(--link); outline-offset: -2px; }
+
+/* ── Snackbar ────────────────────────────────────────────────────────── */
+.ProseMirror .mb-snackbar {
+  position: absolute;
+  top: 38px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  background: #1f1f23;
+  color: #ffffff;
+  border-radius: 7px;
+  font: 500 12px var(--font-body);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 20;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.ProseMirror .mb-snackbar.mb-snackbar-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ProseMirror .mb-snackbar svg { width: 13px; height: 13px; }
+.ProseMirror .mb-snackbar kbd {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+  padding: 0 5px;
+  font: 500 10.5px var(--font-mono);
+}
+
+/* ── Fullscreen modal ────────────────────────────────────────────────── */
+.mmd-fs {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 21, 25, 0.78);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+.mmd-fs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #e5e7eb;
+  margin-bottom: 14px;
+  font-family: var(--font-body);
+}
+.mmd-fs-title { font: 500 12px var(--font-body); opacity: 0.85; }
+.mmd-fs-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px;
+}
+.mmd-fs-tool, .mmd-fs-close {
+  background: transparent;
+  border: none;
+  color: #e5e7eb;
+  font: 500 12px var(--font-body);
+  padding: 4px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mmd-fs-tool:hover, .mmd-fs-close:hover { background: rgba(255, 255, 255, 0.12); }
+.mmd-fs-zoom {
+  color: #ffffff;
+  font: 500 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  padding: 4px 6px;
+}
+.mmd-fs-stage {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  outline: none;
+}
+.mmd-fs-stage.mmd-fs-dragging { cursor: grabbing; }
+.mmd-fs-canvas {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  transition: transform 60ms ease-out;
+  will-change: transform;
+}
+.mmd-fs-canvas > svg { max-width: 90%; max-height: 90%; }
+
+/* ── Theme-specific tweaks ───────────────────────────────────────────── */
+html.theme-dark .ProseMirror .mb-toggle-thumb { background: #fafafa; }
+html.theme-dark .ProseMirror .mb { background: var(--code-bg); }
+html.theme-dark .ProseMirror .mb-header { background: rgba(255, 255, 255, 0.03); }
+html.theme-dark .ProseMirror .mb-preview { background: var(--code-bg); }
+html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
+
+/* RTL: mermaid blocks always stay LTR. */
+.ProseMirror .mb, .ProseMirror .mb * { direction: ltr; }

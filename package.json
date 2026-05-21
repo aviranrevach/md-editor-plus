@@ -117,6 +117,11 @@
           "default": false,
           "description": "Render code blocks with a dark background regardless of page theme"
         },
+        "mdEditorPlus.alwaysDarkDiagram": {
+          "type": "boolean",
+          "default": false,
+          "description": "Render mermaid diagrams with a dark theme regardless of page theme"
+        },
         "mdEditorPlus.alwaysDarkSource": {
           "type": "boolean",
           "default": false,
@@ -186,6 +191,7 @@
     "esbuild": "^0.21.0",
     "jest": "^29.0.0",
     "lowlight": "^3.1.0",
+    "mermaid": "^11.4.0",
     "tiptap-extension-global-drag-handle": "^0.1.18",
     "tiptap-markdown": "^0.8.10",
     "ts-jest": "^29.0.0",

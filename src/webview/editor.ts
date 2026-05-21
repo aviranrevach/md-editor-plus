@@ -10,6 +10,7 @@ import Image from '@tiptap/extension-image';
 import { mergeAttributes } from '@tiptap/core';
 import Link from '@tiptap/extension-link';
 import CodeBlock from './extensions/codeBlock';
+import MermaidBlock from './extensions/mermaidBlock';
 import Underline from '@tiptap/extension-underline';
 import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
@@ -100,7 +101,7 @@ export function createEditor(
         codeBlock: false,
         dropcursor: { color: '#2383e2', width: 3 },
       }),
-      CodeBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
+      MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }),

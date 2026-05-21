@@ -115,6 +115,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           pageWidth:           cfg.get<number>('pageWidth', 800),
           fullWidth:           cfg.get<boolean>('fullWidth', false),
           alwaysDarkCode:      cfg.get<boolean>('alwaysDarkCode', false),
+          alwaysDarkDiagram:   cfg.get<boolean>('alwaysDarkDiagram', false),
           alwaysDarkSource:    cfg.get<boolean>('alwaysDarkSource', false),
           sourceFullWidth:     cfg.get<boolean>('sourceFullWidth', false),
           shortenCodeSnippets: cfg.get<boolean>('shortenCodeSnippets', false),
@@ -144,6 +145,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         pageWidth?: number;
         fullWidth?: boolean;
         alwaysDarkCode?: boolean;
+        alwaysDarkDiagram?: boolean;
         alwaysDarkSource?: boolean;
         sourceFullWidth?: boolean;
         shortenCodeSnippets?: boolean;
@@ -163,6 +165,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           cfg.update('pageWidth',           d.pageWidth,           target),
           cfg.update('fullWidth',           d.fullWidth,           target),
           cfg.update('alwaysDarkCode',      d.alwaysDarkCode,      target),
+          cfg.update('alwaysDarkDiagram',   d.alwaysDarkDiagram,   target),
           cfg.update('alwaysDarkSource',    d.alwaysDarkSource,    target),
           cfg.update('sourceFullWidth',     d.sourceFullWidth,     target),
           cfg.update('shortenCodeSnippets', d.shortenCodeSnippets, target),
@@ -171,7 +174,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       }
       if (msg.type === 'resetDefaults') {
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
-        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets'];
+        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkDiagram','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets'];
         for (const k of keys) {
           // Clear at all scopes so the package.json defaults take over.
           await cfg.update(k, undefined, vscode.ConfigurationTarget.Global).then(() => {}, () => {});
@@ -470,11 +473,16 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     </div>
     <div class="settings-divider"></div>
     <div class="settings-section">
-      <div class="settings-label">Code blocks</div>
+      <div class="settings-label">Code &amp; diagrams</div>
       <div class="settings-row" data-tip="Force fenced code blocks to use a dark theme even on light pages">
         <span class="settings-row-icon">${iCode}</span>
         <span class="settings-row-label">Always dark: Code Snippets</span>
         <button class="toggle-switch" id="always-dark-code-toggle" role="switch" aria-checked="false"></button>
+      </div>
+      <div class="settings-row" data-tip="Force mermaid diagrams to use a dark theme regardless of the page theme">
+        <span class="settings-row-icon">${iCode}</span>
+        <span class="settings-row-label">Always dark: Mermaid diagrams</span>
+        <button class="toggle-switch" id="always-dark-diagram-toggle" role="switch" aria-checked="false"></button>
       </div>
       <div class="settings-row" data-tip="Force the raw source view to use a dark theme even on light pages">
         <span class="settings-row-icon">${iCode}</span>
