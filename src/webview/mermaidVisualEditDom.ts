@@ -14,6 +14,7 @@ import {
   collectNodes, NodeShape, Ast,
   getPositions, setAllPositions, setPosition, clearPositions, PositionMap,
   getLocks, isLocked, toggleLock,
+  getStyles, getNodeStyle, setNodeStyle, NodeStyle, StyleMap,
 } from './mermaidVisualEdit';
 
 export type Tool = 'select' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text';
@@ -85,6 +86,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   const undoStack: Ast[] = [];
   const redoStack: Ast[] = [];
   const MAX_UNDO = 50;
+  // After a duplicate, re-select the new copies on the next rerender.
+  let pendingDuplicateIds: string[] | null = null;
 
   // ── Overlays (mounted under the block, absolute-positioned) ─────────────
   opts.block.classList.add('mb-visual-active');
@@ -129,6 +132,38 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       if (targetIds.length === 0) return;
       mutate((ast) => {
         for (const id of targetIds) toggleLock(ast, id);
+      });
+    },
+    onStyle: (partial) => {
+      const targetIds = Array.from(selectedIds);
+      if (targetIds.length === 0) return;
+      mutate((ast) => {
+        for (const id of targetIds) setNodeStyle(ast, id, partial);
+      });
+    },
+    onDuplicate: () => {
+      const targetIds = Array.from(selectedIds);
+      if (targetIds.length === 0) return;
+      mutate((ast) => {
+        const positions = getPositions(ast);
+        const styles    = getStyles(ast) ?? {};
+        const newIds: string[] = [];
+        for (const id of targetIds) {
+          // Look up shape + label of original.
+          const orig = collectNodes(ast).get(id);
+          const shape: NodeShape = orig?.shape ?? 'rect';
+          const label = (orig?.label ?? id) + ' copy';
+          const added = addNode(ast, shape, label);
+          newIds.push(added.id);
+          // Copy style if present.
+          if (styles[id]) setNodeStyle(ast, added.id, styles[id]);
+          // Copy position with a small offset if positions are pinned.
+          if (positions && positions[id]) {
+            setPosition(ast, added.id, positions[id][0] + 30, positions[id][1] + 30);
+          }
+        }
+        // Defer selection update until after mermaid re-renders.
+        pendingDuplicateIds = newIds;
       });
     },
   });
@@ -750,9 +785,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       contextTip.showBelow(pivotEl, opts.previewPane);
       const ast = parseMermaid(opts.getSource());
       contextTip.setLocked(isLocked(ast, ids[0]));
+      contextTip.setStyle(getNodeStyle(ast, ids[0]));
       showConnectionPoints(pivotEl);
     } else {
       contextTip.showMulti(ids.length, opts.previewPane, pivotEl);
+      contextTip.setStyle(null);
       hideConnectionPoints();
     }
 
@@ -854,8 +891,17 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
         const id = extractMermaidId(n);
         if (id) presentIds.add(id);
       }
-      for (const id of Array.from(selectedIds)) {
-        if (!presentIds.has(id)) selectedIds.delete(id);
+      // Promote pending duplicate selection (set during a duplicate mutate).
+      if (pendingDuplicateIds) {
+        selectedIds.clear();
+        for (const id of pendingDuplicateIds) {
+          if (presentIds.has(id)) selectedIds.add(id);
+        }
+        pendingDuplicateIds = null;
+      } else {
+        for (const id of Array.from(selectedIds)) {
+          if (!presentIds.has(id)) selectedIds.delete(id);
+        }
       }
       syncSelectedId();
       refreshSelectionUI();
@@ -1009,15 +1055,24 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
 // ── Context tip ─────────────────────────────────────────────────────────────
 
 interface ContextTipHandle {
-  el:        HTMLElement;
-  showBelow: (node: Element, host: HTMLElement) => void;
-  showMulti: (count: number, host: HTMLElement, pivot: Element) => void;
-  setLocked: (locked: boolean) => void;
-  hide:      () => void;
-  destroy:   () => void;
+  el:         HTMLElement;
+  showBelow:  (node: Element, host: HTMLElement) => void;
+  showMulti:  (count: number, host: HTMLElement, pivot: Element) => void;
+  setLocked:  (locked: boolean) => void;
+  setStyle:   (s: NodeStyle | null) => void;
+  hide:       () => void;
+  destroy:    () => void;
 }
 
-function buildContextTip(handlers: { onDelete: () => void; onShape: (s: NodeShape) => void; onToggleLock: () => void }): ContextTipHandle {
+interface ContextTipHandlers {
+  onDelete:    () => void;
+  onShape:     (s: NodeShape) => void;
+  onToggleLock:() => void;
+  onStyle:     (partial: NodeStyle) => void;
+  onDuplicate: () => void;
+}
+
+function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   const el = document.createElement('div');
   el.className = 'mb-vCtx mb-hidden';
   el.contentEditable = 'false';
@@ -1065,6 +1120,53 @@ function buildContextTip(handlers: { onDelete: () => void; onShape: (s: NodeShap
   const sep = document.createElement('span');
   sep.className = 'mb-vCtx-sep';
 
+  // ── Font size ─────────────────────────────────────────────────────────
+  const fontInput = document.createElement('input');
+  fontInput.type = 'number';
+  fontInput.className = 'mb-vCtx-num';
+  fontInput.min = '8';
+  fontInput.max = '72';
+  fontInput.step = '1';
+  fontInput.value = '14';
+  fontInput.setAttribute('aria-label', 'Font size');
+  fontInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  fontInput.addEventListener('change', () => {
+    const v = parseInt(fontInput.value, 10);
+    if (Number.isFinite(v)) handlers.onStyle({ fontSize: v });
+  });
+
+  // ── Bold ──────────────────────────────────────────────────────────────
+  const boldBtn = document.createElement('button');
+  boldBtn.type = 'button';
+  boldBtn.className = 'mb-vCtx-btn mb-vCtx-bold';
+  boldBtn.textContent = 'B';
+  boldBtn.setAttribute('aria-label', 'Bold');
+  boldBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  boldBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const on = !boldBtn.classList.contains('mb-vCtx-bold-on');
+    handlers.onStyle({ bold: on });
+  });
+
+  // ── Text color ────────────────────────────────────────────────────────
+  const textColorBtn = makeColorButton('A', 'Text color', (c) => handlers.onStyle({ text: c }));
+  // ── Border color ──────────────────────────────────────────────────────
+  const borderBtn    = makeColorButton('◯', 'Border color', (c) => handlers.onStyle({ border: c }));
+  // ── Fill color ────────────────────────────────────────────────────────
+  const fillBtn      = makeColorButton('●', 'Fill color',   (c) => handlers.onStyle({ fill: c }));
+
+  // ── Duplicate ─────────────────────────────────────────────────────────
+  const dupBtn = document.createElement('button');
+  dupBtn.type = 'button';
+  dupBtn.className = 'mb-vCtx-btn mb-vCtx-dup';
+  dupBtn.setAttribute('aria-label', 'Duplicate');
+  dupBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  dupBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  dupBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDuplicate(); });
+
+  const styleSep = document.createElement('span');
+  styleSep.className = 'mb-vCtx-sep';
+
   const lockBtn = document.createElement('button');
   lockBtn.type = 'button';
   lockBtn.className = 'mb-vCtx-btn mb-vCtx-lock';
@@ -1092,7 +1194,13 @@ function buildContextTip(handlers: { onDelete: () => void; onShape: (s: NodeShap
     handlers.onDelete();
   });
 
-  el.append(shapeBtn, shapeMenu, sep, lockBtn, sep2, deleteBtn);
+  el.append(
+    shapeBtn, shapeMenu, sep,
+    fontInput, boldBtn,
+    textColorBtn.el, borderBtn.el, fillBtn.el,
+    dupBtn, styleSep,
+    lockBtn, sep2, deleteBtn,
+  );
 
   function showBelow(node: Element, host: HTMLElement): void {
     const nodeRect = node.getBoundingClientRect();
@@ -1126,6 +1234,11 @@ function buildContextTip(handlers: { onDelete: () => void; onShape: (s: NodeShap
     lockBtn.classList.toggle('mb-vCtx-lock-on', locked);
   }
 
+  function setStyle(s: NodeStyle | null): void {
+    fontInput.value = String(s?.fontSize ?? 14);
+    boldBtn.classList.toggle('mb-vCtx-bold-on', !!s?.bold);
+  }
+
   function hide(): void {
     el.classList.add('mb-hidden');
     shapeMenu.classList.add('mb-hidden');
@@ -1133,7 +1246,7 @@ function buildContextTip(handlers: { onDelete: () => void; onShape: (s: NodeShap
 
   function destroy(): void { el.remove(); }
 
-  return { el, showBelow, showMulti, setLocked, hide, destroy };
+  return { el, showBelow, showMulti, setLocked, setStyle, hide, destroy };
 }
 
 // ── Rename overlay ──────────────────────────────────────────────────────────
@@ -1324,6 +1437,88 @@ export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
 /** For each g.cluster, recompute the `<rect>` (or `<polygon>`) so it
     encloses its contained nodes after positions are applied. Padded so the
     box doesn't kiss the node edges. */
+/** Build a context-tip color button with a 6-swatch popover. */
+function makeColorButton(glyph: string, ariaLabel: string, onPick: (color: string) => void): { el: HTMLElement } {
+  const SWATCHES = ['#1f2937', '#6366f1', '#06b6d4', '#22c55e', '#b45309', '#ec4899', '#ffffff'];
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-vCtx-color';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mb-vCtx-btn mb-vCtx-colorbtn';
+  btn.textContent = glyph;
+  btn.setAttribute('aria-label', ariaLabel);
+
+  const pop = document.createElement('div');
+  pop.className = 'mb-vCtx-colorpop mb-hidden';
+  for (const c of SWATCHES) {
+    const s = document.createElement('button');
+    s.type = 'button';
+    s.className = 'mb-vCtx-swatch';
+    s.style.background = c;
+    s.dataset.color = c;
+    s.setAttribute('aria-label', `${ariaLabel} ${c}`);
+    s.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    s.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      onPick(c);
+      pop.classList.add('mb-hidden');
+    });
+    pop.appendChild(s);
+  }
+
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    pop.classList.toggle('mb-hidden');
+  });
+
+  wrap.append(btn, pop);
+  return { el: wrap };
+}
+
+/** Apply per-node style overrides (Phase 5) to the rendered SVG. */
+export function applyStylesOverlay(ast: Ast, host: HTMLElement): void {
+  const styles = getStyles(ast);
+  if (!styles) return;
+  for (const [id, s] of Object.entries(styles)) {
+    const g = findNodeElementById(id, host);
+    if (!g) continue;
+    applyStyleToNode(g as SVGGElement, s);
+  }
+}
+
+function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
+  // Background shape: rect / circle / polygon / path drawn inside g.node.
+  // Mermaid often wraps these in <g class="basic ...">.
+  const shapes = g.querySelectorAll<SVGGraphicsElement>(
+    'rect, circle, ellipse, polygon, path',
+  );
+  for (const el of Array.from(shapes)) {
+    // Skip the foreignObject label's nested rendering — we only want the
+    // outer shape. Mermaid renders the foreignObject content in HTML so it
+    // doesn't appear in this query.
+    if (s.fill   !== undefined) el.setAttribute('fill',   s.fill);
+    if (s.border !== undefined) el.setAttribute('stroke', s.border);
+  }
+
+  // Label color + font size + weight live in a foreignObject containing
+  // .nodeLabel (mermaid v11).
+  const labelDiv = g.querySelector<HTMLElement>('foreignObject .nodeLabel, foreignObject div, .label');
+  if (labelDiv) {
+    if (s.text     !== undefined) labelDiv.style.color      = s.text;
+    if (s.fontSize !== undefined) labelDiv.style.fontSize   = `${s.fontSize}px`;
+    if (s.bold     !== undefined) labelDiv.style.fontWeight = s.bold ? '700' : '';
+  }
+  // Some mermaid versions render labels as <text> directly.
+  const textEl = g.querySelector<SVGTextElement>('text.nodeLabel, text');
+  if (textEl) {
+    if (s.text     !== undefined) textEl.setAttribute('fill', s.text);
+    if (s.fontSize !== undefined) textEl.setAttribute('font-size', String(s.fontSize));
+    if (s.bold     !== undefined) textEl.setAttribute('font-weight', s.bold ? '700' : '400');
+  }
+}
+
 function fitClusters(host: HTMLElement): void {
   const clusters = host.querySelectorAll<SVGGElement>('g.cluster');
   const PAD = 24;

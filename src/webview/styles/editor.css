@@ -3308,3 +3308,50 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   opacity: 0.85;
 }
 .ProseMirror .mb-vCtx-multi.mb-hidden { display: none; }
+
+/* ===========================================================================
+   Phase 5: rich style context bar
+   =========================================================================== */
+
+.ProseMirror .mb-vCtx-num {
+  width: 36px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 1px 3px;
+  font: 500 11px var(--font-body);
+}
+.ProseMirror .mb-vCtx-num::-webkit-inner-spin-button { opacity: 0.4; }
+
+.ProseMirror .mb-vCtx-bold { font-weight: 700; }
+.ProseMirror .mb-vCtx-bold.mb-vCtx-bold-on { background: rgba(255, 255, 255, 0.18); }
+
+.ProseMirror .mb-vCtx-color { position: relative; display: inline-flex; }
+.ProseMirror .mb-vCtx-colorbtn { font: 600 12px ui-sans-serif, system-ui; }
+.ProseMirror .mb-vCtx-colorpop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  width: 102px;
+  padding: 6px;
+  background: #1f1f23;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  z-index: 27;
+}
+.ProseMirror .mb-vCtx-colorpop.mb-hidden { display: none; }
+.ProseMirror .mb-vCtx-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  padding: 0;
+}
+.ProseMirror .mb-vCtx-swatch:hover { transform: scale(1.1); }
+.ProseMirror .mb-vCtx-dup svg { width: 11px; height: 11px; }

@@ -47,12 +47,22 @@ export interface PassthroughLine {
 
 export type PositionMap = Record<string, [number, number]>;
 
+export interface NodeStyle {
+  fill?:     string;
+  border?:   string;
+  text?:     string;
+  fontSize?: number;
+  bold?:     boolean;
+}
+export type StyleMap = Record<string, NodeStyle>;
+
 type AnyLine =
   | { kind: 'node';      node: NodeDecl }
   | { kind: 'edge';      edge: EdgeDecl }
   | { kind: 'header';    raw:  string; direction: string }
   | { kind: 'positions'; raw:  string; map: PositionMap }
   | { kind: 'locks';     raw:  string; ids: string[] }
+  | { kind: 'styles';    raw:  string; map: StyleMap }
   | { kind: 'pass';      raw:  string };
 
 export interface Ast {
@@ -108,6 +118,12 @@ export function parseMermaid(source: string): Ast {
     const locks = tryParseLocksLine(trimmed);
     if (locks) {
       lines.push({ kind: 'locks', raw: trimmed, ids: locks });
+      continue;
+    }
+
+    const styles = tryParseStylesLine(trimmed);
+    if (styles) {
+      lines.push({ kind: 'styles', raw: trimmed, map: styles });
       continue;
     }
 
@@ -322,6 +338,60 @@ export function toggleLock(ast: Ast, id: string): void {
   setLocks(ast, cur);
 }
 
+// ── Styles sidecar (Phase 5) ───────────────────────────────────────────────
+
+export function getStyles(ast: Ast): StyleMap | null {
+  for (const line of ast.lines) {
+    if (line.kind === 'styles') return line.map;
+  }
+  return null;
+}
+
+export function getNodeStyle(ast: Ast, id: string): NodeStyle | null {
+  return getStyles(ast)?.[id] ?? null;
+}
+
+function writeStylesLine(ast: Ast, map: StyleMap): void {
+  // Drop entries with zero meaningful fields so the sidecar stays tidy.
+  const filtered: StyleMap = {};
+  for (const [k, v] of Object.entries(map)) {
+    if (v.fill || v.border || v.text || v.fontSize !== undefined || v.bold !== undefined) {
+      filtered[k] = v;
+    }
+  }
+  if (Object.keys(filtered).length === 0) {
+    ast.lines = ast.lines.filter(l => l.kind !== 'styles');
+    return;
+  }
+  const raw = `%% mb-styles: ${JSON.stringify(filtered)}`;
+  const idx = ast.lines.findIndex(l => l.kind === 'styles');
+  if (idx >= 0) {
+    ast.lines[idx] = { kind: 'styles', raw, map: filtered };
+    return;
+  }
+  // Insert after locks (if any) → positions → header.
+  const lockIdx = ast.lines.findIndex(l => l.kind === 'locks');
+  const posIdx  = ast.lines.findIndex(l => l.kind === 'positions');
+  const headerIdx = ast.lines.findIndex(l => l.kind === 'header');
+  const at = lockIdx >= 0 ? lockIdx + 1
+           : posIdx  >= 0 ? posIdx  + 1
+           : headerIdx + 1;
+  ast.lines.splice(at, 0, { kind: 'styles', raw, map: filtered });
+}
+
+export function setNodeStyle(ast: Ast, id: string, partial: NodeStyle): void {
+  const current = { ...(getStyles(ast) ?? {}) } as StyleMap;
+  const merged = { ...(current[id] ?? {}), ...partial };
+  current[id] = merged;
+  writeStylesLine(ast, current);
+}
+
+export function clearNodeStyle(ast: Ast, id: string): void {
+  const current = { ...(getStyles(ast) ?? {}) } as StyleMap;
+  delete current[id];
+  writeStylesLine(ast, current);
+}
+
 // ── Parsers (internal) ──────────────────────────────────────────────────────
 
 // Order matters — more specific (longer) bracket pairs must come first so a
@@ -336,6 +406,31 @@ const NODE_SHAPES: Array<[NodeShape, RegExp]> = [
   ['round',      /^([A-Za-z][\w-]*)\(\s*"?([^)"]*?)"?\s*\)$/],      // A(Label)
   ['diamond',    /^([A-Za-z][\w-]*)\{\s*"?([^}"]*?)"?\s*\}$/],      // A{Label}
 ];
+
+// `%% mb-styles: { "n1": { fill: "#...", border: "#...", text: "#...", fontSize: 14, bold: true } }`
+function tryParseStylesLine(trimmed: string): StyleMap | null {
+  const m = trimmed.match(/^%%\s*mb-styles:\s*(.+)$/);
+  if (!m) return null;
+  try {
+    const obj = JSON.parse(m[1]) as unknown;
+    if (!obj || typeof obj !== 'object') return null;
+    const out: StyleMap = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (!v || typeof v !== 'object') continue;
+      const s = v as Record<string, unknown>;
+      const entry: NodeStyle = {};
+      if (typeof s.fill     === 'string') entry.fill     = s.fill;
+      if (typeof s.border   === 'string') entry.border   = s.border;
+      if (typeof s.text     === 'string') entry.text     = s.text;
+      if (typeof s.fontSize === 'number') entry.fontSize = s.fontSize;
+      if (typeof s.bold     === 'boolean') entry.bold    = s.bold;
+      out[k] = entry;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
 
 // `%% mb-locks: ["n1", "n2"]` — phase 4 sidecar listing locked node ids.
 function tryParseLocksLine(trimmed: string): string[] | null {
@@ -440,6 +535,7 @@ function emitLine(line: AnyLine): string {
   if (line.kind === 'pass')      return line.raw;
   if (line.kind === 'positions') return '    ' + line.raw;
   if (line.kind === 'locks')     return '    ' + line.raw;
+  if (line.kind === 'styles')    return '    ' + line.raw;
   // For node/edge lines: if the parsed `raw` is still attached, emit it
   // verbatim (preserves the user's quoting and inline shape syntax).
   // Mutations clear `raw` to force a canonical re-emit.
