@@ -411,6 +411,15 @@ function renderBody(): HTMLElement {
   bodyWrap.appendChild(placeholder);
   updateBodyPlaceholderVisibility(bodyWrap, card.body || '');
 
+  // Hide the placeholder immediately on the first keystroke. Tiptap's
+  // onChange fires AFTER the browser has already rendered the typed
+  // character, so without this the character briefly overlaps the
+  // placeholder text. Listening for `input` on the body host catches the
+  // event in the same frame as the keystroke.
+  bodyHost.addEventListener('input', () => {
+    placeholder.style.display = 'none';
+  });
+
   return bodyWrap;
 }
 
