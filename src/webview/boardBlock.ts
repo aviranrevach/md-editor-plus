@@ -36,6 +36,15 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   dom.addEventListener('mousedown', (e: Event) => {
     const t = e.target as HTMLElement | null;
     if (!t) return;
+    // When the user starts interacting with the board, blur the surrounding
+    // ProseMirror editable root so the blinking text caret in the paragraph
+    // below the board disappears. Nested contenteditable spans (board name,
+    // column name, card title) get focus naturally on click, so this only
+    // hides the stray caret from the outer document area.
+    const pmRoot = findEditableAncestor(dom);
+    if (pmRoot && document.activeElement === pmRoot) {
+      pmRoot.blur();
+    }
     if (t.closest('[contenteditable="true"], button, input, select, textarea, .board-card, .board-column')) {
       e.stopPropagation();
     }
@@ -55,9 +64,16 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   render();
 
   function mutate(next: Board): void {
+    const heightSnapshot = snapshotColumnHeights(dom);
+    const scrollLeftBefore = (dom.querySelector('.board-columns') as HTMLElement | null)?.scrollLeft ?? 0;
     board = next;
     opts.onMutate(serializeBoard(board));
     render();
+    // Restore horizontal scroll on the freshly-rendered columns row so adding
+    // a card in a column you scrolled to doesn't jerk the board back to the start.
+    const cols = dom.querySelector('.board-columns') as HTMLElement | null;
+    if (cols) cols.scrollLeft = scrollLeftBefore;
+    animateColumnHeights(dom, heightSnapshot);
   }
 
   function render(): void {
@@ -110,54 +126,21 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
   chrome.appendChild(name);
 
   if (!readOnly) {
-    // Right-side action cluster, ABOVE the columns: [+] [Properties].
-    const actions = document.createElement('div');
-    actions.className = 'board-chrome-actions';
-
-    const addCol = document.createElement('button');
-    addCol.type = 'button';
-    addCol.className = 'board-add-column';
-    addCol.textContent = '+';
-    addCol.title = 'Add column';
-    addCol.addEventListener('click', () => {
-      // VSCode webviews block window.prompt(), so add a column with a default
-      // name + an auto-incrementing suffix and focus its inline name span for
-      // immediate rename. Mirrors the "+ New card" UX.
-      const base = 'New';
-      let nm = base;
-      let n = 2;
-      while (board.columns.some((c) => c.name === nm)) nm = `${base} ${n++}`;
-      const color = nextColor(board.columns.map((c) => c.color));
-      mutate({ ...board, columns: [...board.columns, { name: nm, color }] });
-      requestAnimationFrame(() => {
-        const boardDom = chrome.closest('.board-block');
-        const newColDom = boardDom?.querySelector(
-          `.board-column[data-column="${cssEscape(nm)}"]`,
-        ) as HTMLElement | null;
-        const nameEl = newColDom?.querySelector('.board-column-name') as HTMLElement | null;
-        if (!nameEl) return;
-        nameEl.focus();
-        selectAllText(nameEl);
-      });
-    });
-    actions.appendChild(addCol);
-
+    // Right-side: Properties button only. (Column-add moved to a tall + at the
+    // end of the columns row.)
     const props = document.createElement('button');
     props.type = 'button';
     props.className = 'board-properties-btn';
     props.title = 'Properties';
-    // Phosphor Icons — sliders-horizontal, bold weight (256x256 viewBox).
+    // Phosphor Icons — sliders-horizontal, 2-handle variant (256x256 viewBox).
     props.innerHTML = `
       <svg viewBox="0 0 256 256" fill="currentColor">
         <path d="M40,80H79.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24H140.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24Zm70-20a8,8,0,1,1-8,8A8,8,0,0,1,110,60Z"/>
-        <path d="M216,116H176.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24h75.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24Zm-70,20a8,8,0,1,1,8-8A8,8,0,0,1,146,136Z"/>
-        <path d="M216,180H112.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24H51.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24ZM82,200a8,8,0,1,1,8-8A8,8,0,0,1,82,200Z"/>
+        <path d="M216,160H176.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24h75.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24Zm-70,20a8,8,0,1,1,8-8A8,8,0,0,1,146,180Z"/>
       </svg>
     `;
     props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
-    actions.appendChild(props);
-
-    chrome.appendChild(actions);
+    chrome.appendChild(props);
   }
 
   return chrome;
@@ -166,6 +149,7 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
 function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-columns';
+  if (!readOnly) attachEdgeScroll(row);
   const validNames = new Set(board.columns.map((c) => c.name));
   for (const col of board.columns) {
     row.appendChild(renderColumn(board, col, mutate, readOnly));
@@ -174,6 +158,50 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
   if (orphans.length) {
     row.appendChild(renderUncategorized(board, orphans, mutate, readOnly));
   }
+
+  if (!readOnly) {
+    // Tall "+ Add column" button at the end of the row — same height as a
+    // column body, brighter fill so it reads as the primary creation affordance.
+    const addBig = document.createElement('button');
+    addBig.type = 'button';
+    addBig.className = 'board-add-column-big';
+    addBig.title = 'Add column';
+    addBig.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+        <path d="M8 3.5v9M3.5 8h9"/>
+      </svg>
+    `;
+    addBig.addEventListener('click', () => {
+      const base = 'New';
+      let nm = base;
+      let n = 2;
+      while (board.columns.some((c) => c.name === nm)) nm = `${base} ${n++}`;
+      const color = nextColor(board.columns.map((c) => c.color));
+      mutate({ ...board, columns: [...board.columns, { name: nm, color }] });
+      // After mutate(), the row variable references a now-detached element.
+      // Query the FRESH DOM via the board id (set as data-board-id on .board-block).
+      requestAnimationFrame(() => {
+        const boardDom = board.id
+          ? (document.querySelector(`.board-block[data-board-id="${board.id}"]`) as HTMLElement | null)
+          : null;
+        if (!boardDom) return;
+        const newColDom = boardDom.querySelector(
+          `.board-column[data-column="${cssEscape(nm)}"]`,
+        ) as HTMLElement | null;
+        if (!newColDom) return;
+        // Focus first with preventScroll so the focus-induced auto-scroll
+        // doesn't fight the smooth scroll below.
+        const nameEl = newColDom.querySelector('.board-column-name') as HTMLElement | null;
+        if (nameEl) {
+          nameEl.focus({ preventScroll: true });
+          selectAllText(nameEl);
+        }
+        newColDom.scrollIntoView({ behavior: 'smooth', inline: 'end', block: 'nearest' });
+      });
+    });
+    row.appendChild(addBig);
+  }
+
   return row;
 }
 
@@ -239,8 +267,16 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   const chip = document.createElement('span');
   chip.className = 'board-column-chip';
 
-  const dot = document.createElement('span');
+  const dot = document.createElement(readOnly ? 'span' : 'button');
   dot.className = 'board-column-chip-dot';
+  if (!readOnly) {
+    (dot as HTMLButtonElement).type = 'button';
+    dot.setAttribute('title', 'Change color');
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openColumnColorPicker(dot as HTMLElement, board, col, mutate);
+    });
+  }
   chip.appendChild(dot);
 
   const nameEl = document.createElement('span');
@@ -769,6 +805,63 @@ const ICON_EDIT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" st
 const ICON_SORT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h10M5 8h6M7 11h2"/></svg>`;
 const ICON_TRASH = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M5.5 4V2.5h5V4M4 4l.5 9.5h7L12 4M6.5 7v4M9.5 7v4"/></svg>`;
 
+function openColumnColorPicker(
+  anchor: HTMLElement,
+  board: Board,
+  col: { name: string; color: string },
+  mutate: (next: Board) => void,
+): void {
+  document.querySelectorAll('.board-column-menu').forEach((n) => n.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'board-column-menu board-column-menu-color-only';
+  document.body.appendChild(menu);
+
+  const rect = anchor.getBoundingClientRect();
+  menu.style.position = 'absolute';
+  menu.style.top = `${rect.bottom + window.scrollY + 6}px`;
+  menu.style.left = `${rect.left + window.scrollX}px`;
+
+  const colorRow = document.createElement('div');
+  colorRow.className = 'board-color-swatches';
+  for (const tok of COLOR_PALETTE) {
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = `board-color-swatch color-${tok}`;
+    swatch.title = tok;
+    if (col.color === tok) swatch.classList.add('is-selected');
+    swatch.addEventListener('click', () => {
+      const cols = board.columns.map((c) =>
+        c.name === col.name ? { ...c, color: tok } : c,
+      );
+      mutate({ ...board, columns: cols });
+      closeMenu();
+    });
+    colorRow.appendChild(swatch);
+  }
+  menu.appendChild(colorRow);
+
+  function closeMenu(): void {
+    menu.remove();
+    document.removeEventListener('mousedown', onOutside, true);
+  }
+  function onOutside(e: MouseEvent): void {
+    if (!menu.contains(e.target as Node) && e.target !== anchor) {
+      closeMenu();
+    }
+  }
+  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+
+  // Edge-aware: nudge left if it would overflow the right edge.
+  requestAnimationFrame(() => {
+    const r = menu.getBoundingClientRect();
+    const overflowRight = r.right - window.innerWidth;
+    if (overflowRight > 0) {
+      menu.style.left = `${Math.max(8, parseFloat(menu.style.left) - overflowRight - 8)}px`;
+    }
+  });
+}
+
 function openColumnMenu(
   anchor: HTMLElement,
   board: Board,
@@ -907,4 +1000,107 @@ function openColumnMenu(
 function cssEscape(s: string): string {
   // Minimal CSS attr-value escape for use in `[data-column="..."]` selectors.
   return s.replace(/(["\\])/g, '\\$1');
+}
+
+function findEditableAncestor(start: HTMLElement): HTMLElement | null {
+  let el: HTMLElement | null = start.parentElement;
+  while (el) {
+    if (el.getAttribute('contenteditable') === 'true') return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
+// ===== Edge-scroll while dragging =====
+// When the user drags a card (or column) near the left/right edge of the
+// columns row and the row has horizontal overflow, auto-scroll in that
+// direction so they can drop into an off-screen column.
+function attachEdgeScroll(row: HTMLElement): void {
+  const EDGE = 90;       // px from edge that triggers scrolling
+  const MAX_SPEED = 22;  // px per frame at the very edge
+  let raf: number | null = null;
+  let velocity = 0;
+
+  function loop() {
+    if (Math.abs(velocity) < 0.5) {
+      raf = null;
+      return;
+    }
+    row.scrollLeft += velocity;
+    raf = requestAnimationFrame(loop);
+  }
+
+  row.addEventListener('dragover', (e) => {
+    const types = e.dataTransfer?.types;
+    if (!types || (!types.includes('text/board-card-id') && !types.includes('text/board-column-name'))) return;
+    const rect = row.getBoundingClientRect();
+    const leftDist = e.clientX - rect.left;
+    const rightDist = rect.right - e.clientX;
+    if (leftDist < EDGE && leftDist >= 0) {
+      velocity = -MAX_SPEED * (1 - leftDist / EDGE);
+    } else if (rightDist < EDGE && rightDist >= 0) {
+      velocity = MAX_SPEED * (1 - rightDist / EDGE);
+    } else {
+      velocity = 0;
+    }
+    if (velocity !== 0 && raf === null) raf = requestAnimationFrame(loop);
+  });
+
+  const stop = () => {
+    velocity = 0;
+    if (raf !== null) {
+      cancelAnimationFrame(raf);
+      raf = null;
+    }
+  };
+  row.addEventListener('dragleave', (e) => {
+    // dragleave fires when the cursor crosses any child boundary; only stop
+    // when actually leaving the row.
+    const rt = e.relatedTarget as Node | null;
+    if (rt && row.contains(rt)) return;
+    stop();
+  });
+  row.addEventListener('drop', stop);
+  // dragend bubbles from the source element (card/column) up to the row.
+  row.addEventListener('dragend', stop);
+}
+
+// ===== Gentle height transition (FLIP-style) when columns grow/shrink. =====
+// Triggered whenever mutate() re-renders the board: snapshot each column body's
+// height before mutation, then on the freshly rendered DOM lock each body to
+// its old height, force a reflow, and transition to the new natural height.
+function snapshotColumnHeights(boardDom: HTMLElement): Map<string, number> {
+  const map = new Map<string, number>();
+  const cols = boardDom.querySelectorAll('.board-column');
+  cols.forEach((col) => {
+    const name = (col as HTMLElement).dataset.column ?? '';
+    const body = col.querySelector(':scope > .board-column-body') as HTMLElement | null;
+    if (body) map.set(name, body.getBoundingClientRect().height);
+  });
+  return map;
+}
+
+function animateColumnHeights(boardDom: HTMLElement, prev: Map<string, number>): void {
+  const cols = boardDom.querySelectorAll('.board-column');
+  cols.forEach((col) => {
+    const name = (col as HTMLElement).dataset.column ?? '';
+    const body = col.querySelector(':scope > .board-column-body') as HTMLElement | null;
+    if (!body) return;
+    const oldH = prev.get(name);
+    if (oldH == null) return;
+    const newH = body.getBoundingClientRect().height;
+    if (Math.abs(oldH - newH) < 1) return;
+    body.style.height = `${oldH}px`;
+    body.style.transition = 'none';
+    void body.offsetHeight;
+    body.style.transition = 'height 260ms cubic-bezier(0.2, 0, 0, 1)';
+    body.style.height = `${newH}px`;
+    const cleanup = () => {
+      body.style.height = '';
+      body.style.transition = '';
+      body.removeEventListener('transitionend', cleanup);
+    };
+    body.addEventListener('transitionend', cleanup);
+    window.setTimeout(cleanup, 380);
+  });
 }

@@ -17,6 +17,106 @@ export function fieldHasAnyValue(board: Board, fieldName: string): boolean {
   return board.cards.some((c) => ((c.values[fieldName] || '').trim().length > 0));
 }
 
+// ===== Manual mouse-based reorder for Properties rows =====
+// We avoid HTML5 drag-and-drop here: ProseMirror's view intercepts dragstart
+// events on the page and the popover sometimes sits inside its viewport, so
+// HTML5 drag is unreliable in this context.
+function startManualFieldDrag(
+  downEvent: MouseEvent,
+  fromName: string,
+  board: Board,
+  onChange: (next: Board) => void,
+): void {
+  const startX = downEvent.clientX;
+  const startY = downEvent.clientY;
+  const THRESHOLD = 4;
+  let active = false;
+  let lastDropTarget: HTMLElement | null = null;
+
+  function rowsContainer(): HTMLElement | null {
+    return document.querySelector('.board-properties-menu .board-properties-list') as HTMLElement | null;
+  }
+
+  function clearIndicator(): void {
+    document.querySelectorAll('.board-properties-drop-indicator').forEach((n) => n.remove());
+  }
+
+  function showIndicator(target: HTMLElement, before: boolean): void {
+    clearIndicator();
+    const parent = target.parentElement;
+    if (!parent) return;
+    const indicator = document.createElement('div');
+    indicator.className = 'board-properties-drop-indicator';
+    if (before) parent.insertBefore(indicator, target);
+    else parent.insertBefore(indicator, target.nextSibling);
+  }
+
+  function findRowAt(x: number, y: number): { row: HTMLElement; before: boolean } | null {
+    const list = rowsContainer();
+    if (!list) return null;
+    const rows = list.querySelectorAll('.board-properties-row');
+    for (const r of Array.from(rows) as HTMLElement[]) {
+      const rect = r.getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
+        const before = y < rect.top + rect.height / 2;
+        return { row: r, before };
+      }
+    }
+    return null;
+  }
+
+  function onMove(e: MouseEvent): void {
+    if (!active) {
+      if (Math.abs(e.clientX - startX) < THRESHOLD && Math.abs(e.clientY - startY) < THRESHOLD) return;
+      active = true;
+      document.body.classList.add('is-dragging-property');
+    }
+    e.preventDefault();
+    const hit = findRowAt(e.clientX, e.clientY);
+    if (!hit) {
+      clearIndicator();
+      lastDropTarget = null;
+      return;
+    }
+    const targetName = hit.row.dataset.fieldName || '';
+    if (targetName === 'Title' || targetName === 'Status' || targetName === fromName) {
+      clearIndicator();
+      lastDropTarget = null;
+      return;
+    }
+    showIndicator(hit.row, hit.before);
+    lastDropTarget = hit.row;
+  }
+
+  function onUp(e: MouseEvent): void {
+    document.removeEventListener('mousemove', onMove, true);
+    document.removeEventListener('mouseup', onUp, true);
+    document.body.classList.remove('is-dragging-property');
+    if (!active) {
+      clearIndicator();
+      return;
+    }
+    const hit = findRowAt(e.clientX, e.clientY);
+    clearIndicator();
+    if (!hit) return;
+    const toName = hit.row.dataset.fieldName || '';
+    if (toName === 'Title' || toName === 'Status' || toName === fromName) return;
+    const fields = [...board.fields];
+    const fromIdx = fields.findIndex((f) => f.name === fromName);
+    let toIdx = fields.findIndex((f) => f.name === toName);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = fields.splice(fromIdx, 1);
+    toIdx = fields.findIndex((f) => f.name === toName);
+    const insertAt = hit.before ? toIdx : toIdx + 1;
+    fields.splice(insertAt, 0, moved);
+    onChange({ ...board, fields });
+  }
+  void lastDropTarget;
+
+  document.addEventListener('mousemove', onMove, true);
+  document.addEventListener('mouseup', onUp, true);
+}
+
 export function deleteFieldFromBoard(board: Board, fieldName: string): Board {
   return {
     ...board,
@@ -213,12 +313,28 @@ export function openPropertiesMenu(
   header.textContent = 'Properties';
   menu.appendChild(header);
 
+  // Keep a local mirror of the board so we can rebuild the list after each
+  // mutate(). The popover lives at document.body — it's NOT inside the board's
+  // root, so the board's re-render does NOT refresh it. Without this, "Add a
+  // property" appears to do nothing because the user keeps seeing the old list.
+  let currentBoard = board;
+  const wrappedOnChange = (next: Board) => {
+    currentBoard = next;
+    onChange(next);
+    rebuildList();
+  };
+
   const list = document.createElement('div');
   list.className = 'board-properties-list';
   menu.appendChild(list);
-  for (const field of board.fields) {
-    list.appendChild(renderFieldRow(board, field, onChange));
+
+  function rebuildList() {
+    list.innerHTML = '';
+    for (const field of currentBoard.fields) {
+      list.appendChild(renderFieldRow(currentBoard, field, wrappedOnChange));
+    }
   }
+  rebuildList();
 
   const add = document.createElement('button');
   add.type = 'button';
@@ -227,7 +343,7 @@ export function openPropertiesMenu(
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
     <span>Add a property</span>
   `;
-  add.addEventListener('click', () => promptNewField(add, board, onChange));
+  add.addEventListener('click', () => promptNewField(add, currentBoard, wrappedOnChange));
   menu.appendChild(add);
 
   function onOutside(e: MouseEvent) {
@@ -245,12 +361,20 @@ export function openPropertiesMenu(
   }
   setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
 
-  // Edge-aware repositioning so the popover never overflows the viewport.
+  // Edge-aware repositioning so the popover never overflows the viewport on
+  // either side. The menu is right-anchored via transform: translateX(-100%);
+  // if the resulting left edge goes off-screen, switch off the transform and
+  // pin the left edge to the viewport margin.
   requestAnimationFrame(() => {
     const r = menu.getBoundingClientRect();
-    const overflowRight = r.right - window.innerWidth;
-    if (overflowRight > 0) {
-      menu.style.left = `${Math.max(8, parseFloat(menu.style.left) - overflowRight - 8)}px`;
+    const margin = 8;
+    if (r.left < margin) {
+      menu.style.transform = '';
+      menu.style.left = `${window.scrollX + margin}px`;
+    } else if (r.right > window.innerWidth - margin) {
+      // Unlikely (we anchor right) but guard anyway.
+      menu.style.transform = '';
+      menu.style.left = `${window.scrollX + window.innerWidth - r.width - margin}px`;
     }
   });
 }
@@ -262,41 +386,20 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
 
   const isLocked = field.name === 'Title' || field.name === 'Status';
 
-  // Drag handle (hover-revealed)
+  // Drag handle — always visible. Mouse-based reorder (we don't use HTML5
+  // drag-and-drop here because ProseMirror intercepts dragstart events on the
+  // page, and the popover lives inside the editor's viewport).
   const handle = document.createElement('span');
-  handle.className = 'board-properties-handle';
+  handle.className = 'board-properties-handle' + (isLocked ? ' is-locked' : '');
   handle.textContent = '⋮⋮';
-  handle.title = 'Drag to reorder';
-  handle.draggable = !isLocked;
+  handle.title = isLocked ? 'Locked field' : 'Drag to reorder';
   if (!isLocked) {
-    handle.addEventListener('dragstart', (e) => {
-      e.dataTransfer!.setData('text/board-field-name', field.name);
-      e.dataTransfer!.effectAllowed = 'move';
-      row.classList.add('is-dragging');
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startManualFieldDrag(e, field.name, board, onChange);
     });
-    handle.addEventListener('dragend', () => row.classList.remove('is-dragging'));
   }
-  row.addEventListener('dragover', (e) => {
-    if (!e.dataTransfer?.types.includes('text/board-field-name')) return;
-    e.preventDefault();
-    row.classList.add('is-drop-target');
-  });
-  row.addEventListener('dragleave', () => row.classList.remove('is-drop-target'));
-  row.addEventListener('drop', (e) => {
-    if (!e.dataTransfer?.types.includes('text/board-field-name')) return;
-    e.preventDefault();
-    row.classList.remove('is-drop-target');
-    const from = e.dataTransfer.getData('text/board-field-name');
-    if (!from || from === field.name) return;
-    if (from === 'Title' || from === 'Status' || field.name === 'Title' || field.name === 'Status') return;
-    const fields = [...board.fields];
-    const fromIdx = fields.findIndex((f) => f.name === from);
-    const toIdx = fields.findIndex((f) => f.name === field.name);
-    if (fromIdx < 0 || toIdx < 0) return;
-    const [moved] = fields.splice(fromIdx, 1);
-    fields.splice(toIdx, 0, moved);
-    onChange({ ...board, fields });
-  });
   row.appendChild(handle);
 
   // Type icon
@@ -398,6 +501,7 @@ export function promptNewField(
 
   const rect = anchor.getBoundingClientRect();
   pop.style.position = 'absolute';
+  // Provisional placement (refined in rAF below once we know the popover's size).
   pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
   pop.style.left = `${rect.left + window.scrollX}px`;
 
@@ -422,6 +526,24 @@ export function promptNewField(
     row.addEventListener('click', () => commit(t));
     list.appendChild(row);
   }
+
+  // Edge-aware positioning: flip above the anchor if no room below, and clamp
+  // horizontally so the popover never overflows either side.
+  requestAnimationFrame(() => {
+    const r = pop.getBoundingClientRect();
+    const margin = 8;
+    if (r.bottom > window.innerHeight - margin) {
+      const flippedTop = rect.top + window.scrollY - r.height - 4;
+      if (flippedTop > margin) pop.style.top = `${flippedTop}px`;
+      else pop.style.top = `${window.scrollY + window.innerHeight - r.height - margin}px`;
+    }
+    const r2 = pop.getBoundingClientRect();
+    if (r2.right > window.innerWidth - margin) {
+      pop.style.left = `${window.scrollX + window.innerWidth - r2.width - margin}px`;
+    } else if (r2.left < margin) {
+      pop.style.left = `${window.scrollX + margin}px`;
+    }
+  });
 
   const commit = (type: FieldType) => {
     // Generate a default name based on the type label, auto-suffixed on conflict.
@@ -463,5 +585,9 @@ function positionAnchored(menu: HTMLElement, anchor: HTMLElement): void {
   const rect = anchor.getBoundingClientRect();
   menu.style.position = 'absolute';
   menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  // Right-anchored: align popover's right edge to the anchor's right edge so
+  // it grows to the LEFT (the Properties button sits at the far right of the
+  // chrome row, so opening leftward keeps it on-screen).
+  menu.style.left = `${rect.right + window.scrollX}px`;
+  menu.style.transform = 'translateX(-100%)';
 }
