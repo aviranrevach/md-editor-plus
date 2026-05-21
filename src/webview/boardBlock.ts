@@ -18,6 +18,20 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   dom.className = 'board-block';
   dom.setAttribute('contenteditable', 'false');
 
+  // Stop interactive events from bubbling up to ProseMirror's editor root, which
+  // would otherwise convert the click into a NodeSelection on the atom block
+  // (preventing inline edits, button clicks, etc.). Capture phase ensures we run
+  // before any listener attached at the editor root.
+  const swallowInteractive = (e: Event) => {
+    const t = e.target as HTMLElement | null;
+    if (!t) return;
+    if (t.closest('[contenteditable="true"], button, input, select, textarea, .board-card')) {
+      e.stopPropagation();
+    }
+  };
+  dom.addEventListener('mousedown', swallowInteractive, true);
+  dom.addEventListener('click', swallowInteractive, true);
+
   let board = parseBoardSource(initialSource);
   render();
 
@@ -222,11 +236,12 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
     head.appendChild(dots);
   }
 
-  el.appendChild(head);
-
-  // Column body: card list + + New card button inside the rounded gray panel
+  // Column body: ★ wraps the header chip AND the card list AND the "+ New card"
+  // button — single rounded background for the whole column.
+  // Card-drop handlers attached at the body level so empty columns still accept drops.
   const body = document.createElement('div');
   body.className = 'board-column-body';
+  body.appendChild(head);
 
   const list = document.createElement('div');
   list.className = 'board-card-list';
@@ -234,16 +249,19 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
     list.appendChild(renderCard(board, card, mutate, readOnly));
   }
   if (!readOnly) {
-    list.addEventListener('dragover', (e) => {
+    // Listen on the body, not the list, so drops in the empty bottom area of
+    // a column (and on empty columns) still register.
+    body.addEventListener('dragover', (e) => {
+      if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
-      list.classList.add('is-drop-target');
     });
-    list.addEventListener('dragleave', () => list.classList.remove('is-drop-target'));
-    list.addEventListener('drop', (e) => {
+    body.addEventListener('drop', (e) => {
+      if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
-      list.classList.remove('is-drop-target');
-      const id = e.dataTransfer!.getData('text/board-card-id');
+      const id = e.dataTransfer.getData('text/board-card-id');
       if (!id) return;
+      // Don't double-fire if a card.drop handler already moved it.
+      if (e.defaultPrevented && (e as any).__cardDropHandled) return;
       const next: Board = {
         ...board,
         cards: board.cards.map((c) =>
@@ -347,6 +365,10 @@ function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) 
   el.className = 'board-column color-gray board-column-uncategorized';
   el.dataset.column = '';
 
+  // Head + list share a single rounded body bg.
+  const body = document.createElement('div');
+  body.className = 'board-column-body';
+
   const head = document.createElement('div');
   head.className = 'board-column-head';
   const chip = document.createElement('span');
@@ -363,14 +385,13 @@ function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) 
   count.className = 'board-column-count';
   count.textContent = String(cards.length);
   head.appendChild(count);
-  el.appendChild(head);
+  body.appendChild(head);
 
-  const body = document.createElement('div');
-  body.className = 'board-column-body';
   const list = document.createElement('div');
   list.className = 'board-card-list';
   for (const card of cards) list.appendChild(renderCard(board, card, mutate, readOnly));
   body.appendChild(list);
+
   el.appendChild(body);
   return el;
 }
@@ -419,6 +440,8 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
       e.stopPropagation();
+      // Mark this event so the column-body drop handler doesn't also fire.
+      (e as any).__cardDropHandled = true;
       const id = e.dataTransfer.getData('text/board-card-id');
       if (!id || id === card.id) {
         el.classList.remove('drop-before', 'drop-after');
@@ -437,24 +460,102 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
     });
   }
 
+  // Single click = open side panel. Double click = inline-edit title.
   el.addEventListener('click', () => {
-    openBoardSidePanel(
-      board,
-      card,
-      readOnly
-        ? () => {}
-        : (nextCard) => {
-            const next: Board = {
-              ...board,
-              cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
-            };
-            mutate(next);
-          },
-      readOnly,
-    );
+    // Defer so a double-click doesn't open the panel before swapping to inline editor.
+    setTimeout(() => {
+      if (el.classList.contains('is-editing-title')) return;
+      openBoardSidePanel(
+        board,
+        card,
+        readOnly
+          ? () => {}
+          : (nextCard) => {
+              const next: Board = {
+                ...board,
+                cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
+              };
+              mutate(next);
+            },
+        readOnly,
+      );
+    }, 180);
   });
 
+  if (!readOnly) {
+    el.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startInlineTitleEdit(el, card, board, mutate);
+    });
+  }
+
   return el;
+}
+
+// Inline edit a card's title on double-click. Replaces the title div with an
+// input, focuses it. Commit on Enter/blur; Escape reverts.
+function startInlineTitleEdit(
+  cardEl: HTMLElement,
+  card: Card,
+  board: Board,
+  mutate: (next: Board) => void,
+): void {
+  const titleEl = cardEl.querySelector('.board-card-title') as HTMLElement | null;
+  if (!titleEl) return;
+  if (cardEl.classList.contains('is-editing-title')) return;
+  cardEl.classList.add('is-editing-title');
+
+  const original = card.values.Title || '';
+  const input = document.createElement('input');
+  input.className = 'board-card-title-input';
+  input.type = 'text';
+  input.value = original;
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let resolved = false;
+  const commit = () => {
+    if (resolved) return;
+    resolved = true;
+    const next = input.value.trim();
+    if (next === original) {
+      cardEl.classList.remove('is-editing-title');
+      // mutate would re-render anyway; fall back to a direct restore for no-op.
+      const restored = document.createElement('div');
+      restored.className = 'board-card-title';
+      restored.textContent = original || 'Untitled';
+      input.replaceWith(restored);
+      return;
+    }
+    mutate({
+      ...board,
+      cards: board.cards.map((c) =>
+        c.id === card.id ? { ...c, values: { ...c.values, Title: next } } : c,
+      ),
+    });
+  };
+  const cancel = () => {
+    if (resolved) return;
+    resolved = true;
+    cardEl.classList.remove('is-editing-title');
+    const restored = document.createElement('div');
+    restored.className = 'board-card-title';
+    restored.textContent = original || 'Untitled';
+    input.replaceWith(restored);
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancel();
+    }
+  });
+  input.addEventListener('blur', () => setTimeout(commit, 50));
 }
 
 function bodyPreview(body: string): string {
@@ -532,6 +633,11 @@ function nextColor(used: string[]): ColorToken {
 const COLOR_PALETTE: ColorToken[] =
   ['gray', 'blue', 'amber', 'emerald', 'red', 'purple'];
 
+// Inline SVG icons used in the column menu.
+const ICON_EDIT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-3 1 1-3 7.5-7.5z"/></svg>`;
+const ICON_SORT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h10M5 8h6M7 11h2"/></svg>`;
+const ICON_TRASH = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h11M5.5 4V2.5h5V4M4 4l.5 9.5h7L12 4M6.5 7v4M9.5 7v4"/></svg>`;
+
 function openColumnMenu(
   anchor: HTMLElement,
   board: Board,
@@ -550,14 +656,31 @@ function openColumnMenu(
   menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
   menu.style.left = `${rect.left + window.scrollX}px`;
 
-  // Row 1: color swatches
+  const section = (label: string) => {
+    const s = document.createElement('div');
+    s.className = 'board-column-menu-section';
+    s.textContent = label;
+    menu.appendChild(s);
+  };
+
+  const row = (icon: string, label: string, variant: '' | 'danger', onClick: () => void) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'board-column-menu-row' + (variant ? ` is-${variant}` : '');
+    btn.innerHTML = `<span class="board-column-menu-icon">${icon}</span><span class="board-column-menu-label">${label}</span>`;
+    btn.addEventListener('click', onClick);
+    menu.appendChild(btn);
+    return btn;
+  };
+
+  // Color picker
+  section('Color');
   const colorRow = document.createElement('div');
   colorRow.className = 'board-color-swatches';
   for (const tok of COLOR_PALETTE) {
     const swatch = document.createElement('button');
     swatch.type = 'button';
-    swatch.className = 'board-color-swatch';
-    swatch.style.background = `var(--color-${tok})`;
+    swatch.className = `board-color-swatch color-${tok}`;
     swatch.title = tok;
     if (col.color === tok) swatch.classList.add('is-selected');
     swatch.addEventListener('click', () => {
@@ -571,24 +694,42 @@ function openColumnMenu(
   }
   menu.appendChild(colorRow);
 
-  // Row 2: sort cards by title
-  const sortBtn = document.createElement('button');
-  sortBtn.type = 'button';
-  sortBtn.textContent = 'Sort cards by title';
-  sortBtn.addEventListener('click', () => {
+  const divider1 = document.createElement('div');
+  divider1.className = 'board-column-menu-divider';
+  menu.appendChild(divider1);
+
+  // Rename — focuses the inline column name input on the source column
+  row(ICON_EDIT, 'Rename', '', () => {
+    closeMenu();
+    // Find the column DOM and focus its name span. The board re-renders on
+    // mutate, so reading the live DOM right now is safe.
+    const colEl = document.querySelector(`.board-column[data-column="${cssEscape(col.name)}"]`);
+    const nameEl = colEl?.querySelector('.board-column-name') as HTMLElement | null;
+    if (nameEl) {
+      nameEl.focus();
+      const range = document.createRange();
+      range.selectNodeContents(nameEl);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  });
+
+  // Sort cards by title
+  row(ICON_SORT, 'Sort cards by title', '', () => {
     const inCol = board.cards.filter((c) => (c.values.Status || '') === col.name);
     const others = board.cards.filter((c) => (c.values.Status || '') !== col.name);
     inCol.sort((a, b) => (a.values.Title || '').localeCompare(b.values.Title || ''));
     mutate({ ...board, cards: [...others, ...inCol] });
     closeMenu();
   });
-  menu.appendChild(sortBtn);
 
-  // Row 3: delete column
-  const delBtn = document.createElement('button');
-  delBtn.type = 'button';
-  delBtn.textContent = 'Delete column';
-  delBtn.addEventListener('click', () => {
+  const divider2 = document.createElement('div');
+  divider2.className = 'board-column-menu-divider';
+  menu.appendChild(divider2);
+
+  // Move to trash
+  row(ICON_TRASH, 'Move to trash', 'danger', () => {
     const cardsInCol = board.cards.filter((c) => (c.values.Status || '') === col.name);
     if (cardsInCol.length > 0) {
       const otherCols = board.columns.filter((c) => c.name !== col.name);
@@ -617,7 +758,6 @@ function openColumnMenu(
     }
     closeMenu();
   });
-  menu.appendChild(delBtn);
 
   function closeMenu(): void {
     menu.remove();
@@ -628,8 +768,12 @@ function openColumnMenu(
       closeMenu();
     }
   }
-  // Defer attaching so the current click doesn't immediately close the menu
   setTimeout(() => {
     document.addEventListener('mousedown', onOutside, true);
   }, 0);
+}
+
+function cssEscape(s: string): string {
+  // Minimal CSS attr-value escape for use in `[data-column="..."]` selectors.
+  return s.replace(/(["\\])/g, '\\$1');
 }

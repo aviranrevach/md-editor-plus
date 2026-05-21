@@ -77,6 +77,12 @@
   border: 0;
   padding: 0;
 }
+/* Suppress ProseMirror's atom-selection outline; the board manages its own focus. */
+.board-block.ProseMirror-selectednode,
+.ProseMirror-selectednode > .board-block {
+  outline: none;
+  background: transparent;
+}
 
 /* ===== Chrome (top header: name + Properties icon) ===== */
 .board-chrome {
@@ -132,13 +138,21 @@
   overflow-x: auto;
   padding-bottom: 4px;
   scrollbar-width: thin;
-  scrollbar-color: var(--board-border) transparent;
+  scrollbar-color: transparent transparent;        /* hidden by default */
+  transition: scrollbar-color 0.15s;
+}
+.board-columns:hover {
+  scrollbar-color: var(--board-border) transparent; /* reveal on hover */
 }
 .board-columns::-webkit-scrollbar { height: 8px; }
 .board-columns::-webkit-scrollbar-track { background: transparent; }
 .board-columns::-webkit-scrollbar-thumb {
-  background: var(--board-border);
+  background: transparent;
   border-radius: 4px;
+  transition: background 0.15s;
+}
+.board-columns:hover::-webkit-scrollbar-thumb {
+  background: var(--board-border);
 }
 
 /* ===== Single column ===== */
@@ -150,17 +164,17 @@
   padding: 0;
 }
 
-/* Column header row: [chip] [count] (filler) [⋯ on hover] */
+/* Column header row: [chip] [count] (filler) [⋯ on hover] — lives inside .board-column-body */
 .board-column-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 4px;
-  margin-bottom: 10px;
+  padding: 2px 4px 8px;
   height: 28px;
   text-transform: none;
   font-weight: normal;
   color: inherit;
+  margin-bottom: 0;
 }
 
 /* The chip wraps dot + name only. Count rendered outside. */
@@ -230,7 +244,7 @@
 .board-column:hover .board-column-dots { opacity: 1; }
 .board-column-dots:hover { background: var(--board-hover); color: var(--board-text-light); }
 
-/* ===== Column body (the bg behind the cards) ===== */
+/* ===== Column body — single rounded panel wrapping head + cards + add-card ===== */
 .board-column-body {
   background: var(--board-bg-col);
   border-radius: 10px;
@@ -241,11 +255,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-.board-card-list.is-drop-target {
-  outline: 2px dashed var(--board-chip-blue-dot);
-  outline-offset: -4px;
-  border-radius: 8px;
+  /* Drop indicators live on individual cards; no outline at the list level. */
 }
 
 /* ===== Card ===== */
@@ -382,16 +392,32 @@
 .board-column-menu {
   background: var(--board-bg-card);
   border: 1px solid var(--board-border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  padding: 4px 0;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  padding: 6px 0;
   font-size: 13px;
   z-index: 110;
-  min-width: 160px;
+  min-width: 200px;
   color: var(--board-text);
+  font-family: inherit;
 }
-.board-column-menu button {
-  display: block;
+.board-column-menu-section {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--board-text-muted);
+  padding: 6px 12px 4px;
+  font-weight: 500;
+}
+.board-column-menu-divider {
+  height: 1px;
+  background: var(--board-border-soft);
+  margin: 4px 0;
+}
+.board-column-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 6px 12px;
   background: transparent;
@@ -401,18 +427,45 @@
   font-size: 13px;
   color: var(--board-text);
   font-family: inherit;
+  line-height: 1.4;
 }
-.board-column-menu button:hover { background: var(--board-hover); }
+.board-column-menu-row:hover { background: var(--board-hover); }
+.board-column-menu-row.is-danger { color: var(--board-chip-red-dot); }
+.board-column-menu-row.is-danger:hover { background: rgba(220, 38, 38, 0.08); }
+.board-column-menu-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--board-text-muted);
+  flex-shrink: 0;
+}
+.board-column-menu-row.is-danger .board-column-menu-icon { color: var(--board-chip-red-dot); }
+.board-column-menu-icon svg { width: 14px; height: 14px; }
+.board-column-menu-label { flex: 1; }
+
 .board-color-swatches { display: flex; gap: 6px; padding: 6px 12px; }
 .board-color-swatch {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
+  position: relative;
 }
-.board-color-swatch.is-selected { border-color: var(--board-text); }
+.board-color-swatch.is-selected {
+  border-color: var(--board-text);
+}
+/* The swatch background uses the chip dot color of each token */
+.board-color-swatch.color-gray   { background: var(--board-chip-gray-dot); }
+.board-color-swatch.color-blue   { background: var(--board-chip-blue-dot); }
+.board-color-swatch.color-green,
+.board-color-swatch.color-emerald { background: var(--board-chip-green-dot); }
+.board-color-swatch.color-amber  { background: var(--board-chip-amber-dot); }
+.board-color-swatch.color-red    { background: var(--board-chip-red-dot); }
+.board-color-swatch.color-purple { background: var(--board-chip-purple-dot); }
 
 /* ===== Side panel ===== */
 .board-side-panel {
