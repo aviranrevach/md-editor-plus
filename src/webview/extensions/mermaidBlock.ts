@@ -19,8 +19,8 @@
 import CodeBlock from './codeBlock';
 import { renderMermaid, detectDiagramKind } from '../mermaidRenderer';
 import { openMermaidFullscreen } from '../mermaidFullscreen';
-import { canEdit } from '../mermaidVisualEdit';
-import { createVisualEditor, VisualEditorHandle } from '../mermaidVisualEditDom';
+import { canEdit, parseMermaid } from '../mermaidVisualEdit';
+import { createVisualEditor, VisualEditorHandle, applyPositionsOverlay } from '../mermaidVisualEditDom';
 
 // SVGs — kept inline so the bundle has no extra asset deps.
 const ICON_EXPAND = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>`;
@@ -223,6 +223,14 @@ function buildMermaidView(props: unknown) {
       svgHost.innerHTML = result.svg;
       lastSvg = result.svg;
       expandBtn.classList.remove('mb-disabled');
+      // Phase 2: apply pinned positions (if any) over mermaid's auto-layout.
+      // Runs regardless of visual mode so positioned diagrams render
+      // correctly on initial load too.
+      try {
+        applyPositionsOverlay(parseMermaid(src), preview);
+      } catch (err) {
+        console.warn('[md-editor-plus] applyPositionsOverlay failed', err);
+      }
       // Let the visual editor re-bind its overlays to the freshly painted SVG.
       // Defer one frame so the new <g.node> elements are laid out before we
       // measure their bounding rects.

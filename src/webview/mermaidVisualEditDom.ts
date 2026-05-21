@@ -12,6 +12,7 @@ import {
   parseMermaid, serializeMermaid, cloneAst, canEdit,
   addNode, renameNode, deleteNode, addEdge, changeNodeShape,
   collectNodes, NodeShape, Ast,
+  getPositions, setAllPositions, setPosition, clearPositions, PositionMap,
 } from './mermaidVisualEdit';
 
 export type Tool = 'select' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text';
@@ -53,6 +54,7 @@ const ICONS: Record<string, string> = {
   diamond: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>`,
   arrow:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-4-4l4 4-4 4"/></svg>`,
   text:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M12 7v13"/></svg>`,
+  reset:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>`,
 };
 
 const TOOL_HOTKEYS: Record<string, Tool> = {
@@ -78,7 +80,13 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // ── Overlays (mounted under the block, absolute-positioned) ─────────────
   opts.block.classList.add('mb-visual-active');
 
-  const toolbar = buildToolbar((tool) => setTool(tool));
+  const toolbar = buildToolbar({
+    onPick: (tool) => setTool(tool),
+    onReset: () => {
+      if (!window.confirm('Reset layout? This removes pinned positions and lets mermaid auto-layout the diagram.')) return;
+      mutate((ast) => clearPositions(ast));
+    },
+  });
   const selectionRing = document.createElement('div');
   selectionRing.className = 'mb-vSel mb-hidden';
   const contextTip = buildContextTip({
@@ -114,6 +122,15 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
 
   // ── Listeners ───────────────────────────────────────────────────────────
   const onPreviewClick = (e: MouseEvent) => {
+    // A successful drag fires mouseup → click on the same node. The click
+    // shouldn't be interpreted as a selection toggle / rename, so suppress.
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+      return;
+    }
+
     const targetNode = findMermaidNode(e.target as Element, opts.previewPane);
 
     if (activeTool === 'select') {
@@ -223,6 +240,100 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   document.addEventListener('keydown',     onKeyDown,     true);
   document.addEventListener('mousedown',   onOutsideClick, true);
 
+  // Sync Reset Layout enabled state with the current source's pinned-ness.
+  toolbar.setResetEnabled(getPositions(parseMermaid(opts.getSource())) !== null);
+
+  // ── Drag-to-reposition ─────────────────────────────────────────────────
+  // Mousedown on a node starts a candidate drag. If the cursor moves > 4 px
+  // before release, we promote to a real drag and apply transient transforms
+  // to the mermaid SVG. On release we commit the new position to the source.
+  // Non-moving mousedown→mouseup falls through to the click handler so
+  // selection still works.
+  interface DragCandidate {
+    id:        string;
+    nodeEl:    SVGGElement;
+    startX:    number;
+    startY:    number;
+    originSvgX:number;
+    originSvgY:number;
+    scale:     number;
+    moved:     boolean;
+  }
+  let drag: DragCandidate | null = null;
+  let suppressNextClick = false;
+  const DRAG_THRESHOLD = 4;
+
+  function onDragMouseDown(e: MouseEvent): void {
+    if (activeTool !== 'select') return;
+    if (e.button !== 0) return; // left button only
+    const hit = findMermaidNode(e.target as Element, opts.previewPane);
+    if (!hit) return;
+    const nodeEl = hit.el as SVGGElement;
+    const origin = readNodeTranslate(nodeEl);
+    if (!origin) return;
+    const svg = nodeEl.ownerSVGElement;
+    if (!svg) return;
+    drag = {
+      id:         hit.id,
+      nodeEl,
+      startX:     e.clientX,
+      startY:     e.clientY,
+      originSvgX: origin.x,
+      originSvgY: origin.y,
+      scale:      svgUnitsPerPixel(svg),
+      moved:      false,
+    };
+  }
+
+  function onDragMouseMove(e: MouseEvent): void {
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    drag.moved = true;
+    opts.previewPane.classList.add('mb-dragging');
+    const newSvgX = drag.originSvgX + dx * drag.scale;
+    const newSvgY = drag.originSvgY + dy * drag.scale;
+    drag.nodeEl.setAttribute('transform', `translate(${newSvgX}, ${newSvgY})`);
+    // Live edge update + ring tracking
+    recomputeEdgesTouching(drag.id, opts.previewPane);
+    positionRingAround(selectionRing, drag.nodeEl, opts.previewPane);
+    if (selectedId === drag.id) {
+      contextTip.showBelow(drag.nodeEl, opts.previewPane);
+    }
+  }
+
+  function onDragMouseUp(_e: MouseEvent): void {
+    if (!drag) return;
+    const wasDrag = drag.moved;
+    const id = drag.id;
+    const finalPos = readNodeTranslate(drag.nodeEl);
+    drag = null;
+    opts.previewPane.classList.remove('mb-dragging');
+    if (!wasDrag || !finalPos) return;
+    suppressNextClick = true;
+    // Commit. If this block had no positions yet, snapshot every node's
+    // current auto-layout position first so edges stay coherent.
+    mutate((ast) => {
+      if (!getPositions(ast)) {
+        const snapshot: PositionMap = {};
+        const allNodes = opts.previewPane.querySelectorAll<SVGGElement>('g.node');
+        for (const n of Array.from(allNodes)) {
+          const nodeId = extractMermaidId(n);
+          if (!nodeId) continue;
+          const t = readNodeTranslate(n);
+          if (t) snapshot[nodeId] = [t.x, t.y];
+        }
+        setAllPositions(ast, snapshot);
+      }
+      setPosition(ast, id, finalPos.x, finalPos.y);
+    });
+  }
+
+  opts.previewPane.addEventListener('mousedown', onDragMouseDown, true);
+  document.addEventListener('mousemove', onDragMouseMove, true);
+  document.addEventListener('mouseup',   onDragMouseUp,   true);
+
   // ── Tool / selection / rename / mutation plumbing ────────────────────────
   function setTool(tool: Tool): void {
     activeTool = tool;
@@ -290,9 +401,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // ── Cleanup + rebind ────────────────────────────────────────────────────
   return {
     onMermaidRerender(): void {
-      // Re-position overlays after the SVG has been replaced. If the previously
-      // selected node still exists, refresh the ring + context tip; otherwise
-      // clear selection.
+      // mermaidBlock already called applyPositionsOverlay for us before
+      // this. We just refresh toolbar state and re-bind ring/tip to the
+      // (possibly newly-positioned) selected node.
+      const ast = parseMermaid(opts.getSource());
+      toolbar.setResetEnabled(getPositions(ast) !== null);
       if (!selectedId) return;
       const nodeEl = findNodeElementById(selectedId, opts.previewPane);
       if (!nodeEl) { setSelected(null); return; }
@@ -302,8 +415,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     destroy(): void {
       opts.block.classList.remove('mb-visual-active');
       opts.previewPane.removeEventListener('click', onPreviewClick);
+      opts.previewPane.removeEventListener('mousedown', onDragMouseDown, true);
       document.removeEventListener('keydown',     onKeyDown,     true);
       document.removeEventListener('mousedown',   onOutsideClick, true);
+      document.removeEventListener('mousemove',   onDragMouseMove, true);
+      document.removeEventListener('mouseup',     onDragMouseUp,   true);
       toolbar.el.remove();
       selectionRing.remove();
       contextTip.destroy();
@@ -319,11 +435,17 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
 // ── Toolbar ─────────────────────────────────────────────────────────────────
 
 interface ToolbarHandle {
-  el:        HTMLElement;
-  setActive: (tool: Tool) => void;
+  el:                 HTMLElement;
+  setActive:          (tool: Tool) => void;
+  setResetEnabled:    (enabled: boolean) => void;
 }
 
-function buildToolbar(onPick: (tool: Tool) => void): ToolbarHandle {
+interface ToolbarHandlers {
+  onPick:  (tool: Tool) => void;
+  onReset: () => void;
+}
+
+function buildToolbar({ onPick, onReset }: ToolbarHandlers): ToolbarHandle {
   const el = document.createElement('div');
   el.className = 'mb-vTb';
   el.contentEditable = 'false';
@@ -372,14 +494,39 @@ function buildToolbar(onPick: (tool: Tool) => void): ToolbarHandle {
     }
   });
 
+  // Reset layout — separator + dedicated action button (not a tool).
+  const sep2 = document.createElement('span');
+  sep2.className = 'mb-vTb-sep';
+  el.appendChild(sep2);
+  const resetBtn = document.createElement('button');
+  resetBtn.type = 'button';
+  resetBtn.className = 'mb-vTb-btn mb-vTb-reset mb-vTb-disabled';
+  resetBtn.dataset.tip = 'Reset layout';
+  resetBtn.setAttribute('aria-label', 'Reset layout — restore auto-layout');
+  resetBtn.innerHTML = ICONS.reset;
+  resetBtn.disabled = true;
+  resetBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  resetBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (resetBtn.disabled) return;
+    onReset();
+  });
+  el.appendChild(resetBtn);
+
   function setActive(tool: Tool): void {
     for (const [t, btn] of buttonsByTool) {
       btn.classList.toggle('mb-vTb-active', t === tool);
     }
   }
 
+  function setResetEnabled(enabled: boolean): void {
+    resetBtn.disabled = !enabled;
+    resetBtn.classList.toggle('mb-vTb-disabled', !enabled);
+  }
+
   setActive('select');
-  return { el, setActive };
+  return { el, setActive, setResetEnabled };
 }
 
 // ── Context tip ─────────────────────────────────────────────────────────────
@@ -581,4 +728,199 @@ function positionRingAround(ring: HTMLElement, node: Element, host: HTMLElement)
   ring.style.top    = `${nodeRect.top  - hostRect.top  - 4}px`;
   ring.style.width  = `${nodeRect.width  + 8}px`;
   ring.style.height = `${nodeRect.height + 8}px`;
+}
+
+// ── Positions overlay (Phase 2) ────────────────────────────────────────────
+
+/** Mermaid puts `transform="translate(X, Y)"` on every g.node. Parse it. */
+function readNodeTranslate(g: SVGGElement): { x: number; y: number } | null {
+  const t = g.getAttribute('transform') ?? '';
+  const m = t.match(/translate\(\s*(-?[\d.]+)\s*[, ]\s*(-?[\d.]+)\s*\)/);
+  if (!m) return null;
+  return { x: parseFloat(m[1]), y: parseFloat(m[2]) };
+}
+
+/** How many SVG user units correspond to one CSS pixel — used to convert
+    pointer deltas to coordinate-space deltas during a drag. */
+function svgUnitsPerPixel(svg: SVGSVGElement): number {
+  const vb = svg.viewBox?.baseVal;
+  const cssWidth = svg.getBoundingClientRect().width || 1;
+  if (vb && vb.width > 0 && cssWidth > 0) return vb.width / cssWidth;
+  return 1;
+}
+
+/** Override mermaid's auto-layout positions with the user's pinned ones
+    (if any), expand the SVG viewBox to fit them, and redraw every edge as
+    a simple bezier between node centers. */
+export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
+  const positions = getPositions(ast);
+  if (!positions) return;
+
+  // 1) Override node transforms
+  for (const [id, [x, y]] of Object.entries(positions)) {
+    const nodeEl = findNodeElementById(id, host);
+    if (!nodeEl) continue;
+    (nodeEl as SVGGElement).setAttribute('transform', `translate(${x}, ${y})`);
+  }
+
+  // 2) Expand SVG viewBox to enclose every (possibly-moved) node. Mermaid's
+  // auto-layout sets a tight viewBox; if a user drags a node outside it,
+  // the node renders off-screen unless we widen.
+  fitSvgViewBoxToNodes(host);
+
+  // 3) Recompute edges. We do this for ALL edges, not just ones touching a
+  // pinned node — keeps the pipeline simple and avoids partial weirdness.
+  recomputeAllEdges(host);
+}
+
+function fitSvgViewBoxToNodes(host: HTMLElement): void {
+  const svg = host.querySelector<SVGSVGElement>('svg');
+  if (!svg) return;
+
+  const nodes = host.querySelectorAll<SVGGElement>('g.node');
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const n of Array.from(nodes)) {
+    const t = readNodeTranslate(n);
+    if (!t) continue;
+    // getBBox on a node returns the bbox of its children in local coords
+    // (before the g's transform). Mermaid centers shapes at (0,0), so the
+    // bbox tends to be roughly (-w/2, -h/2, w, h). Treat as half-extents.
+    let half = 40;
+    try {
+      const bb = n.getBBox();
+      half = Math.max(Math.abs(bb.x), Math.abs(bb.x + bb.width), Math.abs(bb.y), Math.abs(bb.y + bb.height));
+    } catch { /* getBBox can throw on detached nodes — ignore */ }
+    minX = Math.min(minX, t.x - half);
+    minY = Math.min(minY, t.y - half);
+    maxX = Math.max(maxX, t.x + half);
+    maxY = Math.max(maxY, t.y + half);
+  }
+  if (!isFinite(minX)) return;
+
+  const current = svg.viewBox?.baseVal;
+  const PAD = 20;
+  let x = minX - PAD;
+  let y = minY - PAD;
+  let w = maxX - minX + PAD * 2;
+  let h = maxY - minY + PAD * 2;
+  // Never shrink an existing viewBox — keeps zoom feel stable when the user
+  // drags a node back inside the original bounds.
+  if (current) {
+    const cx2 = current.x + current.width;
+    const cy2 = current.y + current.height;
+    x = Math.min(x, current.x);
+    y = Math.min(y, current.y);
+    w = Math.max(cx2, x + w) - x;
+    h = Math.max(cy2, y + h) - y;
+  }
+  svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  // Also remove fixed width/height so the SVG scales to its container.
+  svg.removeAttribute('width');
+  svg.removeAttribute('height');
+  svg.style.maxWidth = '100%';
+  svg.style.height = 'auto';
+}
+
+/** Walks every edge element in the SVG and yields { element, from, to }. */
+function* eachEdge(host: HTMLElement): Iterable<{ el: SVGPathElement; from: string; to: string }> {
+  // Mermaid v11 emits `<path id="…-L_from_to_n" class="flowchart-link …">`
+  // directly inside `g.edgePaths` (no wrapping `g.edgePath`).
+  const paths = host.querySelectorAll<SVGPathElement>('g.edgePaths > path, g.edgePaths g.edgePath > path.path, g.edgePath > path.path');
+  for (const p of Array.from(paths)) {
+    const ep = parseEdgeEndpoints(p);
+    if (ep) yield { el: p, from: ep.from, to: ep.to };
+  }
+}
+
+function recomputeAllEdges(host: HTMLElement): void {
+  for (const e of eachEdge(host)) {
+    redrawEdge(e.el, e.from, e.to, host);
+  }
+}
+
+function recomputeEdgesTouching(id: string, host: HTMLElement): void {
+  for (const e of eachEdge(host)) {
+    if (e.from !== id && e.to !== id) continue;
+    redrawEdge(e.el, e.from, e.to, host);
+  }
+}
+
+function redrawEdge(pathEl: SVGPathElement, fromId: string, toId: string, host: HTMLElement): void {
+  const fromNode = findNodeElementById(fromId, host) as SVGGElement | null;
+  const toNode   = findNodeElementById(toId,   host) as SVGGElement | null;
+  if (!fromNode || !toNode) return;
+  const aCenter = readNodeTranslate(fromNode);
+  const bCenter = readNodeTranslate(toNode);
+  if (!aCenter || !bCenter) return;
+  const aHalf = nodeHalfExtent(fromNode);
+  const bHalf = nodeHalfExtent(toNode);
+  const aEdge = shrinkToNodeEdge(aCenter, aHalf, bCenter);
+  const bEdge = shrinkToNodeEdge(bCenter, bHalf, aCenter);
+  pathEl.setAttribute('d', bezierPath(aEdge, bEdge));
+}
+
+/** Half-extents (w/2, h/2) of a mermaid node's bbox. Mermaid centers shapes
+    at (0,0) local, so getBBox gives us a roughly symmetric box. We use the
+    largest extent in each axis so circles/diamonds get a sensible value. */
+function nodeHalfExtent(n: SVGGElement): { w: number; h: number } {
+  try {
+    const bb = n.getBBox();
+    return {
+      w: Math.max(Math.abs(bb.x), Math.abs(bb.x + bb.width))  || 30,
+      h: Math.max(Math.abs(bb.y), Math.abs(bb.y + bb.height)) || 20,
+    };
+  } catch {
+    return { w: 30, h: 20 };
+  }
+}
+
+/** Move `center` along the direction `toward - center` until it hits the
+    rectangle edge defined by `half`. Result lies on the node's boundary in
+    the direction of `toward` — so the arrowhead lands flush against the
+    node instead of inside it. */
+function shrinkToNodeEdge(
+  center: { x: number; y: number },
+  half:   { w: number; h: number },
+  toward: { x: number; y: number },
+): { x: number; y: number } {
+  const dx = toward.x - center.x;
+  const dy = toward.y - center.y;
+  if (dx === 0 && dy === 0) return center;
+  let tx = Infinity, ty = Infinity;
+  if (dx !== 0) tx = half.w / Math.abs(dx);
+  if (dy !== 0) ty = half.h / Math.abs(dy);
+  const t = Math.min(tx, ty, 1); // never overshoot the toward point
+  return { x: center.x + t * dx, y: center.y + t * dy };
+}
+
+/** Mermaid edge ids look like `<diagramPrefix>-L_<from>_<to>_<n>` (v11) or
+    `L-<from>-<to>-<n>` (older). We anchor at the end and accept arbitrary
+    prefixes. As a fallback we look at LS-/LE- classes. */
+function parseEdgeEndpoints(el: Element): { from: string; to: string } | null {
+  const rawId = el.getAttribute('id') ?? '';
+  // Underscore form (v11): ...-L_from_to_n
+  const u = rawId.match(/L_([\w-]+?)_([\w-]+?)_\d+$/);
+  if (u) return { from: u[1], to: u[2] };
+  // Hyphen form (older): L-from-to-n
+  const h = rawId.match(/-L-([\w-]+?)-([\w-]+?)-\d+$/) ?? rawId.match(/^L-([\w-]+?)-([\w-]+?)-\d+$/);
+  if (h) return { from: h[1], to: h[2] };
+
+  const cls = el.getAttribute('class') ?? '';
+  const fromMatch = cls.match(/LS-([\w-]+)/);
+  const toMatch   = cls.match(/LE-([\w-]+)/);
+  if (fromMatch && toMatch) return { from: fromMatch[1], to: toMatch[1] };
+  return null;
+}
+
+/** Cubic bezier from a to b that bends gently — horizontal first half then
+    vertical, matching the typical flowchart aesthetic. */
+function bezierPath(a: { x: number; y: number }, b: { x: number; y: number }): string {
+  const dx = b.x - a.x;
+  // Pull control points one third of the horizontal distance into each side;
+  // produces a smooth s-curve regardless of node alignment.
+  const cp1x = a.x + dx * 0.5;
+  const cp1y = a.y;
+  const cp2x = b.x - dx * 0.5;
+  const cp2y = b.y;
+  return `M ${a.x} ${a.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${b.x} ${b.y}`;
 }

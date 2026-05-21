@@ -3193,3 +3193,24 @@ html.theme-dark .ProseMirror .mb-vTb-btn.mb-vTb-active {
   background: rgba(99, 102, 241, 0.18);
   color: #c7d2fe;
 }
+
+/* ── Phase 2: drag-to-reposition ───────────────────────────────────────── */
+
+/* Cursor states. The grab cursor only shows on selected (hoverable) nodes;
+   while dragging, the entire preview pane shows grabbing. */
+.ProseMirror .mb-visual .mb-preview g.node { cursor: default; }
+.ProseMirror .mb-visual .mb-preview g.node:hover { cursor: grab; }
+.ProseMirror .mb-visual .mb-preview.mb-dragging,
+.ProseMirror .mb-visual .mb-preview.mb-dragging g.node,
+.ProseMirror .mb-visual .mb-preview.mb-dragging * { cursor: grabbing !important; }
+
+/* Reset Layout toolbar button — same chrome as a tool button but disabled
+   state is much more obvious so users know it's contextual. */
+.ProseMirror .mb-vTb-reset.mb-vTb-disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ProseMirror .mb-vTb-reset:not(.mb-vTb-disabled):hover {
+  background: var(--callout-caution-bg);
+  color: var(--callout-caution-accent);
+}

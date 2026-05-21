@@ -45,11 +45,14 @@ export interface PassthroughLine {
   raw: string;
 }
 
+export type PositionMap = Record<string, [number, number]>;
+
 type AnyLine =
-  | { kind: 'node';   node: NodeDecl }
-  | { kind: 'edge';   edge: EdgeDecl }
-  | { kind: 'header'; raw:  string; direction: string }
-  | { kind: 'pass';   raw:  string };
+  | { kind: 'node';      node: NodeDecl }
+  | { kind: 'edge';      edge: EdgeDecl }
+  | { kind: 'header';    raw:  string; direction: string }
+  | { kind: 'positions'; raw:  string; map: PositionMap }
+  | { kind: 'pass';      raw:  string };
 
 export interface Ast {
   // Lines in original order. Operations append new node/edge lines and remove
@@ -90,6 +93,14 @@ export function parseMermaid(source: string): Ast {
 
     if (trimmed.length === 0) {
       lines.push({ kind: 'pass', raw });
+      continue;
+    }
+
+    // Recognize our own positions sidecar before edges/nodes — its leading
+    // %% would otherwise classify it as passthrough comment.
+    const positions = tryParsePositionsLine(trimmed);
+    if (positions) {
+      lines.push({ kind: 'positions', raw: trimmed, map: positions });
       continue;
     }
 
@@ -229,6 +240,42 @@ export function cloneAst(ast: Ast): Ast {
   return JSON.parse(JSON.stringify(ast)) as Ast;
 }
 
+// ── Positions sidecar ──────────────────────────────────────────────────────
+
+export function getPositions(ast: Ast): PositionMap | null {
+  for (const line of ast.lines) {
+    if (line.kind === 'positions') return line.map;
+  }
+  return null;
+}
+
+/** Replace or insert the positions sidecar wholesale. */
+export function setAllPositions(ast: Ast, map: PositionMap): void {
+  const filtered: PositionMap = {};
+  for (const [k, v] of Object.entries(map)) filtered[k] = [Math.round(v[0]), Math.round(v[1])];
+  const raw = `%% mb-positions: ${JSON.stringify(filtered)}`;
+  const idx = ast.lines.findIndex(l => l.kind === 'positions');
+  if (idx >= 0) {
+    ast.lines[idx] = { kind: 'positions', raw, map: filtered };
+    return;
+  }
+  // Insert right after the header.
+  const headerIdx = ast.lines.findIndex(l => l.kind === 'header');
+  ast.lines.splice(headerIdx + 1, 0, { kind: 'positions', raw, map: filtered });
+}
+
+/** Update a single node's position. Inserts the sidecar if missing (caller is
+    expected to call setAllPositions first if they want a full snapshot). */
+export function setPosition(ast: Ast, id: string, x: number, y: number): void {
+  const existing = getPositions(ast) ?? {};
+  existing[id] = [Math.round(x), Math.round(y)];
+  setAllPositions(ast, existing);
+}
+
+export function clearPositions(ast: Ast): void {
+  ast.lines = ast.lines.filter(l => l.kind !== 'positions');
+}
+
 // ── Parsers (internal) ──────────────────────────────────────────────────────
 
 // Order matters — more specific (longer) bracket pairs must come first so a
@@ -243,6 +290,25 @@ const NODE_SHAPES: Array<[NodeShape, RegExp]> = [
   ['round',      /^([A-Za-z][\w-]*)\(\s*"?([^)"]*?)"?\s*\)$/],      // A(Label)
   ['diamond',    /^([A-Za-z][\w-]*)\{\s*"?([^}"]*?)"?\s*\}$/],      // A{Label}
 ];
+
+// `%% mb-positions: { "n1": [120,80], ... }` — our hidden sidecar.
+function tryParsePositionsLine(trimmed: string): PositionMap | null {
+  const m = trimmed.match(/^%%\s*mb-positions:\s*(.+)$/);
+  if (!m) return null;
+  try {
+    const obj = JSON.parse(m[1]) as unknown;
+    if (!obj || typeof obj !== 'object') return null;
+    const out: PositionMap = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number') {
+        out[k] = [v[0], v[1]];
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
 
 function tryParseStandaloneNode(trimmed: string): NodeDecl | null {
   for (const [shape, re] of NODE_SHAPES) {
@@ -311,8 +377,9 @@ function peelInlineId(fragment: string): string | null {
 // ── Serializers (internal) ──────────────────────────────────────────────────
 
 function emitLine(line: AnyLine): string {
-  if (line.kind === 'header') return line.raw;
-  if (line.kind === 'pass')   return line.raw;
+  if (line.kind === 'header')    return line.raw;
+  if (line.kind === 'pass')      return line.raw;
+  if (line.kind === 'positions') return '    ' + line.raw;
   // For node/edge lines: if the parsed `raw` is still attached, emit it
   // verbatim (preserves the user's quoting and inline shape syntax).
   // Mutations clear `raw` to force a canonical re-emit.
