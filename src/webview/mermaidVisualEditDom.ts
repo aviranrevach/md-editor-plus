@@ -55,6 +55,7 @@ const ICONS: Record<string, string> = {
   arrow:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-4-4l4 4-4 4"/></svg>`,
   text:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M12 7v13"/></svg>`,
   reset:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>`,
+  grid:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
 };
 
 const TOOL_HOTKEYS: Record<string, Tool> = {
@@ -80,11 +81,19 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // ── Overlays (mounted under the block, absolute-positioned) ─────────────
   opts.block.classList.add('mb-visual-active');
 
+  // ── Phase 3 state ──────────────────────────────────────────────────────
+  let gridSnapEnabled = false;
+  const guideLayer = createGuideLayer(opts.previewPane);
+
   const toolbar = buildToolbar({
     onPick: (tool) => setTool(tool),
     onReset: () => {
       if (!window.confirm('Reset layout? This removes pinned positions and lets mermaid auto-layout the diagram.')) return;
       mutate((ast) => clearPositions(ast));
+    },
+    onToggleGrid: () => {
+      gridSnapEnabled = !gridSnapEnabled;
+      toolbar.setGridSnapOn(gridSnapEnabled);
     },
   });
   const selectionRing = document.createElement('div');
@@ -168,11 +177,25 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       return;
     }
 
-    // One of the shape tools — drop a node. Position is left to mermaid's
-    // auto-layout in Phase 1 (we just insert a node declaration; mermaid will
-    // place it on next render).
+    // One of the shape tools — drop a node. In an un-pinned block mermaid's
+    // auto-layout decides the position (Phase 1). In a pinned block we
+    // place the new node near the centroid of existing positions so it
+    // doesn't land outside the viewBox or stack on (0, 0).
     const shapeKey = activeTool as keyof typeof SHAPE_FOR_TOOL;
-    mutate((ast) => { addNode(ast, SHAPE_FOR_TOOL[shapeKey]); });
+    mutate((ast) => {
+      const added = addNode(ast, SHAPE_FOR_TOOL[shapeKey]);
+      const positions = getPositions(ast);
+      if (positions) {
+        const ids = Object.keys(positions);
+        if (ids.length > 0) {
+          let sx = 0, sy = 0;
+          for (const id of ids) { sx += positions[id][0]; sy += positions[id][1]; }
+          const cx = Math.round(sx / ids.length) + 40;
+          const cy = Math.round(sy / ids.length) + 40;
+          setPosition(ast, added.id, cx, cy);
+        }
+      }
+    });
     toolbar.setActive('select');
     activeTool = 'select';
   };
@@ -220,6 +243,16 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       return;
     }
 
+    // Phase 3: arrow-key nudge of selected node.
+    if (selectedId && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      const step = e.shiftKey ? 8 : 1;
+      const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+      const dy = e.key === 'ArrowUp'   ? -step : e.key === 'ArrowDown'  ? step : 0;
+      nudgeSelected(dx, dy);
+      return;
+    }
+
     // Toolbar hotkeys.
     if (!meta && !e.shiftKey && !e.altKey) {
       const t = TOOL_HOTKEYS[e.key.toLowerCase()];
@@ -229,6 +262,48 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       }
     }
   };
+
+  // Keyboard nudge — debounce the source mutation so 10 rapid presses are
+  // coalesced into one undo step. We update the DOM (transient transform)
+  // synchronously for snappy feel.
+  let nudgeAcc: { id: string; x: number; y: number } | null = null;
+  let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
+  function nudgeSelected(dx: number, dy: number): void {
+    if (!selectedId) return;
+    const nodeEl = findNodeElementById(selectedId, opts.previewPane) as SVGGElement | null;
+    if (!nodeEl) return;
+    const cur = readNodeTranslate(nodeEl);
+    if (!cur) return;
+    const nx = cur.x + dx;
+    const ny = cur.y + dy;
+    nodeEl.setAttribute('transform', `translate(${nx}, ${ny})`);
+    recomputeEdgesTouching(selectedId, opts.previewPane);
+    positionRingAround(selectionRing, nodeEl, opts.previewPane);
+    contextTip.showBelow(nodeEl, opts.previewPane);
+    nudgeAcc = { id: selectedId, x: nx, y: ny };
+    if (nudgeTimer) clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(commitNudge, 200);
+  }
+  function commitNudge(): void {
+    if (!nudgeAcc) return;
+    const { id, x, y } = nudgeAcc;
+    nudgeAcc = null;
+    nudgeTimer = null;
+    mutate((ast) => {
+      if (!getPositions(ast)) {
+        const snapshot: PositionMap = {};
+        const allNodes = opts.previewPane.querySelectorAll<SVGGElement>('g.node');
+        for (const n of Array.from(allNodes)) {
+          const nid = extractMermaidId(n);
+          if (!nid) continue;
+          const t = readNodeTranslate(n);
+          if (t) snapshot[nid] = [t.x, t.y];
+        }
+        setAllPositions(ast, snapshot);
+      }
+      setPosition(ast, id, x, y);
+    });
+  }
 
   const onOutsideClick = (e: MouseEvent) => {
     if (opts.block.contains(e.target as Node)) return;
@@ -292,8 +367,26 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     drag.moved = true;
     opts.previewPane.classList.add('mb-dragging');
-    const newSvgX = drag.originSvgX + dx * drag.scale;
-    const newSvgY = drag.originSvgY + dy * drag.scale;
+    let newSvgX = drag.originSvgX + dx * drag.scale;
+    let newSvgY = drag.originSvgY + dy * drag.scale;
+
+    // Phase 3: alignment guides take precedence over grid snap.
+    const otherNodes = collectOtherNodes(drag.id, opts.previewPane);
+    const dragHalf = nodeHalfExtent(drag.nodeEl);
+    const snap = computeAlignmentSnap({ x: newSvgX, y: newSvgY }, dragHalf, otherNodes);
+    if (snap.snapX !== null) newSvgX = snap.snapX;
+    if (snap.snapY !== null) newSvgY = snap.snapY;
+    if (snap.guides.length > 0) {
+      guideLayer.show(snap.guides);
+    } else if (gridSnapEnabled) {
+      const GRID = 8;
+      newSvgX = Math.round(newSvgX / GRID) * GRID;
+      newSvgY = Math.round(newSvgY / GRID) * GRID;
+      guideLayer.hide();
+    } else {
+      guideLayer.hide();
+    }
+
     drag.nodeEl.setAttribute('transform', `translate(${newSvgX}, ${newSvgY})`);
     // Live edge update + ring tracking
     recomputeEdgesTouching(drag.id, opts.previewPane);
@@ -310,6 +403,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     const finalPos = readNodeTranslate(drag.nodeEl);
     drag = null;
     opts.previewPane.classList.remove('mb-dragging');
+    guideLayer.hide();
     if (!wasDrag || !finalPos) return;
     suppressNextClick = true;
     // Commit. If this block had no positions yet, snapshot every node's
@@ -425,6 +519,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       contextTip.destroy();
       renameOverlay.destroy();
       pendingPin.remove();
+      guideLayer.destroy();
+      if (nudgeTimer) clearTimeout(nudgeTimer);
     },
   };
 
@@ -438,14 +534,16 @@ interface ToolbarHandle {
   el:                 HTMLElement;
   setActive:          (tool: Tool) => void;
   setResetEnabled:    (enabled: boolean) => void;
+  setGridSnapOn:      (on: boolean) => void;
 }
 
 interface ToolbarHandlers {
-  onPick:  (tool: Tool) => void;
-  onReset: () => void;
+  onPick:    (tool: Tool) => void;
+  onReset:   () => void;
+  onToggleGrid: () => void;
 }
 
-function buildToolbar({ onPick, onReset }: ToolbarHandlers): ToolbarHandle {
+function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): ToolbarHandle {
   const el = document.createElement('div');
   el.className = 'mb-vTb';
   el.contentEditable = 'false';
@@ -494,10 +592,26 @@ function buildToolbar({ onPick, onReset }: ToolbarHandlers): ToolbarHandle {
     }
   });
 
-  // Reset layout — separator + dedicated action button (not a tool).
+  // Layout actions — separator + grid toggle + reset.
   const sep2 = document.createElement('span');
   sep2.className = 'mb-vTb-sep';
   el.appendChild(sep2);
+
+  const gridBtn = document.createElement('button');
+  gridBtn.type = 'button';
+  gridBtn.className = 'mb-vTb-btn mb-vTb-grid';
+  gridBtn.dataset.tip = 'Snap to grid';
+  gridBtn.setAttribute('aria-label', 'Snap to grid (8 px)');
+  gridBtn.setAttribute('aria-pressed', 'false');
+  gridBtn.innerHTML = ICONS.grid;
+  gridBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  gridBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggleGrid();
+  });
+  el.appendChild(gridBtn);
+
   const resetBtn = document.createElement('button');
   resetBtn.type = 'button';
   resetBtn.className = 'mb-vTb-btn mb-vTb-reset mb-vTb-disabled';
@@ -525,8 +639,13 @@ function buildToolbar({ onPick, onReset }: ToolbarHandlers): ToolbarHandle {
     resetBtn.classList.toggle('mb-vTb-disabled', !enabled);
   }
 
+  function setGridSnapOn(on: boolean): void {
+    gridBtn.classList.toggle('mb-vTb-active', on);
+    gridBtn.setAttribute('aria-pressed', String(on));
+  }
+
   setActive('select');
-  return { el, setActive, setResetEnabled };
+  return { el, setActive, setResetEnabled, setGridSnapOn };
 }
 
 // ── Context tip ─────────────────────────────────────────────────────────────
@@ -763,14 +882,96 @@ export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
     (nodeEl as SVGGElement).setAttribute('transform', `translate(${x}, ${y})`);
   }
 
-  // 2) Expand SVG viewBox to enclose every (possibly-moved) node. Mermaid's
+  // 2) Re-fit each subgraph cluster's box around its (now-moved) children.
+  // Best-effort: if mermaid's DOM doesn't expose enough info we'll just leave
+  // clusters where they are.
+  try { fitClusters(host); } catch { /* tolerate */ }
+
+  // 3) Expand SVG viewBox to enclose every (possibly-moved) node. Mermaid's
   // auto-layout sets a tight viewBox; if a user drags a node outside it,
   // the node renders off-screen unless we widen.
   fitSvgViewBoxToNodes(host);
 
-  // 3) Recompute edges. We do this for ALL edges, not just ones touching a
+  // 4) Recompute edges. We do this for ALL edges, not just ones touching a
   // pinned node — keeps the pipeline simple and avoids partial weirdness.
   recomputeAllEdges(host);
+}
+
+/** For each g.cluster, recompute the `<rect>` (or `<polygon>`) so it
+    encloses its contained nodes after positions are applied. Padded so the
+    box doesn't kiss the node edges. */
+function fitClusters(host: HTMLElement): void {
+  const clusters = host.querySelectorAll<SVGGElement>('g.cluster');
+  const PAD = 24;
+  const LABEL_TOP_PAD = 10;
+  for (const cluster of Array.from(clusters)) {
+    const rect = cluster.querySelector<SVGRectElement>('rect');
+    if (!rect) continue;
+    // Find nodes inside this cluster — mermaid usually nests them, but the
+    // structure varies. We use a heuristic: any g.node whose center falls
+    // inside the cluster's bbox before the overlay. Easier path: read the
+    // cluster's data attribute (if mermaid sets one) or use the children of
+    // the cluster's parent group. We fall back to "all nodes that mermaid
+    // tagged as belonging to this cluster" via id naming.
+    const clusterIdRaw = cluster.getAttribute('id') ?? '';
+    const clusterId = clusterIdRaw.match(/(?:flowchart|graph)-([\w-]+?)(?:-\d+)?$/)?.[1];
+    if (!clusterId) continue;
+    // mermaid sets parentLookupDb but doesn't expose it in DOM; we instead
+    // measure all nodes that sit *visually* inside the cluster's original
+    // rect (the rect that mermaid drew before we touched it).
+    const innerNodes = findNodesInsideRect(host, rect);
+    if (innerNodes.length === 0) continue;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of innerNodes) {
+      const t = readNodeTranslate(n);
+      if (!t) continue;
+      const half = nodeHalfExtent(n);
+      minX = Math.min(minX, t.x - half.w);
+      minY = Math.min(minY, t.y - half.h);
+      maxX = Math.max(maxX, t.x + half.w);
+      maxY = Math.max(maxY, t.y + half.h);
+    }
+    if (!isFinite(minX)) continue;
+
+    rect.setAttribute('x',      String(minX - PAD));
+    rect.setAttribute('y',      String(minY - PAD - LABEL_TOP_PAD));
+    rect.setAttribute('width',  String(maxX - minX + PAD * 2));
+    rect.setAttribute('height', String(maxY - minY + PAD * 2 + LABEL_TOP_PAD));
+
+    // Re-position the cluster label (g.cluster-label) at the top-center.
+    const label = cluster.querySelector<SVGGElement>('g.cluster-label, g.label');
+    if (label) {
+      const cx = (minX + maxX) / 2;
+      const ly = minY - PAD - LABEL_TOP_PAD / 2;
+      label.setAttribute('transform', `translate(${cx}, ${ly})`);
+    }
+  }
+}
+
+function findNodesInsideRect(host: HTMLElement, rect: SVGRectElement): SVGGElement[] {
+  const rx = parseFloat(rect.getAttribute('x') ?? '0');
+  const ry = parseFloat(rect.getAttribute('y') ?? '0');
+  const rw = parseFloat(rect.getAttribute('width')  ?? '0');
+  const rh = parseFloat(rect.getAttribute('height') ?? '0');
+  if (rw === 0 || rh === 0) return [];
+  // Account for any inherited transform on the cluster ancestor chain.
+  // For mermaid's typical structure, the cluster's rect is in the same
+  // coordinate space as the nodes (both inside the same root group).
+  const inside: SVGGElement[] = [];
+  const all = host.querySelectorAll<SVGGElement>('g.node');
+  for (const n of Array.from(all)) {
+    const t = readNodeTranslate(n);
+    if (!t) continue;
+    // We check the node's ORIGINAL (pre-overlay) position, but at this
+    // point overlay has already moved nodes. As a fallback we use a
+    // generous bbox check: if the node CENTER is anywhere within ±rect
+    // padded by 32 units, treat it as inside.
+    if (t.x >= rx - 32 && t.x <= rx + rw + 32 && t.y >= ry - 32 && t.y <= ry + rh + 32) {
+      inside.push(n);
+    }
+  }
+  return inside;
 }
 
 function fitSvgViewBoxToNodes(host: HTMLElement): void {
@@ -923,4 +1124,191 @@ function bezierPath(a: { x: number; y: number }, b: { x: number; y: number }): s
   const cp2x = b.x - dx * 0.5;
   const cp2y = b.y;
   return `M ${a.x} ${a.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${b.x} ${b.y}`;
+}
+
+// ── Phase 3: alignment guides + snap ───────────────────────────────────────
+
+interface NodeSnap {
+  id:    string;
+  x:     number;  // center x
+  y:     number;  // center y
+  half:  { w: number; h: number };
+}
+
+interface GuideLine {
+  orient: 'h' | 'v';
+  coord:  number;
+  from:   number;
+  to:     number;
+}
+
+interface SnapResult {
+  snapX:  number | null;
+  snapY:  number | null;
+  guides: GuideLine[];
+}
+
+const ALIGN_THRESHOLD = 6; // SVG units
+
+function collectOtherNodes(excludeId: string, host: HTMLElement): NodeSnap[] {
+  const out: NodeSnap[] = [];
+  const all = host.querySelectorAll<SVGGElement>('g.node');
+  for (const n of Array.from(all)) {
+    const id = extractMermaidId(n);
+    if (!id || id === excludeId) continue;
+    const t = readNodeTranslate(n);
+    if (!t) continue;
+    out.push({ id, x: t.x, y: t.y, half: nodeHalfExtent(n) });
+  }
+  return out;
+}
+
+/** For a dragged node positioned at `center` with half-extents `half`, find
+    the nearest aligning X / Y from any peer node and return both the snap
+    coordinates and the guide lines to render. */
+function computeAlignmentSnap(
+  center: { x: number; y: number },
+  half:   { w: number; h: number },
+  others: NodeSnap[],
+): SnapResult {
+  // Candidate X coords: peers' center, left edge, right edge.
+  // We track the BEST X snap (closest to the current) and similarly for Y.
+  let bestDX = Infinity;
+  let snapX: number | null = null;
+  let bestDY = Infinity;
+  let snapY: number | null = null;
+  const guides: GuideLine[] = [];
+
+  const myL = center.x - half.w;
+  const myR = center.x + half.w;
+  const myT = center.y - half.h;
+  const myB = center.y + half.h;
+
+  for (const o of others) {
+    const oL = o.x - o.half.w;
+    const oR = o.x + o.half.w;
+    const oT = o.y - o.half.h;
+    const oB = o.y + o.half.h;
+
+    // X candidates: my-center↔o-center, my-left↔o-left, my-right↔o-right,
+    // my-left↔o-right, my-right↔o-left. The snap target for the *node center*
+    // is derived from the comparison pair.
+    const xCandidates: Array<{ targetCenter: number; coord: number }> = [
+      { targetCenter: o.x,                  coord: o.x  },                   // center↔center
+      { targetCenter: oL + half.w,          coord: oL  },                    // left↔left
+      { targetCenter: oR - half.w,          coord: oR  },                    // right↔right
+      { targetCenter: oL - half.w,          coord: oL  },                    // right↔left
+      { targetCenter: oR + half.w,          coord: oR  },                    // left↔right
+    ];
+    for (const c of xCandidates) {
+      const dist = Math.abs(c.targetCenter - center.x);
+      if (dist > ALIGN_THRESHOLD) continue;
+      if (dist < bestDX) {
+        bestDX = dist;
+        snapX  = c.targetCenter;
+        // Replace any existing vertical guide
+        for (let i = guides.length - 1; i >= 0; i--) {
+          if (guides[i].orient === 'v') guides.splice(i, 1);
+        }
+        const y1 = Math.min(myT, oT);
+        const y2 = Math.max(myB, oB);
+        guides.push({ orient: 'v', coord: c.coord, from: y1, to: y2 });
+      }
+    }
+
+    const yCandidates: Array<{ targetCenter: number; coord: number }> = [
+      { targetCenter: o.y,                  coord: o.y  },
+      { targetCenter: oT + half.h,          coord: oT  },
+      { targetCenter: oB - half.h,          coord: oB  },
+      { targetCenter: oT - half.h,          coord: oT  },
+      { targetCenter: oB + half.h,          coord: oB  },
+    ];
+    for (const c of yCandidates) {
+      const dist = Math.abs(c.targetCenter - center.y);
+      if (dist > ALIGN_THRESHOLD) continue;
+      if (dist < bestDY) {
+        bestDY = dist;
+        snapY  = c.targetCenter;
+        for (let i = guides.length - 1; i >= 0; i--) {
+          if (guides[i].orient === 'h') guides.splice(i, 1);
+        }
+        const x1 = Math.min(myL, oL);
+        const x2 = Math.max(myR, oR);
+        guides.push({ orient: 'h', coord: c.coord, from: x1, to: x2 });
+      }
+    }
+  }
+  return { snapX, snapY, guides };
+}
+
+interface GuideLayerHandle {
+  show:    (lines: GuideLine[]) => void;
+  hide:    () => void;
+  destroy: () => void;
+}
+
+/** A dedicated SVG overlay layer for alignment guides. Lives inside the
+    preview pane, sized to the rendered SVG's viewBox so guides align with
+    the diagram. */
+function createGuideLayer(previewPane: HTMLElement): GuideLayerHandle {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'mb-vGuides');
+  svg.style.position       = 'absolute';
+  svg.style.inset          = '0';
+  svg.style.pointerEvents  = 'none';
+  svg.style.overflow       = 'visible';
+  svg.style.display        = 'none';
+  svg.style.zIndex         = '15';
+  previewPane.appendChild(svg);
+
+  function syncViewBox(): void {
+    const mermaidSvg = previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+    if (!mermaidSvg) return;
+    const vb = mermaidSvg.viewBox?.baseVal;
+    if (!vb) return;
+    svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.width} ${vb.height}`);
+    // Position the guide SVG to overlay the mermaid SVG exactly.
+    const mRect = mermaidSvg.getBoundingClientRect();
+    const pRect = previewPane.getBoundingClientRect();
+    svg.style.left   = `${mRect.left - pRect.left}px`;
+    svg.style.top    = `${mRect.top  - pRect.top}px`;
+    svg.style.width  = `${mRect.width}px`;
+    svg.style.height = `${mRect.height}px`;
+  }
+
+  function show(lines: GuideLine[]): void {
+    syncViewBox();
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    for (const l of lines) {
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      if (l.orient === 'v') {
+        el.setAttribute('x1', String(l.coord));
+        el.setAttribute('x2', String(l.coord));
+        el.setAttribute('y1', String(l.from - 20));
+        el.setAttribute('y2', String(l.to + 20));
+      } else {
+        el.setAttribute('y1', String(l.coord));
+        el.setAttribute('y2', String(l.coord));
+        el.setAttribute('x1', String(l.from - 20));
+        el.setAttribute('x2', String(l.to + 20));
+      }
+      el.setAttribute('stroke', '#6366f1');
+      el.setAttribute('stroke-width', '1');
+      el.setAttribute('stroke-dasharray', '3 3');
+      el.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(el);
+    }
+    svg.style.display = lines.length > 0 ? 'block' : 'none';
+  }
+
+  function hide(): void {
+    svg.style.display = 'none';
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+  }
+
+  function destroy(): void {
+    svg.remove();
+  }
+
+  return { show, hide, destroy };
 }

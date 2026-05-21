@@ -3214,3 +3214,18 @@ html.theme-dark .ProseMirror .mb-vTb-btn.mb-vTb-active {
   background: var(--callout-caution-bg);
   color: var(--callout-caution-accent);
 }
+
+/* Phase 3: snap-to-grid toggle (uses the same mb-vTb-active class as tools). */
+.ProseMirror .mb-vTb-grid.mb-vTb-active {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
+}
+
+/* Phase 3: alignment guide overlay (its own SVG inside .mb-preview). */
+.ProseMirror .mb-vGuides {
+  pointer-events: none;
+}
