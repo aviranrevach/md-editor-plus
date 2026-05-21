@@ -407,7 +407,7 @@ function renderBody(): HTMLElement {
 
   const placeholder = document.createElement('div');
   placeholder.className = 'board-panel-body-placeholder';
-  placeholder.innerHTML = `Add a description… or press <kbd>/</kbd> for commands`;
+  placeholder.textContent = 'Add a description to this card…';
   bodyWrap.appendChild(placeholder);
   updateBodyPlaceholderVisibility(bodyWrap, card.body || '');
 
