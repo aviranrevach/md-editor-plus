@@ -177,22 +177,40 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       return;
     }
 
-    // One of the shape tools — drop a node. In an un-pinned block mermaid's
-    // auto-layout decides the position (Phase 1). In a pinned block we
-    // place the new node near the centroid of existing positions so it
-    // doesn't land outside the viewBox or stack on (0, 0).
+    // One of the shape tools — drop a node where the user clicked. If the
+    // block wasn't pinned yet, snapshot every existing node's auto-layout
+    // position first so edges stay coherent once we promote the block to
+    // pinned mode (same trick as the first-drag commit).
     const shapeKey = activeTool as keyof typeof SHAPE_FOR_TOOL;
+    const dropPos = clientToSvgPoint(e.clientX, e.clientY, opts.previewPane);
     mutate((ast) => {
       const added = addNode(ast, SHAPE_FOR_TOOL[shapeKey]);
-      const positions = getPositions(ast);
-      if (positions) {
-        const ids = Object.keys(positions);
-        if (ids.length > 0) {
-          let sx = 0, sy = 0;
-          for (const id of ids) { sx += positions[id][0]; sy += positions[id][1]; }
-          const cx = Math.round(sx / ids.length) + 40;
-          const cy = Math.round(sy / ids.length) + 40;
-          setPosition(ast, added.id, cx, cy);
+      if (dropPos) {
+        if (!getPositions(ast)) {
+          const snapshot: PositionMap = {};
+          const allNodes = opts.previewPane.querySelectorAll<SVGGElement>('g.node');
+          for (const n of Array.from(allNodes)) {
+            const nid = extractMermaidId(n);
+            if (!nid) continue;
+            const t = readNodeTranslate(n);
+            if (t) snapshot[nid] = [t.x, t.y];
+          }
+          setAllPositions(ast, snapshot);
+        }
+        setPosition(ast, added.id, dropPos.x, dropPos.y);
+      } else {
+        // Fallback when we can't measure the SVG: drop near the centroid of
+        // any existing pinned nodes, or let mermaid auto-layout decide.
+        const positions = getPositions(ast);
+        if (positions) {
+          const ids = Object.keys(positions);
+          if (ids.length > 0) {
+            let sx = 0, sy = 0;
+            for (const id of ids) { sx += positions[id][0]; sy += positions[id][1]; }
+            const cx = Math.round(sx / ids.length) + 40;
+            const cy = Math.round(sy / ids.length) + 40;
+            setPosition(ast, added.id, cx, cy);
+          }
         }
       }
     });
@@ -866,6 +884,26 @@ function svgUnitsPerPixel(svg: SVGSVGElement): number {
   const cssWidth = svg.getBoundingClientRect().width || 1;
   if (vb && vb.width > 0 && cssWidth > 0) return vb.width / cssWidth;
   return 1;
+}
+
+/** Map an absolute client (event) coordinate to a point in the rendered
+    mermaid SVG's viewBox space. Uses SVG's native ScreenCTM matrix so any
+    parent transforms / preserveAspectRatio offsets are accounted for.
+    Returns null if the click missed the SVG. */
+function clientToSvgPoint(clientX: number, clientY: number, host: HTMLElement): { x: number; y: number } | null {
+  const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (!svg) return null;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  try {
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const transformed = pt.matrixTransform(ctm.inverse());
+    return { x: transformed.x, y: transformed.y };
+  } catch {
+    return null;
+  }
 }
 
 /** Override mermaid's auto-layout positions with the user's pinned ones
