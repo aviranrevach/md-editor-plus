@@ -246,21 +246,42 @@
   padding: 0;
 }
 
-/* Per-color chip backgrounds and dot colors */
-.color-gray   .board-column-chip { background: var(--board-chip-gray-bg);   color: var(--board-chip-gray-fg); }
-.color-gray   .board-column-chip-dot { background: var(--board-chip-gray-dot); }
-.color-blue   .board-column-chip { background: var(--board-chip-blue-bg);   color: var(--board-chip-blue-fg); }
-.color-blue   .board-column-chip-dot { background: var(--board-chip-blue-dot); }
+/* Per-color chip backgrounds and dot colors.
+   Two selector forms for each token:
+   - `.color-X .board-column-chip` — column-head case where the color class
+     lives on the parent .board-column and the chip is a descendant.
+   - `.color-X.board-column-chip` — side-panel case where both classes are
+     on the SAME element (the standalone chip built by buildChip()). The
+     descendant form alone would silently fail to colour the side-panel
+     status pill and dropdown options. */
+.color-gray   .board-column-chip,
+.color-gray.board-column-chip   { background: var(--board-chip-gray-bg);   color: var(--board-chip-gray-fg); }
+.color-gray   .board-column-chip-dot,
+.color-gray.board-column-chip   .board-column-chip-dot { background: var(--board-chip-gray-dot); }
+.color-blue   .board-column-chip,
+.color-blue.board-column-chip   { background: var(--board-chip-blue-bg);   color: var(--board-chip-blue-fg); }
+.color-blue   .board-column-chip-dot,
+.color-blue.board-column-chip   .board-column-chip-dot { background: var(--board-chip-blue-dot); }
 .color-green  .board-column-chip,
-.color-emerald .board-column-chip { background: var(--board-chip-green-bg); color: var(--board-chip-green-fg); }
+.color-green.board-column-chip  ,
+.color-emerald .board-column-chip,
+.color-emerald.board-column-chip { background: var(--board-chip-green-bg); color: var(--board-chip-green-fg); }
 .color-green  .board-column-chip-dot,
-.color-emerald .board-column-chip-dot { background: var(--board-chip-green-dot); }
-.color-amber  .board-column-chip { background: var(--board-chip-amber-bg);  color: var(--board-chip-amber-fg); }
-.color-amber  .board-column-chip-dot { background: var(--board-chip-amber-dot); }
-.color-red    .board-column-chip { background: var(--board-chip-red-bg);    color: var(--board-chip-red-fg); }
-.color-red    .board-column-chip-dot { background: var(--board-chip-red-dot); }
-.color-purple .board-column-chip { background: var(--board-chip-purple-bg); color: var(--board-chip-purple-fg); }
-.color-purple .board-column-chip-dot { background: var(--board-chip-purple-dot); }
+.color-green.board-column-chip  .board-column-chip-dot,
+.color-emerald .board-column-chip-dot,
+.color-emerald.board-column-chip .board-column-chip-dot { background: var(--board-chip-green-dot); }
+.color-amber  .board-column-chip,
+.color-amber.board-column-chip  { background: var(--board-chip-amber-bg);  color: var(--board-chip-amber-fg); }
+.color-amber  .board-column-chip-dot,
+.color-amber.board-column-chip  .board-column-chip-dot { background: var(--board-chip-amber-dot); }
+.color-red    .board-column-chip,
+.color-red.board-column-chip    { background: var(--board-chip-red-bg);    color: var(--board-chip-red-fg); }
+.color-red    .board-column-chip-dot,
+.color-red.board-column-chip    .board-column-chip-dot { background: var(--board-chip-red-dot); }
+.color-purple .board-column-chip,
+.color-purple.board-column-chip { background: var(--board-chip-purple-bg); color: var(--board-chip-purple-fg); }
+.color-purple .board-column-chip-dot,
+.color-purple.board-column-chip .board-column-chip-dot { background: var(--board-chip-purple-dot); }
 
 .board-column-dots {
   margin-left: auto;
