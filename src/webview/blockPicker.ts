@@ -614,7 +614,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
 function freshBoardSource(id: string): string {
   return [
-    `<!-- board:start id="${id}" name="" columns="Todo|Doing|Done" column-colors="blue|amber|emerald" field-types="Title=text,Status=status,id=text" hidden-fields="id" -->`,
+    `<!-- board:start id="${id}" name="" columns="Todo|Doing|Done" column-colors="gray|blue|green" field-types="Title=text,Status=status,id=text" hidden-fields="id" -->`,
     ``,
     `| Title    | Status | id |`,
     `|----------|--------|----|`,

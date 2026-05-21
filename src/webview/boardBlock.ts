@@ -305,11 +305,25 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
     body.addEventListener('dragover', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
       e.preventDefault();
-      // If the cursor is NOT over a card, show the indicator at the end of the
-      // list. The card-level dragover handler will take over (and place the
-      // indicator above/below itself) when the cursor is over a card.
+      // The card-level dragover handler covers the case where the cursor is
+      // over a specific card. The body handler only steps in when the cursor
+      // is BELOW the last card (drop at end of list) or when the list is
+      // empty. Without this guard, the indicator flickered between the gap
+      // between two cards and the bottom of the list as the cursor moved.
       const overCard = (e.target as HTMLElement | null)?.closest('.board-card');
-      if (!overCard) showEndOfListDropIndicator(list);
+      if (overCard) return;
+      const cards = list.querySelectorAll(':scope > .board-card:not(.is-new)');
+      if (cards.length === 0) {
+        showEndOfListDropIndicator(list);
+        return;
+      }
+      const lastCard = cards[cards.length - 1] as HTMLElement;
+      const lastRect = lastCard.getBoundingClientRect();
+      if (e.clientY > lastRect.bottom) {
+        showEndOfListDropIndicator(list);
+      }
+      // Cursor is in a gap between cards: leave the indicator wherever the
+      // last card-level dragover placed it.
     });
     body.addEventListener('drop', (e) => {
       if (!e.dataTransfer?.types.includes('text/board-card-id')) return;
