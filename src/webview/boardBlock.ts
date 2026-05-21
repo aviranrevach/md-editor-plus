@@ -109,24 +109,8 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
   }
   chrome.appendChild(name);
 
-  if (!readOnly) {
-    const props = document.createElement('button');
-    props.type = 'button';
-    props.className = 'board-properties-btn';
-    props.title = 'Properties';
-    props.innerHTML = `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <line x1="2" y1="4" x2="14" y2="4"/>
-        <line x1="2" y1="8" x2="14" y2="8"/>
-        <line x1="2" y1="12" x2="14" y2="12"/>
-        <circle cx="5" cy="4" r="1.5" fill="currentColor"/>
-        <circle cx="10" cy="8" r="1.5" fill="currentColor"/>
-        <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
-      </svg>
-    `;
-    props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
-    chrome.appendChild(props);
-  }
+  // Properties button no longer lives in the chrome — it sits in the columns
+  // row alongside the "+" so both align with the column headers.
   return chrome;
 }
 
@@ -142,22 +126,56 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
     row.appendChild(renderUncategorized(board, orphans, mutate, readOnly));
   }
   if (!readOnly) {
+    // Right-side action cluster: [+] [Properties], aligned with the chip header.
+    const actions = document.createElement('div');
+    actions.className = 'board-columns-actions';
+
     const addCol = document.createElement('button');
     addCol.type = 'button';
     addCol.className = 'board-add-column';
     addCol.textContent = '+';
     addCol.title = 'Add column';
     addCol.addEventListener('click', () => {
-      const name = prompt('Column name', 'New');
-      if (!name) return;
-      if (board.columns.some((c) => c.name === name)) {
-        alert('A column with that name already exists.');
-        return;
-      }
+      // VSCode webviews block window.prompt(), so add a column with a default
+      // name + an auto-incrementing suffix and focus its inline name span for
+      // immediate rename. Mirrors the "+ New card" UX.
+      const base = 'New';
+      let name = base;
+      let n = 2;
+      while (board.columns.some((c) => c.name === name)) name = `${base} ${n++}`;
       const color = nextColor(board.columns.map((c) => c.color));
       mutate({ ...board, columns: [...board.columns, { name, color }] });
+      requestAnimationFrame(() => {
+        const boardDom = row.closest('.board-block');
+        const newColDom = boardDom?.querySelector(
+          `.board-column[data-column="${cssEscape(name)}"]`,
+        ) as HTMLElement | null;
+        const nameEl = newColDom?.querySelector('.board-column-name') as HTMLElement | null;
+        if (!nameEl) return;
+        nameEl.focus();
+        selectAllText(nameEl);
+      });
     });
-    row.appendChild(addCol);
+    actions.appendChild(addCol);
+
+    const props = document.createElement('button');
+    props.type = 'button';
+    props.className = 'board-properties-btn';
+    props.title = 'Properties';
+    props.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <line x1="2" y1="4" x2="14" y2="4"/>
+        <line x1="2" y1="8" x2="14" y2="8"/>
+        <line x1="2" y1="12" x2="14" y2="12"/>
+        <circle cx="5" cy="4" r="1.5" fill="currentColor"/>
+        <circle cx="10" cy="8" r="1.5" fill="currentColor"/>
+        <circle cx="6" cy="12" r="1.5" fill="currentColor"/>
+      </svg>
+    `;
+    props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
+    actions.appendChild(props);
+
+    row.appendChild(actions);
   }
   return row;
 }

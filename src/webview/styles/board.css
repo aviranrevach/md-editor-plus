@@ -412,9 +412,18 @@
   color: var(--board-text-light);
 }
 
-/* ===== + Add column at end of row ===== */
+/* ===== Right-edge actions cluster — [+] [Properties], aligned with column heads ===== */
+.board-columns-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-start;
+  height: 28px;
+  margin-left: 4px;
+  padding-top: 0;
+}
 .board-add-column {
-  flex: 0 0 32px;
+  width: 28px;
   height: 28px;
   background: transparent;
   border: 0;
@@ -423,7 +432,7 @@
   font-size: 18px;
   border-radius: 4px;
   padding: 0;
-  align-self: flex-start;
+  line-height: 1;
 }
 .board-add-column:hover {
   background: var(--board-hover);
