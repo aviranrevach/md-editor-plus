@@ -1114,20 +1114,28 @@
 }
 .board-confirm-confirm:hover { filter: brightness(0.95); }
 
-/* ===== Side-panel row-label as clickable trigger ===== */
-.board-panel-prop-label.is-clickable {
-  cursor: pointer;
+/* ===== Side-panel row-label as clickable trigger =====
+   The label renders as a <button> so it can be a click target for the action
+   menu. Reset all default button chrome (border, background, padding) on
+   every label — even the locked ones (Status / Title) — and add the
+   pointer + hover only when it's actually clickable. */
+.board-panel-prop-label {
   background: transparent;
   border: 0;
   text-align: left;
   font-family: inherit;
-  font-size: 14px;
   padding: 2px 6px;
   margin-left: -6px;
   border-radius: 3px;
 }
+.board-panel-prop-label.is-clickable {
+  cursor: pointer;
+}
 .board-panel-prop-label.is-clickable:hover {
   background: rgba(15, 15, 15, 0.05);
+}
+.board-panel-prop-label:not(.is-clickable) {
+  cursor: default;
 }
 
 /* Add-field inline picker */
