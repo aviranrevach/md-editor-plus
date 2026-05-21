@@ -2,6 +2,7 @@
 import type { Board, Card, FieldType } from './boardModel';
 import { createEditor } from './editor';
 import { promptNewField } from './boardProperties';
+import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
 
 let panel: HTMLElement | null = null;
 let currentBoard: Board | null = null;
@@ -9,42 +10,6 @@ let currentCard: Card | null = null;
 let currentOnChange: ((next: Card) => void) | null = null;
 let currentOnBoardChange: ((next: Board) => void) | null = null;
 let currentReadOnly = false;
-
-// Inline SVG icons (16x16 viewBox, 1.5 stroke) per field type. Rendered in the
-// muted color (var(--board-text-muted)) so they look like Notion's row glyphs.
-const FIELD_TYPE_ICONS: Record<FieldType, string> = {
-  text:
-    `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-      <path d="M3 4h10M3 8h10M3 12h7"/>
-    </svg>`,
-  status:
-    `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="2" fill="currentColor"/>
-    </svg>`,
-  date:
-    `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <rect x="2.5" y="3.5" width="11" height="10" rx="1"/>
-      <path d="M2.5 6.5h11M5.5 2v2M10.5 2v2"/>
-    </svg>`,
-  person:
-    `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="8" cy="6" r="2.5"/>
-      <path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5"/>
-    </svg>`,
-  tags:
-    `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-      <path d="M3 6h10M3 10h10M6 3v10M10 3v10"/>
-    </svg>`,
-};
-
-const ICON_PLUS =
-  `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-    <path d="M8 3v10M3 8h10"/>
-  </svg>`;
-const ICON_CLOSE =
-  `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-    <path d="M4 4l8 8M12 4l-8 8"/>
-  </svg>`;
 
 export function initBoardSidePanel(): void {
   if (panel) return;
@@ -55,6 +20,8 @@ export function initBoardSidePanel(): void {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && panel && panel.style.display !== 'none') {
+      // Don't close if an open popover (status dropdown / add-prop picker) is on screen.
+      if (document.querySelector('.board-status-dropdown, .board-add-field-picker')) return;
       closeBoardSidePanel();
     }
   });
@@ -62,9 +29,11 @@ export function initBoardSidePanel(): void {
   document.addEventListener('mousedown', (e) => {
     if (!panel || panel.style.display === 'none') return;
     if (panel.contains(e.target as Node)) return;
+    const target = e.target as HTMLElement;
     // Click on a card opens a new panel; don't auto-close in that case.
-    const onCard = (e.target as HTMLElement).closest('.board-card');
-    if (onCard) return;
+    if (target.closest('.board-card')) return;
+    // Click inside a popover spawned BY the panel; don't close.
+    if (target.closest('.board-status-dropdown, .board-add-field-picker')) return;
     closeBoardSidePanel();
   });
 }
@@ -96,10 +65,33 @@ export function closeBoardSidePanel(): void {
   currentReadOnly = false;
 }
 
+// === Commit helpers. Crucially, they update the module-level currentCard /
+// currentBoard BEFORE notifying the outside world, so subsequent edits inside
+// the panel read the latest state rather than the stale closure values from
+// when renderPanel ran. Fixes the "edits don't save" / "edits overwrite each
+// other" bug. ===
+function commitCard(updater: (c: Card) => Card): void {
+  if (!currentCard || !currentOnChange) return;
+  const next = updater(currentCard);
+  currentCard = next;
+  currentOnChange(next);
+}
+function commitBoard(next: Board): void {
+  currentBoard = next;
+  // Refresh currentCard against the new board so subsequent card edits stay
+  // consistent (the card's field values might be untouched, but a schema
+  // change like "add property" expands the cards' values map).
+  if (currentCard) {
+    const refreshed = next.cards.find((c) => c.id === currentCard!.id);
+    if (refreshed) currentCard = refreshed;
+  }
+  currentOnBoardChange?.(next);
+  // Re-render to show new fields / updated schema.
+  renderPanel();
+}
+
 function renderPanel(): void {
   if (!panel || !currentBoard || !currentCard) return;
-  const board = currentBoard;
-  const card = currentCard;
 
   panel.innerHTML = '';
 
@@ -115,12 +107,23 @@ function renderPanel(): void {
   toolbar.appendChild(close);
   panel.appendChild(toolbar);
 
-  // === Body container (scrolls) ===
+  // === Scrollable container ===
   const wrap = document.createElement('div');
   wrap.className = 'board-panel-wrap';
   panel.appendChild(wrap);
 
-  // === Big editable title ===
+  wrap.appendChild(renderTitle());
+  wrap.appendChild(renderProperties());
+
+  const divider = document.createElement('div');
+  divider.className = 'board-panel-divider';
+  wrap.appendChild(divider);
+
+  wrap.appendChild(renderBody());
+}
+
+function renderTitle(): HTMLElement {
+  const card = currentCard!;
   const title = document.createElement('div');
   title.className = 'board-panel-title';
   title.contentEditable = currentReadOnly ? 'false' : 'true';
@@ -133,9 +136,7 @@ function renderPanel(): void {
       title.classList.toggle('is-placeholder', !title.textContent);
     });
     title.addEventListener('blur', () => {
-      if (!currentOnChange) return;
-      const next: Card = { ...card, values: { ...card.values, Title: title.textContent || '' } };
-      currentOnChange(next);
+      commitCard((c) => ({ ...c, values: { ...c.values, Title: title.textContent || '' } }));
     });
     title.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -148,15 +149,17 @@ function renderPanel(): void {
       selectAllText(title);
     });
   }
-  wrap.appendChild(title);
+  return title;
+}
 
-  // === Properties section ===
+function renderProperties(): HTMLElement {
+  const board = currentBoard!;
   const props = document.createElement('div');
   props.className = 'board-panel-props';
   for (const field of board.fields) {
     if (field.name === 'Title') continue;
     if (!field.visibleOnCard && field.name === 'id') continue;
-    props.appendChild(renderPropRow(board, card, field));
+    props.appendChild(renderPropRow(field));
   }
   if (!currentReadOnly) {
     const addProp = document.createElement('button');
@@ -167,52 +170,19 @@ function renderPanel(): void {
       <span class="board-panel-prop-label">Add a property</span>
     `;
     addProp.addEventListener('click', () => {
-      if (!currentOnBoardChange) return; // shouldn't happen — wired in boardBlock
-      promptNewField(addProp, board, (nextBoard) => {
-        currentOnBoardChange?.(nextBoard);
+      if (!currentBoard) return;
+      promptNewField(addProp, currentBoard, (nextBoard) => {
+        commitBoard(nextBoard);
       });
     });
     props.appendChild(addProp);
   }
-  wrap.appendChild(props);
-
-  // === Divider ===
-  const divider = document.createElement('div');
-  divider.className = 'board-panel-divider';
-  wrap.appendChild(divider);
-
-  // === Body ===
-  const bodyWrap = document.createElement('div');
-  bodyWrap.className = 'board-panel-body-wrap';
-  wrap.appendChild(bodyWrap);
-
-  const bodyHost = document.createElement('div');
-  bodyHost.className = 'board-panel-body editable';
-  bodyWrap.appendChild(bodyHost);
-
-  const sub = createEditor(bodyHost, card.body || '', (markdown: string) => {
-    if (!currentOnChange) return;
-    const next: Card = { ...card, body: markdown };
-    currentOnChange(next);
-    updateBodyPlaceholderVisibility(bodyWrap, markdown);
-  });
-  sub.setEditable(!currentReadOnly);
-
-  // Empty-state placeholder overlay
-  const placeholder = document.createElement('div');
-  placeholder.className = 'board-panel-body-placeholder';
-  placeholder.innerHTML = `Add a description… or press <kbd>/</kbd> for commands`;
-  bodyWrap.appendChild(placeholder);
-  updateBodyPlaceholderVisibility(bodyWrap, card.body || '');
+  return props;
 }
 
-function updateBodyPlaceholderVisibility(bodyWrap: HTMLElement, markdown: string): void {
-  const placeholder = bodyWrap.querySelector('.board-panel-body-placeholder') as HTMLElement | null;
-  if (!placeholder) return;
-  placeholder.style.display = markdown.trim() ? 'none' : 'block';
-}
-
-function renderPropRow(board: Board, card: Card, field: { name: string; type: FieldType; visibleOnCard: boolean }): HTMLElement {
+function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: boolean }): HTMLElement {
+  const board = currentBoard!;
+  const card = currentCard!;
   const row = document.createElement('div');
   row.className = 'board-panel-prop-row';
 
@@ -237,90 +207,14 @@ function renderPropRow(board: Board, card: Card, field: { name: string; type: Fi
     if (!rawValue) input.placeholder = 'Empty';
     if (!currentReadOnly) {
       input.addEventListener('change', () => {
-        if (!currentOnChange) return;
-        const next: Card = { ...card, values: { ...card.values, [field.name]: input.value } };
-        currentOnChange(next);
+        commitCard((c) => ({ ...c, values: { ...c.values, [field.name]: input.value } }));
       });
     }
     row.appendChild(input);
   } else if (field.type === 'status') {
-    const select = document.createElement('select');
-    select.className = 'board-panel-prop-value';
-    for (const col of board.columns) {
-      const opt = document.createElement('option');
-      opt.value = col.name;
-      opt.textContent = col.name;
-      if (card.values.Status === col.name) opt.selected = true;
-      select.appendChild(opt);
-    }
-    select.disabled = currentReadOnly;
-    if (!currentReadOnly) {
-      select.addEventListener('change', () => {
-        if (!currentOnChange) return;
-        const next: Card = { ...card, values: { ...card.values, Status: select.value } };
-        currentOnChange(next);
-      });
-    }
-    row.appendChild(select);
+    row.appendChild(renderStatusChipTrigger(board, card));
   } else if (field.type === 'tags') {
-    const wrap = document.createElement('div');
-    wrap.className = 'board-tag-input board-panel-prop-value';
-    const tags = rawValue.split(',').map((t) => t.trim()).filter(Boolean);
-    if (currentReadOnly) {
-      if (tags.length === 0) {
-        wrap.classList.add('is-empty');
-        wrap.textContent = 'Empty';
-      } else {
-        tags.forEach((tag) => {
-          const chip = document.createElement('span');
-          chip.className = 'board-tag-chip';
-          chip.textContent = tag;
-          chip.style.pointerEvents = 'none';
-          wrap.appendChild(chip);
-        });
-      }
-    } else {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.placeholder = tags.length === 0 ? 'Empty' : '';
-      const renderChips = () => {
-        wrap.querySelectorAll('.board-tag-chip').forEach((n) => n.remove());
-        tags.forEach((tag, i) => {
-          const chip = document.createElement('span');
-          chip.className = 'board-tag-chip';
-          chip.textContent = tag;
-          const x = document.createElement('button');
-          x.type = 'button';
-          x.setAttribute('aria-label', 'Remove');
-          x.textContent = '×';
-          x.addEventListener('click', () => {
-            tags.splice(i, 1);
-            commit();
-          });
-          chip.appendChild(x);
-          wrap.insertBefore(chip, input);
-        });
-        input.placeholder = tags.length === 0 ? 'Empty' : '';
-      };
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ',') {
-          e.preventDefault();
-          const t = input.value.replace(/,/g, '').trim();
-          if (t && !tags.includes(t)) tags.push(t);
-          input.value = '';
-          commit();
-        }
-      });
-      const commit = () => {
-        if (!currentOnChange) return;
-        const next: Card = { ...card, values: { ...card.values, [field.name]: tags.join(', ') } };
-        currentOnChange(next);
-        renderChips();
-      };
-      wrap.appendChild(input);
-      renderChips();
-    }
-    row.appendChild(wrap);
+    row.appendChild(renderTagsEditor(card, field.name, rawValue));
   } else {
     // text or person — contenteditable span with Empty placeholder
     const value = document.createElement('span');
@@ -334,15 +228,196 @@ function renderPropRow(board: Board, card: Card, field: { name: string; type: Fi
         value.classList.toggle('is-empty', !value.textContent);
       });
       value.addEventListener('blur', () => {
-        if (!currentOnChange) return;
-        const next: Card = { ...card, values: { ...card.values, [field.name]: value.textContent || '' } };
-        currentOnChange(next);
+        commitCard((c) => ({ ...c, values: { ...c.values, [field.name]: value.textContent || '' } }));
       });
     }
     row.appendChild(value);
   }
 
   return row;
+}
+
+// === Status: render the current value as a chip (matches the column chip),
+// and on click open a dropdown of chips for every column. No more <select>. ===
+function renderStatusChipTrigger(board: Board, card: Card): HTMLElement {
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'board-panel-status-trigger board-panel-prop-value';
+  trigger.disabled = currentReadOnly;
+
+  const status = card.values.Status || '';
+  const col = board.columns.find((c) => c.name === status);
+  if (status && col) {
+    trigger.appendChild(buildChip(col.name, col.color));
+  } else {
+    const empty = document.createElement('span');
+    empty.className = 'board-panel-status-empty';
+    empty.textContent = 'Empty';
+    trigger.appendChild(empty);
+  }
+  const caret = document.createElement('span');
+  caret.className = 'board-panel-status-caret';
+  caret.innerHTML = ICON_CHEVRON_DOWN;
+  trigger.appendChild(caret);
+
+  if (!currentReadOnly) {
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openStatusDropdown(trigger);
+    });
+  }
+  return trigger;
+}
+
+function buildChip(name: string, color: string): HTMLElement {
+  const chip = document.createElement('span');
+  chip.className = `board-column-chip color-${color}`;
+  const dot = document.createElement('span');
+  dot.className = 'board-column-chip-dot';
+  chip.appendChild(dot);
+  const text = document.createElement('span');
+  text.className = 'board-column-name';
+  text.textContent = name;
+  chip.appendChild(text);
+  return chip;
+}
+
+function openStatusDropdown(anchor: HTMLElement): void {
+  document.querySelectorAll('.board-status-dropdown').forEach((n) => n.remove());
+  if (!currentBoard || !currentCard) return;
+  const board = currentBoard;
+  const card = currentCard;
+
+  const menu = document.createElement('div');
+  menu.className = 'board-status-dropdown';
+  document.body.appendChild(menu);
+
+  const rect = anchor.getBoundingClientRect();
+  menu.style.position = 'absolute';
+  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
+  menu.style.left = `${rect.left + window.scrollX}px`;
+  menu.style.minWidth = `${rect.width}px`;
+
+  for (const col of board.columns) {
+    const opt = document.createElement('button');
+    opt.type = 'button';
+    opt.className = 'board-status-option';
+    opt.appendChild(buildChip(col.name, col.color));
+    if (card.values.Status === col.name) {
+      const check = document.createElement('span');
+      check.className = 'board-status-check';
+      check.innerHTML = ICON_CHECK;
+      opt.appendChild(check);
+    }
+    opt.addEventListener('click', () => {
+      commitCard((c) => ({ ...c, values: { ...c.values, Status: col.name } }));
+      close();
+    });
+    menu.appendChild(opt);
+  }
+
+  function close(): void {
+    menu.remove();
+    document.removeEventListener('mousedown', onOutside, true);
+  }
+  function onOutside(e: MouseEvent): void {
+    if (!menu.contains(e.target as Node) && e.target !== anchor) close();
+  }
+  setTimeout(() => {
+    document.addEventListener('mousedown', onOutside, true);
+  }, 0);
+}
+
+function renderTagsEditor(card: Card, fieldName: string, rawValue: string): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'board-tag-input board-panel-prop-value';
+  const tags = rawValue.split(',').map((t) => t.trim()).filter(Boolean);
+  if (currentReadOnly) {
+    if (tags.length === 0) {
+      wrap.classList.add('is-empty');
+      wrap.textContent = 'Empty';
+    } else {
+      tags.forEach((tag) => {
+        const chip = document.createElement('span');
+        chip.className = 'board-tag-chip';
+        chip.textContent = tag;
+        chip.style.pointerEvents = 'none';
+        wrap.appendChild(chip);
+      });
+    }
+    return wrap;
+  }
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = tags.length === 0 ? 'Empty' : '';
+  const renderChips = () => {
+    wrap.querySelectorAll('.board-tag-chip').forEach((n) => n.remove());
+    tags.forEach((tag, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'board-tag-chip';
+      chip.textContent = tag;
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'Remove');
+      x.textContent = '×';
+      x.addEventListener('click', () => {
+        tags.splice(i, 1);
+        commit();
+      });
+      chip.appendChild(x);
+      wrap.insertBefore(chip, input);
+    });
+    input.placeholder = tags.length === 0 ? 'Empty' : '';
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const t = input.value.replace(/,/g, '').trim();
+      if (t && !tags.includes(t)) tags.push(t);
+      input.value = '';
+      commit();
+    }
+  });
+  const commit = () => {
+    commitCard((c) => ({ ...c, values: { ...c.values, [fieldName]: tags.join(', ') } }));
+    renderChips();
+  };
+  wrap.appendChild(input);
+  renderChips();
+  void card;  // referenced via currentCard inside commitCard
+  return wrap;
+}
+
+function renderBody(): HTMLElement {
+  const card = currentCard!;
+  const bodyWrap = document.createElement('div');
+  bodyWrap.className = 'board-panel-body-wrap';
+
+  const bodyHost = document.createElement('div');
+  bodyHost.className = 'board-panel-body editable';
+  bodyWrap.appendChild(bodyHost);
+
+  const sub = createEditor(bodyHost, card.body || '', (markdown: string) => {
+    // Use currentCard (latest) instead of the stale closure capture so a
+    // body update doesn't clobber other edits the user already made.
+    commitCard((c) => ({ ...c, body: markdown }));
+    updateBodyPlaceholderVisibility(bodyWrap, markdown);
+  });
+  sub.setEditable(!currentReadOnly);
+
+  const placeholder = document.createElement('div');
+  placeholder.className = 'board-panel-body-placeholder';
+  placeholder.innerHTML = `Add a description… or press <kbd>/</kbd> for commands`;
+  bodyWrap.appendChild(placeholder);
+  updateBodyPlaceholderVisibility(bodyWrap, card.body || '');
+
+  return bodyWrap;
+}
+
+function updateBodyPlaceholderVisibility(bodyWrap: HTMLElement, markdown: string): void {
+  const placeholder = bodyWrap.querySelector('.board-panel-body-placeholder') as HTMLElement | null;
+  if (!placeholder) return;
+  placeholder.style.display = markdown.trim() ? 'none' : 'block';
 }
 
 function selectAllText(el: HTMLElement): void {

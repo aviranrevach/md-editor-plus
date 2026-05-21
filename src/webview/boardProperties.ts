@@ -1,5 +1,6 @@
 // src/webview/boardProperties.ts
 import type { Board, FieldDef, FieldType } from './boardModel';
+import { FIELD_TYPE_ICONS, FIELD_TYPE_LABELS } from './boardIcons';
 
 export function openPropertiesMenu(
   anchor: HTMLElement,
@@ -158,7 +159,10 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
 }
 
 export function promptNewField(anchor: HTMLElement, board: Board, onChange: (next: Board) => void): void {
-  // Close any existing pickers first
+  // One popover, two visible sections:
+  // 1) a name input at top, 2) a list of typed options (icon + label) below.
+  // Clicking a type row commits the field with that type. No separate "Add" button.
+
   document.querySelectorAll('.board-add-field-picker').forEach((n) => n.remove());
 
   const pop = document.createElement('div');
@@ -167,46 +171,53 @@ export function promptNewField(anchor: HTMLElement, board: Board, onChange: (nex
 
   const rect = anchor.getBoundingClientRect();
   pop.style.position = 'absolute';
-  pop.style.top = `${rect.top + window.scrollY}px`;
-  pop.style.left = `${rect.right + window.scrollX + 8}px`;
+  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
+  pop.style.left = `${rect.left + window.scrollX}px`;
 
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.placeholder = 'Field name';
   nameInput.className = 'board-add-field-name';
+  pop.appendChild(nameInput);
 
-  const typeSelect = document.createElement('select');
-  typeSelect.className = 'board-add-field-type';
+  const sep = document.createElement('div');
+  sep.className = 'board-add-field-separator';
+  pop.appendChild(sep);
+
+  const sectionLabel = document.createElement('div');
+  sectionLabel.className = 'board-add-field-section';
+  sectionLabel.textContent = 'Type';
+  pop.appendChild(sectionLabel);
+
+  const list = document.createElement('div');
+  list.className = 'board-add-field-type-list';
+  pop.appendChild(list);
+
   const types: FieldType[] = ['text', 'status', 'date', 'person', 'tags'];
   for (const t of types) {
-    const opt = document.createElement('option');
-    opt.value = t;
-    opt.textContent = t;
-    typeSelect.appendChild(opt);
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'board-add-field-type-row';
+    row.innerHTML = `
+      <span class="board-add-field-type-icon">${FIELD_TYPE_ICONS[t]}</span>
+      <span class="board-add-field-type-label">${FIELD_TYPE_LABELS[t]}</span>
+    `;
+    row.addEventListener('click', () => commitWithType(t));
+    list.appendChild(row);
   }
 
-  const actions = document.createElement('div');
-  actions.className = 'board-add-field-actions';
-  const addBtn = document.createElement('button');
-  addBtn.type = 'button';
-  addBtn.textContent = 'Add';
-  addBtn.className = 'board-add-field-confirm';
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.className = 'board-add-field-cancel';
-  actions.append(addBtn, cancelBtn);
-
-  pop.append(nameInput, typeSelect, actions);
-
-  const commit = () => {
+  const commitWithType = (type: FieldType) => {
     const name = nameInput.value.trim();
-    if (!name) { nameInput.focus(); return; }
-    if (board.fields.some((f) => f.name === name)) {
+    if (!name) {
       nameInput.classList.add('is-error');
+      nameInput.focus();
       return;
     }
-    const type = typeSelect.value as FieldType;
+    if (board.fields.some((f) => f.name === name)) {
+      nameInput.classList.add('is-error');
+      nameInput.focus();
+      return;
+    }
     onChange({
       ...board,
       fields: [...board.fields, { name, type, visibleOnCard: true }],
@@ -215,11 +226,15 @@ export function promptNewField(anchor: HTMLElement, board: Board, onChange: (nex
     closePop();
   };
 
-  addBtn.addEventListener('click', commit);
-  cancelBtn.addEventListener('click', closePop);
   nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); closePop(); }
+    // Enter on the input → commit as Text (the default first option).
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitWithType('text');
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closePop();
+    }
   });
   nameInput.addEventListener('input', () => nameInput.classList.remove('is-error'));
 
