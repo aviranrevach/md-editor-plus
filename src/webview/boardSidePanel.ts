@@ -38,6 +38,17 @@ export function initBoardSidePanel(): void {
     if (target.closest('.board-card')) return;
     // Click inside a popover spawned BY the panel; don't close.
     if (target.closest('.board-status-dropdown, .board-add-field-picker')) return;
+    // If focus is inside the panel (e.g. an inline-rename input or a
+    // contenteditable field), defer the close so the focused element's
+    // blur handler can commit its pending edit BEFORE we tear down the
+    // panel state. Without this, mousedown synchronously clears
+    // currentBoard/currentOnBoardChange and the blur-driven commit
+    // returns early as a no-op — losing the edit.
+    const activeEl = document.activeElement as HTMLElement | null;
+    if (activeEl && panel.contains(activeEl)) {
+      setTimeout(() => closeBoardSidePanel(), 0);
+      return;
+    }
     closeBoardSidePanel();
   });
 }
@@ -246,8 +257,11 @@ function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: bo
     };
 
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      // Don't let Enter/Escape bubble to the global keydown listener that
+      // closes the whole panel on Escape; the rename should be its own
+      // commit/cancel scope.
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
     });
     input.addEventListener('blur', () => finish(true));
 
