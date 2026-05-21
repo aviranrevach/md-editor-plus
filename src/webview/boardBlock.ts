@@ -17,6 +17,13 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   const dom = document.createElement('div');
   dom.className = 'board-block';
   dom.setAttribute('contenteditable', 'false');
+  // Tag the DOM with the board's id so the slash-insert handler (and any
+  // other external caller) can reliably target a specific board instance —
+  // important when more than one board exists in the same document.
+  {
+    const initialBoard = parseBoardSource(initialSource);
+    if (initialBoard.id) dom.dataset.boardId = initialBoard.id;
+  }
 
   // Stop mousedown from bubbling up to ProseMirror, which would call
   // preventDefault on it (to keep the editor focused) and kill the resulting

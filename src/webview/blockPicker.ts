@@ -306,31 +306,39 @@ export const BLOCK_DEFS: BlockDef[] = [
   },
   {
     id: 'board',
-    label: 'Board',
+    label: 'Kanban Board',
     description: 'Kanban board with columns and cards',
     iconHtml: ICO.board,
-    section: 'other',
-    aliases: ['kanban', 'tasks', 'project'],
+    section: 'lists',
+    aliases: ['board', 'kanban', 'tasks', 'project'],
     insert: (editor, pos) => {
       const id = `b-${Math.random().toString(36).slice(2, 6)}`;
       const source = freshBoardSource(id);
-      editor.chain().focus().insertContentAt(pos, {
-        type: 'board',
-        attrs: { source },
-      }).run();
-      // Focus the board's name input on the next tick so the user can type immediately.
+      // Insert the board followed by an empty paragraph so the cursor has
+      // somewhere to land below the (atom) board.
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(pos, [
+          { type: 'board', attrs: { source } },
+          { type: 'paragraph' },
+        ])
+        .run();
+      // Focus the NEW board specifically by its id — querySelector('.board-name')
+      // alone would return the first board on the page and steal focus when
+      // adding a second/third board to the same doc.
       requestAnimationFrame(() => {
-        const dom = document.querySelector(`.board-block .board-name`) as HTMLElement | null;
-        if (dom) {
-          dom.focus();
-          // Place caret at end.
-          const range = document.createRange();
-          range.selectNodeContents(dom);
-          range.collapse(false);
-          const sel = window.getSelection();
-          sel?.removeAllRanges();
-          sel?.addRange(range);
-        }
+        const board = document.querySelector(
+          `.board-block[data-board-id="${id}"]`,
+        ) as HTMLElement | null;
+        const name = board?.querySelector('.board-name') as HTMLElement | null;
+        if (!name) return;
+        name.focus();
+        const range = document.createRange();
+        range.selectNodeContents(name);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
       });
     },
   },
