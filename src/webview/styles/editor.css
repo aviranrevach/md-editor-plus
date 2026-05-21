@@ -3215,6 +3215,28 @@ html.theme-dark .ProseMirror .mb-vTb-btn.mb-vTb-active {
   color: var(--callout-caution-accent);
 }
 
+/* Shapes group: a single toolbar button that opens a popover with all shape
+   options, like Miro / Whimsical. Avoids a long row of look-alike icons. */
+.ProseMirror .mb-vTb-shapes {
+  position: relative;
+  display: inline-flex;
+}
+.ProseMirror .mb-vTb-shapespop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  gap: 2px;
+  padding: 5px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+  z-index: 32;
+}
+.ProseMirror .mb-vTb-shapespop.mb-hidden { display: none; }
+
 /* Phase 3: snap-to-grid toggle (uses the same mb-vTb-active class as tools). */
 .ProseMirror .mb-vTb-grid.mb-vTb-active {
   background: var(--callout-note-bg);

@@ -57,7 +57,9 @@ const ICONS: Record<string, string> = {
   diamond: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>`,
   arrow:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-4-4l4 4-4 4"/></svg>`,
   text:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M12 7v13"/></svg>`,
-  sticky:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>`,
+  sticky:  `<svg viewBox="0 0 24 24" fill="#fef6a9" stroke="#b89d1f" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5" fill="#f0e07a"/></svg>`,
+  // "Shapes" composite button — represents the shapes group in a single icon.
+  shapes:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="8" height="8" rx="1"/><circle cx="17" cy="17" r="4"/><path d="M9 3l5 8h-10z"/></svg>`,
   reset:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>`,
   grid:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`,
 };
@@ -1268,9 +1270,11 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
   el.className = 'mb-vTb';
   el.contentEditable = 'false';
 
+  // The four shape tools collapse into a single "Shapes" button with a
+  // popover. Other tools remain individual buttons.
+  const SHAPE_TOOLS: Tool[] = ['rect', 'pill', 'circle', 'diamond'];
   const groups: Array<{ tools: Tool[] }> = [
     { tools: ['select', 'pan'] },
-    { tools: ['rect', 'pill', 'circle', 'diamond'] },
     { tools: ['arrow'] },
     { tools: ['text', 'sticky'] },
   ];
@@ -1289,6 +1293,23 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
 
   const buttonsByTool = new Map<Tool, HTMLButtonElement>();
 
+  function makeToolButton(tool: Tool): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vTb-btn';
+    b.dataset.tool = tool;
+    b.dataset.tip = tipMap[tool];
+    b.setAttribute('aria-label', tipMap[tool]);
+    b.innerHTML = ICONS[tool];
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onPick(tool);
+    });
+    return b;
+  }
+
   groups.forEach((group, idx) => {
     if (idx > 0) {
       const sep = document.createElement('span');
@@ -1296,21 +1317,55 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
       el.appendChild(sep);
     }
     for (const tool of group.tools) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'mb-vTb-btn';
-      b.dataset.tool = tool;
-      b.dataset.tip = tipMap[tool];
-      b.setAttribute('aria-label', tipMap[tool]);
-      b.innerHTML = ICONS[tool];
-      b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-      b.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onPick(tool);
-      });
+      const b = makeToolButton(tool);
       buttonsByTool.set(tool, b);
       el.appendChild(b);
+    }
+    // After the first group (Select/Pan), inject the Shapes group button + popover.
+    if (idx === 0) {
+      const sepShapes = document.createElement('span');
+      sepShapes.className = 'mb-vTb-sep';
+      el.appendChild(sepShapes);
+
+      const shapesWrap = document.createElement('div');
+      shapesWrap.className = 'mb-vTb-shapes';
+
+      const shapesBtn = document.createElement('button');
+      shapesBtn.type = 'button';
+      shapesBtn.className = 'mb-vTb-btn mb-vTb-shapesbtn';
+      shapesBtn.dataset.tip = 'Shapes';
+      shapesBtn.setAttribute('aria-label', 'Shapes — pick a shape to drop');
+      shapesBtn.innerHTML = ICONS.shapes;
+      shapesBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+
+      const shapesPop = document.createElement('div');
+      shapesPop.className = 'mb-vTb-shapespop mb-hidden';
+      for (const tool of SHAPE_TOOLS) {
+        const opt = makeToolButton(tool);
+        // Re-style as a popover row.
+        opt.classList.add('mb-vTb-shapespop-item');
+        buttonsByTool.set(tool, opt);
+        shapesPop.appendChild(opt);
+      }
+      shapesBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        shapesPop.classList.toggle('mb-hidden');
+      });
+      // Auto-close when clicking outside.
+      document.addEventListener('mousedown', (e) => {
+        if (!shapesWrap.contains(e.target as Node)) shapesPop.classList.add('mb-hidden');
+      }, true);
+      // Closes after a shape is picked.
+      shapesPop.addEventListener('click', () => {
+        shapesPop.classList.add('mb-hidden');
+      });
+
+      shapesWrap.append(shapesBtn, shapesPop);
+      el.appendChild(shapesWrap);
+
+      // Expose for setActive() to also toggle the parent Shapes button.
+      (buttonsByTool as Map<Tool, HTMLButtonElement> & { __shapesBtn?: HTMLButtonElement }).__shapesBtn = shapesBtn;
     }
   });
 
@@ -1353,6 +1408,11 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
   function setActive(tool: Tool): void {
     for (const [t, btn] of buttonsByTool) {
       btn.classList.toggle('mb-vTb-active', t === tool);
+    }
+    // Light up the Shapes parent button whenever any shape tool is active.
+    const shapesParent = (buttonsByTool as Map<Tool, HTMLButtonElement> & { __shapesBtn?: HTMLButtonElement }).__shapesBtn;
+    if (shapesParent) {
+      shapesParent.classList.toggle('mb-vTb-active', SHAPE_TOOLS.includes(tool));
     }
   }
 
@@ -1560,6 +1620,32 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
     dupBtn, moreWrap, styleSep,
     lockBtn, sep2, deleteBtn,
   );
+
+  // Single-popover policy: opening any popover (shape menu, color picker,
+  // or More menu) auto-closes the others. Capture-phase listener so we run
+  // BEFORE the opener button's own toggle handler — close everything, then
+  // let the button open its own.
+  el.addEventListener('click', (e) => {
+    const t = e.target as Element;
+    if (!t) return;
+    // Ignore clicks on items inside a popover (swatches, menu items).
+    if (t.closest('.mb-vCtx-menu-item, .mb-vCtx-swatch')) return;
+    const opener = t.closest('.mb-vCtx-btn, .mb-vCtx-colorbtn');
+    if (!opener) return;
+    // Identify the popover this opener owns (either a direct sibling or a
+    // child of the parent wrap).
+    let ownPop: Element | null = null;
+    const sib = opener.nextElementSibling;
+    if (sib && sib.matches('.mb-vCtx-menu, .mb-vCtx-colorpop, .mb-vCtx-morepop')) {
+      ownPop = sib;
+    } else {
+      ownPop = opener.parentElement?.querySelector('.mb-vCtx-menu, .mb-vCtx-colorpop, .mb-vCtx-morepop') ?? null;
+    }
+    const allPops = el.querySelectorAll<HTMLElement>('.mb-vCtx-menu, .mb-vCtx-colorpop, .mb-vCtx-morepop');
+    for (const p of Array.from(allPops)) {
+      if (p !== ownPop) p.classList.add('mb-hidden');
+    }
+  }, true);
 
   function showBelow(node: Element, host: HTMLElement): void {
     const nodeRect = node.getBoundingClientRect();
