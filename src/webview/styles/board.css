@@ -881,63 +881,134 @@
 }
 .board-tag-input input:focus { outline: none; }
 
-/* ===== Properties menu ===== */
+/* ===== Properties menu — Notion-style ===== */
 .board-properties-menu {
   background: var(--board-bg-card);
   border: 1px solid var(--board-border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
   padding: 6px 0;
   font-size: 13px;
   z-index: 110;
-  min-width: 260px;
+  min-width: 280px;
+  max-width: 360px;
   color: var(--board-text);
+  font-family: inherit;
 }
-.board-properties-list { padding: 0 0 4px; }
+.board-properties-section {
+  padding: 6px 14px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--board-text-muted);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+.board-properties-list { padding: 0; }
 .board-properties-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  margin: 0 4px;
 }
+.board-properties-row:hover { background: var(--board-hover); }
 .board-properties-row.is-dragging { opacity: 0.5; }
-.board-properties-row.is-drop-target { background: var(--board-hover); }
+.board-properties-row.is-drop-target {
+  background: var(--board-hover);
+  box-shadow: inset 0 2px 0 var(--board-chip-blue-dot);
+}
 .board-properties-handle {
   cursor: grab;
   color: var(--board-text-muted);
-  font-size: 12px;
+  font-size: 10px;
   user-select: none;
-  padding: 0 4px;
+  width: 12px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
+.board-properties-row:hover .board-properties-handle { opacity: 1; }
 .board-properties-handle:active { cursor: grabbing; }
-.board-properties-name { flex: 1; color: var(--board-text); outline: none; }
+.board-properties-type-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--board-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.board-properties-type-icon svg { width: 14px; height: 14px; }
+.board-properties-name {
+  flex: 1;
+  color: var(--board-text);
+  outline: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .board-properties-name[contenteditable="true"]:focus {
   outline: 1px solid var(--board-chip-blue-dot);
   outline-offset: 1px;
   border-radius: 2px;
+  background: var(--board-bg-card);
 }
-.board-properties-type {
-  font-size: 11px;
-  color: var(--board-text-muted);
-  background: var(--board-bg-col);
+/* Toggle switch — visible always so the user can see the current state */
+.board-properties-toggle {
+  width: 28px;
+  height: 16px;
   border-radius: 999px;
-  padding: 1px 7px;
+  background: var(--board-border);
+  position: relative;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
 }
-.board-properties-delete {
+.board-properties-toggle.is-on { background: var(--board-chip-blue-dot); }
+.board-properties-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: left 0.15s;
+}
+.board-properties-toggle.is-on::after { left: 14px; }
+.board-properties-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+/* "More" (⋯) button — appears on row hover */
+.board-properties-more {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
   color: var(--board-text-muted);
-  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
-.board-properties-delete:hover:not(:disabled) { color: var(--board-chip-red-dot); }
-.board-properties-delete:disabled { opacity: 0.3; cursor: not-allowed; }
+.board-properties-row:hover .board-properties-more { opacity: 1; }
+.board-properties-more:hover { background: var(--board-hover); color: var(--board-text-light); }
+.board-properties-more svg { width: 14px; height: 14px; }
+.board-properties-more:disabled { opacity: 0; cursor: not-allowed; }
 .board-properties-add {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 14px;
   background: transparent;
   border: 0;
   border-top: 1px solid var(--board-border-soft);
@@ -946,8 +1017,118 @@
   font-size: 13px;
   color: var(--board-text-muted);
   font-family: inherit;
+  margin-top: 4px;
 }
-.board-properties-add:hover { background: var(--board-hover); }
+.board-properties-add:hover { background: var(--board-hover); color: var(--board-text-light); }
+.board-properties-add svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ===== Per-field action menu (Rename / Hide / Delete) =====
+   Used both from the Properties popover's ⋯ button and from the side-panel
+   row label click. */
+.board-field-action-menu {
+  background: var(--board-bg-card);
+  border: 1px solid var(--board-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  padding: 4px 0;
+  z-index: 120;
+  min-width: 180px;
+  color: var(--board-text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.board-field-action-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--board-text);
+  font-family: inherit;
+  line-height: 1.4;
+}
+.board-field-action-item:hover:not(:disabled) { background: var(--board-hover); }
+.board-field-action-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.board-field-action-item.is-danger { color: var(--board-chip-red-dot); }
+.board-field-action-item.is-danger:hover:not(:disabled) { background: rgba(220, 38, 38, 0.08); }
+.board-field-action-icon {
+  width: 16px; height: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: var(--board-text-muted);
+}
+.board-field-action-item.is-danger .board-field-action-icon { color: var(--board-chip-red-dot); }
+.board-field-action-icon svg { width: 14px; height: 14px; }
+.board-field-action-label { flex: 1; }
+.board-field-action-divider {
+  height: 1px;
+  background: var(--board-border-soft);
+  margin: 4px 0;
+}
+
+/* ===== Custom confirm dialog (window.confirm is blocked in VSCode webviews) ===== */
+.board-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 15, 0.4);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.board-confirm {
+  background: var(--board-bg-card);
+  border: 1px solid var(--board-border);
+  border-radius: 10px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.24);
+  padding: 18px 20px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  color: var(--board-text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.board-confirm-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+.board-confirm-body { color: var(--board-text-muted); line-height: 1.45; margin-bottom: 14px; }
+.board-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.board-confirm-actions button {
+  padding: 5px 14px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--board-border);
+  background: var(--board-bg-card);
+  color: var(--board-text);
+  font-family: inherit;
+}
+.board-confirm-actions button:hover { background: var(--board-hover); }
+.board-confirm-confirm {
+  background: var(--board-chip-red-dot) !important;
+  color: #fff !important;
+  border-color: var(--board-chip-red-dot) !important;
+}
+.board-confirm-confirm:hover { filter: brightness(0.95); }
+
+/* ===== Side-panel row-label as clickable trigger ===== */
+.board-panel-prop-label.is-clickable {
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border-radius: 3px;
+}
+.board-panel-prop-label.is-clickable:hover {
+  background: rgba(15, 15, 15, 0.05);
+}
 
 /* Add-field inline picker */
 .board-add-field-picker {

@@ -1,7 +1,7 @@
 // src/webview/boardSidePanel.ts
 import type { Board, Card, FieldType } from './boardModel';
 import { createEditor } from './editor';
-import { promptNewField } from './boardProperties';
+import { promptNewField, openFieldActionMenu } from './boardProperties';
 import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
 
 let panel: HTMLElement | null = null;
@@ -271,9 +271,28 @@ function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: bo
       input.select();
     });
   } else {
-    const label = document.createElement('span');
+    const label = document.createElement('button');
+    label.type = 'button';
     label.className = 'board-panel-prop-label';
     label.textContent = field.name;
+    // Click the label → open the field action menu (Rename / Hide / Delete).
+    // Locked fields (Status) don't get a menu trigger.
+    const isLocked = field.name === 'Status';
+    if (!currentReadOnly && !isLocked) {
+      label.classList.add('is-clickable');
+      label.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!currentBoard) return;
+        openFieldActionMenu(label, currentBoard, field, (nextBoard) => {
+          commitBoard(nextBoard);
+        }, {
+          onRename: () => {
+            renamingFieldName = field.name;
+            renderPanel();
+          },
+        });
+      });
+    }
     row.appendChild(label);
   }
 
@@ -289,6 +308,15 @@ function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: bo
     if (!currentReadOnly) {
       input.addEventListener('change', () => {
         commitCard((c) => ({ ...c, values: { ...c.values, [field.name]: input.value } }));
+      });
+      // Native date inputs only pop the calendar when you click the calendar
+      // glyph at the far right. Calling showPicker() on any click lets the
+      // whole field act as a picker trigger while still allowing typing.
+      input.addEventListener('mousedown', () => {
+        const anyInput = input as HTMLInputElement & { showPicker?: () => void };
+        if (typeof anyInput.showPicker === 'function') {
+          try { anyInput.showPicker(); } catch { /* ignore — picker may be already open */ }
+        }
       });
     }
     row.appendChild(input);
