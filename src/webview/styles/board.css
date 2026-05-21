@@ -610,6 +610,24 @@
   font-size: 14px;
   flex-shrink: 0;
 }
+/* Inline label input for a just-added field (Option D rename in place). */
+.board-panel-prop-row.is-renaming {
+  background: rgba(245, 158, 11, 0.04);
+}
+.board-panel-prop-label-input {
+  width: 110px;
+  flex-shrink: 0;
+  border: 1px solid var(--board-chip-blue-dot);
+  box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.15);
+  border-radius: 3px;
+  background: var(--board-bg-card);
+  padding: 2px 6px;
+  font-size: 14px;
+  color: var(--board-text);
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
 .board-panel-prop-value {
   flex: 1;
   color: var(--board-text);

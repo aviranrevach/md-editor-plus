@@ -158,15 +158,27 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
   return row;
 }
 
-export function promptNewField(anchor: HTMLElement, board: Board, onChange: (next: Board) => void): void {
-  // One popover, two visible sections:
-  // 1) a name input at top, 2) a list of typed options (icon + label) below.
-  // Clicking a type row commits the field with that type. No separate "Add" button.
-
+/**
+ * Type-only picker. Click "+ Add a property" → menu of types appears
+ * (no name input here). Clicking a type creates the field with a default
+ * label (e.g., "Status", "Status 2", "Status 3", …) and fires onChange
+ * with both the new board state and the chosen default field name so the
+ * caller can immediately put that label into "inline rename" mode.
+ *
+ * Naming the field is intentionally a SEPARATE step from the picker — it
+ * happens in the property list itself, where the user can see the row in
+ * its real spot with the value column showing "Empty". This eliminates
+ * the "name vs value" confusion the old two-input popover had.
+ */
+export function promptNewField(
+  anchor: HTMLElement,
+  board: Board,
+  onChange: (next: Board, newFieldName: string) => void,
+): void {
   document.querySelectorAll('.board-add-field-picker').forEach((n) => n.remove());
 
   const pop = document.createElement('div');
-  pop.className = 'board-add-field-picker';
+  pop.className = 'board-add-field-picker board-add-field-picker--types-only';
   document.body.appendChild(pop);
 
   const rect = anchor.getBoundingClientRect();
@@ -174,19 +186,9 @@ export function promptNewField(anchor: HTMLElement, board: Board, onChange: (nex
   pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
   pop.style.left = `${rect.left + window.scrollX}px`;
 
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.placeholder = 'Field name';
-  nameInput.className = 'board-add-field-name';
-  pop.appendChild(nameInput);
-
-  const sep = document.createElement('div');
-  sep.className = 'board-add-field-separator';
-  pop.appendChild(sep);
-
   const sectionLabel = document.createElement('div');
   sectionLabel.className = 'board-add-field-section';
-  sectionLabel.textContent = 'Type';
+  sectionLabel.textContent = 'Property type';
   pop.appendChild(sectionLabel);
 
   const list = document.createElement('div');
@@ -202,54 +204,43 @@ export function promptNewField(anchor: HTMLElement, board: Board, onChange: (nex
       <span class="board-add-field-type-icon">${FIELD_TYPE_ICONS[t]}</span>
       <span class="board-add-field-type-label">${FIELD_TYPE_LABELS[t]}</span>
     `;
-    row.addEventListener('click', () => commitWithType(t));
+    row.addEventListener('click', () => commit(t));
     list.appendChild(row);
   }
 
-  const commitWithType = (type: FieldType) => {
-    const name = nameInput.value.trim();
-    if (!name) {
-      nameInput.classList.add('is-error');
-      nameInput.focus();
-      return;
-    }
-    if (board.fields.some((f) => f.name === name)) {
-      nameInput.classList.add('is-error');
-      nameInput.focus();
-      return;
-    }
-    onChange({
-      ...board,
-      fields: [...board.fields, { name, type, visibleOnCard: true }],
-      cards: board.cards.map((c) => ({ ...c, values: { ...c.values, [name]: '' } })),
-    });
+  const commit = (type: FieldType) => {
+    // Generate a default name based on the type label, auto-suffixed on conflict.
+    const base = FIELD_TYPE_LABELS[type];
+    let name = base;
+    let n = 2;
+    while (board.fields.some((f) => f.name === name)) name = `${base} ${n++}`;
+    onChange(
+      {
+        ...board,
+        fields: [...board.fields, { name, type, visibleOnCard: true }],
+        cards: board.cards.map((c) => ({ ...c, values: { ...c.values, [name]: '' } })),
+      },
+      name,
+    );
     closePop();
   };
-
-  nameInput.addEventListener('keydown', (e) => {
-    // Enter on the input → commit as Text (the default first option).
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitWithType('text');
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      closePop();
-    }
-  });
-  nameInput.addEventListener('input', () => nameInput.classList.remove('is-error'));
 
   function onOutside(e: MouseEvent) {
     if (!pop.contains(e.target as Node) && e.target !== anchor) {
       closePop();
     }
   }
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') { e.preventDefault(); closePop(); }
+  }
   function closePop() {
     pop.remove();
     document.removeEventListener('mousedown', onOutside, true);
+    document.removeEventListener('keydown', onKey, true);
   }
   setTimeout(() => {
     document.addEventListener('mousedown', onOutside, true);
-    nameInput.focus();
+    document.addEventListener('keydown', onKey, true);
   }, 0);
 }
 

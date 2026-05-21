@@ -10,6 +10,10 @@ let currentCard: Card | null = null;
 let currentOnChange: ((next: Card) => void) | null = null;
 let currentOnBoardChange: ((next: Board) => void) | null = null;
 let currentReadOnly = false;
+// Name of a field whose label should render as an inline-editable input on
+// the next renderPanel call. Used immediately after "+ Add a property" so
+// the user can rename the just-added field in place (Option D flow).
+let renamingFieldName: string | null = null;
 
 export function initBoardSidePanel(): void {
   if (panel) return;
@@ -63,6 +67,7 @@ export function closeBoardSidePanel(): void {
   currentOnChange = null;
   currentOnBoardChange = null;
   currentReadOnly = false;
+  renamingFieldName = null;
 }
 
 // === Commit helpers. Crucially, they update the module-level currentCard /
@@ -171,7 +176,10 @@ function renderProperties(): HTMLElement {
     `;
     addProp.addEventListener('click', () => {
       if (!currentBoard) return;
-      promptNewField(addProp, currentBoard, (nextBoard) => {
+      promptNewField(addProp, currentBoard, (nextBoard, newFieldName) => {
+        // Drop the user straight into renaming the freshly-added field in
+        // its real spot in the property list (no separate name input).
+        renamingFieldName = newFieldName;
         commitBoard(nextBoard);
       });
     });
@@ -185,16 +193,75 @@ function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: bo
   const card = currentCard!;
   const row = document.createElement('div');
   row.className = 'board-panel-prop-row';
+  row.dataset.fieldName = field.name;
 
   const icon = document.createElement('span');
   icon.className = 'board-panel-prop-icon';
   icon.innerHTML = FIELD_TYPE_ICONS[field.type] || FIELD_TYPE_ICONS.text;
   row.appendChild(icon);
 
-  const label = document.createElement('span');
-  label.className = 'board-panel-prop-label';
-  label.textContent = field.name;
-  row.appendChild(label);
+  // Label slot: usually a static <span>, but for the just-added field we
+  // swap in an inline input so the user can name it in place.
+  if (field.name === renamingFieldName && !currentReadOnly) {
+    row.classList.add('is-renaming');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'board-panel-prop-label-input';
+    input.value = field.name;
+    input.spellcheck = false;
+    row.appendChild(input);
+
+    const finish = (commit: boolean) => {
+      if (!currentBoard || renamingFieldName !== field.name) return;
+      const oldName = field.name;
+      renamingFieldName = null;
+      const newName = input.value.trim();
+      if (!commit || !newName || newName === oldName) {
+        // Cancel / no-op rename — keep the default name and re-render to
+        // drop the input.
+        renderPanel();
+        return;
+      }
+      if (currentBoard.fields.some((f) => f.name === newName)) {
+        // Duplicate — revert silently. (Could highlight in red; keeping
+        // simple for v1.)
+        renderPanel();
+        return;
+      }
+      const renamed: Board = {
+        ...currentBoard,
+        fields: currentBoard.fields.map((f) =>
+          f.name === oldName ? { ...f, name: newName } : f,
+        ),
+        cards: currentBoard.cards.map((c) => {
+          const v: Record<string, string> = { ...c.values };
+          if (oldName in v) {
+            v[newName] = v[oldName];
+            delete v[oldName];
+          }
+          return { ...c, values: v };
+        }),
+      };
+      commitBoard(renamed);
+    };
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+
+    // Focus + select-all after the DOM is inserted.
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  } else {
+    const label = document.createElement('span');
+    label.className = 'board-panel-prop-label';
+    label.textContent = field.name;
+    row.appendChild(label);
+  }
 
   const rawValue = (card.values[field.name] || '').trim();
 
