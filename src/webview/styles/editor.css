@@ -3306,6 +3306,61 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
    harmless no-op in case any cached DOM has the class. */
 .ProseMirror .mb-vLockBadge { display: none !important; }
 
+/* Phase 9: edge animation + edge selection + target hooks. */
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-animated,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-animated {
+  animation: mb-edge-march 600ms linear infinite;
+}
+@keyframes mb-edge-march {
+  to { stroke-dashoffset: -20; }
+}
+
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdgeSelected,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdgeSelected {
+  stroke: #6366f1 !important;
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
+}
+
+/* Edge context tip — dark pill at click point. */
+.ProseMirror .mb-vEdgeCtx {
+  position: absolute;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: #1f1f23;
+  color: #ffffff;
+  border-radius: 8px;
+  font: 500 11px var(--font-body);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  z-index: 26;
+}
+.ProseMirror .mb-vEdgeCtx.mb-hidden { display: none; }
+.ProseMirror .mb-vEdgeCtx-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.ProseMirror .mb-vEdgeCtx-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.ProseMirror .mb-vEdgeCtx-type-on { background: rgba(255, 255, 255, 0.18); }
+.ProseMirror .mb-vEdgeCtx-group { display: inline-flex; gap: 1px; }
+.ProseMirror .mb-vEdgeCtx-opacity { display: inline-flex; align-items: center; }
+.ProseMirror .mb-vEdgeCtx-opacity input { width: 70px; }
+.ProseMirror .mb-vEdgeCtx-anim-on { background: rgba(99, 102, 241, 0.35); color: #c7d2fe; }
+
+/* Target hooks layer — same chrome as the source connection layer. */
+.ProseMirror .mb-vTargetHooks .mb-vConn-dot {
+  background: #22c55e;
+  border-color: #16a34a;
+  pointer-events: none;
+}
+
 /* Edge-draft target highlight: when dragging a new edge over a candidate
    destination, the node's outer shape gets a green glow so the user knows
    "release here". */

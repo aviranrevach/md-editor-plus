@@ -56,14 +56,26 @@ export interface NodeStyle {
 }
 export type StyleMap = Record<string, NodeStyle>;
 
+/** Per-edge visual style. Key in the EdgeStyleMap is `<from>->-<to>->-<index>`
+    where index disambiguates parallel edges. */
+export interface EdgeStyle {
+  type?:      'solid' | 'dashed' | 'dotted';
+  thickness?: number;     // stroke-width in SVG units
+  color?:     string;     // hex
+  opacity?:   number;     // 0..1
+  animated?:  boolean;    // dashed/dotted "marching ants"
+}
+export type EdgeStyleMap = Record<string, EdgeStyle>;
+
 type AnyLine =
-  | { kind: 'node';      node: NodeDecl }
-  | { kind: 'edge';      edge: EdgeDecl }
-  | { kind: 'header';    raw:  string; direction: string }
-  | { kind: 'positions'; raw:  string; map: PositionMap }
-  | { kind: 'locks';     raw:  string; ids: string[] }
-  | { kind: 'styles';    raw:  string; map: StyleMap }
-  | { kind: 'pass';      raw:  string };
+  | { kind: 'node';        node: NodeDecl }
+  | { kind: 'edge';        edge: EdgeDecl }
+  | { kind: 'header';      raw:  string; direction: string }
+  | { kind: 'positions';   raw:  string; map: PositionMap }
+  | { kind: 'locks';       raw:  string; ids: string[] }
+  | { kind: 'styles';      raw:  string; map: StyleMap }
+  | { kind: 'edge-styles'; raw:  string; map: EdgeStyleMap }
+  | { kind: 'pass';        raw:  string };
 
 export interface Ast {
   // Lines in original order. Operations append new node/edge lines and remove
@@ -124,6 +136,12 @@ export function parseMermaid(source: string): Ast {
     const styles = tryParseStylesLine(trimmed);
     if (styles) {
       lines.push({ kind: 'styles', raw: trimmed, map: styles });
+      continue;
+    }
+
+    const edgeStyles = tryParseEdgeStylesLine(trimmed);
+    if (edgeStyles) {
+      lines.push({ kind: 'edge-styles', raw: trimmed, map: edgeStyles });
       continue;
     }
 
@@ -392,6 +410,81 @@ export function clearNodeStyle(ast: Ast, id: string): void {
   writeStylesLine(ast, current);
 }
 
+// ── Edge styles sidecar ────────────────────────────────────────────────────
+
+export function getEdgeStyles(ast: Ast): EdgeStyleMap | null {
+  for (const line of ast.lines) {
+    if (line.kind === 'edge-styles') return line.map;
+  }
+  return null;
+}
+
+export function edgeKey(from: string, to: string, index = 0): string {
+  return `${from}->${to}->${index}`;
+}
+
+export function getEdgeStyle(ast: Ast, key: string): EdgeStyle | null {
+  return getEdgeStyles(ast)?.[key] ?? null;
+}
+
+function writeEdgeStylesLine(ast: Ast, map: EdgeStyleMap): void {
+  const filtered: EdgeStyleMap = {};
+  for (const [k, v] of Object.entries(map)) {
+    if (v.type || v.thickness !== undefined || v.color || v.opacity !== undefined || v.animated !== undefined) {
+      filtered[k] = v;
+    }
+  }
+  if (Object.keys(filtered).length === 0) {
+    ast.lines = ast.lines.filter(l => l.kind !== 'edge-styles');
+    return;
+  }
+  const raw = `%% mb-edge-styles: ${JSON.stringify(filtered)}`;
+  const idx = ast.lines.findIndex(l => l.kind === 'edge-styles');
+  if (idx >= 0) {
+    ast.lines[idx] = { kind: 'edge-styles', raw, map: filtered };
+    return;
+  }
+  const styleIdx = ast.lines.findIndex(l => l.kind === 'styles');
+  const lockIdx  = ast.lines.findIndex(l => l.kind === 'locks');
+  const posIdx   = ast.lines.findIndex(l => l.kind === 'positions');
+  const headerIdx = ast.lines.findIndex(l => l.kind === 'header');
+  const at = styleIdx >= 0 ? styleIdx + 1
+           : lockIdx  >= 0 ? lockIdx  + 1
+           : posIdx   >= 0 ? posIdx   + 1
+           : headerIdx + 1;
+  ast.lines.splice(at, 0, { kind: 'edge-styles', raw, map: filtered });
+}
+
+export function setEdgeStyle(ast: Ast, key: string, partial: EdgeStyle): void {
+  const current = { ...(getEdgeStyles(ast) ?? {}) } as EdgeStyleMap;
+  const merged = { ...(current[key] ?? {}), ...partial };
+  current[key] = merged;
+  writeEdgeStylesLine(ast, current);
+}
+
+export function deleteEdgeByKey(ast: Ast, key: string): void {
+  const parts = key.split('->');
+  if (parts.length < 2) return;
+  const from = parts[0];
+  const to   = parts[1];
+  // Find the n-th occurrence of an edge with the same from/to.
+  const targetIdx = parts[2] ? parseInt(parts[2], 10) : 0;
+  let seen = 0;
+  let removeAt = -1;
+  for (let i = 0; i < ast.lines.length; i++) {
+    const l = ast.lines[i];
+    if (l.kind === 'edge' && l.edge.from === from && l.edge.to === to) {
+      if (seen === targetIdx) { removeAt = i; break; }
+      seen++;
+    }
+  }
+  if (removeAt >= 0) ast.lines.splice(removeAt, 1);
+  // Also strip the style entry.
+  const styles = { ...(getEdgeStyles(ast) ?? {}) };
+  delete styles[key];
+  writeEdgeStylesLine(ast, styles);
+}
+
 // ── Parsers (internal) ──────────────────────────────────────────────────────
 
 // Order matters — more specific (longer) bracket pairs must come first so a
@@ -406,6 +499,31 @@ const NODE_SHAPES: Array<[NodeShape, RegExp]> = [
   ['round',      /^([A-Za-z][\w-]*)\(\s*"?([^)"]*?)"?\s*\)$/],      // A(Label)
   ['diamond',    /^([A-Za-z][\w-]*)\{\s*"?([^}"]*?)"?\s*\}$/],      // A{Label}
 ];
+
+// `%% mb-edge-styles: { "A->B->0": { type: "dashed", thickness: 2, color: "#...", opacity: 0.8, animated: true } }`
+function tryParseEdgeStylesLine(trimmed: string): EdgeStyleMap | null {
+  const m = trimmed.match(/^%%\s*mb-edge-styles:\s*(.+)$/);
+  if (!m) return null;
+  try {
+    const obj = JSON.parse(m[1]) as unknown;
+    if (!obj || typeof obj !== 'object') return null;
+    const out: EdgeStyleMap = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      if (!v || typeof v !== 'object') continue;
+      const s = v as Record<string, unknown>;
+      const entry: EdgeStyle = {};
+      if (s.type === 'solid' || s.type === 'dashed' || s.type === 'dotted') entry.type = s.type;
+      if (typeof s.thickness === 'number') entry.thickness = s.thickness;
+      if (typeof s.color     === 'string') entry.color     = s.color;
+      if (typeof s.opacity   === 'number') entry.opacity   = s.opacity;
+      if (typeof s.animated  === 'boolean') entry.animated = s.animated;
+      out[k] = entry;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
 
 // `%% mb-styles: { "n1": { fill: "#...", border: "#...", text: "#...", fontSize: 14, bold: true } }`
 function tryParseStylesLine(trimmed: string): StyleMap | null {
@@ -536,6 +654,7 @@ function emitLine(line: AnyLine): string {
   if (line.kind === 'positions') return '    ' + line.raw;
   if (line.kind === 'locks')     return '    ' + line.raw;
   if (line.kind === 'styles')    return '    ' + line.raw;
+  if (line.kind === 'edge-styles') return '    ' + line.raw;
   // For node/edge lines: if the parsed `raw` is still attached, emit it
   // verbatim (preserves the user's quoting and inline shape syntax).
   // Mutations clear `raw` to force a canonical re-emit.

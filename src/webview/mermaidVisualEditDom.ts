@@ -15,6 +15,8 @@ import {
   getPositions, setAllPositions, setPosition, clearPositions, PositionMap,
   getLocks, isLocked, toggleLock,
   getStyles, getNodeStyle, setNodeStyle, NodeStyle, StyleMap,
+  getEdgeStyles, getEdgeStyle, setEdgeStyle, deleteEdgeByKey, edgeKey,
+  EdgeStyle,
 } from './mermaidVisualEdit';
 
 export type Tool = 'select' | 'pan' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text' | 'sticky';
@@ -86,6 +88,10 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   function syncSelectedId(): void {
     selectedId = selectedIds.size === 1 ? selectedIds.values().next().value as string : null;
   }
+  // Phase 9: selected edge (single, by edgeKey "from->to->idx"). Mutually
+  // exclusive with node selection — selecting an edge clears node selection
+  // and vice versa.
+  let selectedEdgeKey: string | null = null;
   // For Arrow tool — first click captures the source node, second click connects.
   let pendingFromId: string | null = null;
 
@@ -215,6 +221,22 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   pendingPin.className = 'mb-vPin mb-hidden';
   pendingPin.textContent = 'Click another node to connect';
 
+  // ── Phase 9: edge context tip ──────────────────────────────────────────
+  const edgeTip = buildEdgeContextTip({
+    onStyleChange: (partial) => {
+      if (!selectedEdgeKey) return;
+      const key = selectedEdgeKey;
+      mutate((ast) => { setEdgeStyle(ast, key, partial); });
+    },
+    onDelete: () => {
+      if (!selectedEdgeKey) return;
+      const key = selectedEdgeKey;
+      mutate((ast) => { deleteEdgeByKey(ast, key); });
+      selectedEdgeKey = null;
+      refreshSelectionUI();
+    },
+  });
+
   // ── Phase 4 overlays: connection points + marquee + lock badges ────────
   // Container for the 4 connection points around the primary selected node.
   const connectionLayer = document.createElement('div');
@@ -228,6 +250,19 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     d.dataset.side = side;
     connDots[side] = d;
     connectionLayer.appendChild(d);
+  }
+
+  // Phase 9: hooks appearing over the target node during an edge draft.
+  // Visually identical to the source-node hooks; just mirrors the 4 sides
+  // onto whichever node is currently being hovered.
+  const targetHooksLayer = document.createElement('div');
+  targetHooksLayer.className = 'mb-vConn mb-vTargetHooks mb-hidden';
+  targetHooksLayer.contentEditable = 'false';
+  for (const side of connSides) {
+    const d = document.createElement('div');
+    d.className = `mb-vConn-dot mb-vConn-${side}`;
+    d.dataset.side = side;
+    targetHooksLayer.appendChild(d);
   }
 
   // Marquee selection rect.
@@ -268,8 +303,10 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   opts.previewPane.appendChild(toolbar.el);
   opts.previewPane.appendChild(selectionRing);
   opts.previewPane.appendChild(connectionLayer);
+  opts.previewPane.appendChild(targetHooksLayer);
   opts.previewPane.appendChild(marqueeEl);
   opts.previewPane.appendChild(contextTip.el);
+  opts.previewPane.appendChild(edgeTip.el);
   opts.previewPane.appendChild(renameOverlay.el);
   opts.previewPane.appendChild(pendingPin);
   opts.previewPane.appendChild(zoomCtrl);
@@ -289,6 +326,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
 
     if (activeTool === 'select') {
       if (targetNode) {
+        // Clicking a node clears any edge selection.
+        if (selectedEdgeKey) { selectedEdgeKey = null; edgeTip.hide(); }
         const shift = e.shiftKey;
         // Shift-click toggles in the selection (add/remove). Plain click on
         // the already-selected single node opens rename (unless locked).
@@ -302,8 +341,41 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
         } else {
           setSelected(targetNode.id, 'replace');
         }
-      } else if (!e.shiftKey) {
-        setSelected(null);
+      } else {
+        // Maybe the user clicked an edge path?
+        const hitEdgePath = (e.target as Element).closest?.('g.edgePaths > path, path.flowchart-link') as SVGPathElement | null;
+        if (hitEdgePath) {
+          const ep = parseEdgeEndpoints(hitEdgePath);
+          if (ep) {
+            // Pick the index by looking at order in g.edgePaths.
+            const idx = Array.from(opts.previewPane.querySelectorAll<SVGPathElement>('g.edgePaths > path'))
+              .filter(p => {
+                const o = parseEdgeEndpoints(p);
+                return o && o.from === ep.from && o.to === ep.to;
+              })
+              .indexOf(hitEdgePath);
+            const key = edgeKey(ep.from, ep.to, Math.max(0, idx));
+            // Clear node selection, mark this edge selected, show its tip.
+            setSelected(null);
+            selectedEdgeKey = key;
+            const ast = parseMermaid(opts.getSource());
+            edgeTip.setStyle(getEdgeStyle(ast, key));
+            edgeTip.showAt(e.clientX, e.clientY);
+            // Highlight the path with a class for the selection look.
+            opts.previewPane.querySelectorAll('path.mb-vEdgeSelected').forEach(p => p.classList.remove('mb-vEdgeSelected'));
+            hitEdgePath.classList.add('mb-vEdgeSelected');
+            return;
+          }
+        }
+        // Empty canvas click — deselect everything.
+        if (!e.shiftKey) {
+          setSelected(null);
+          if (selectedEdgeKey) {
+            selectedEdgeKey = null;
+            edgeTip.hide();
+            opts.previewPane.querySelectorAll('path.mb-vEdgeSelected').forEach(p => p.classList.remove('mb-vEdgeSelected'));
+          }
+        }
       }
       return;
     }
@@ -839,7 +911,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       const hitTarget = findMermaidNode(hit, opts.previewPane);
       const newTargetId = (hitTarget && hitTarget.id !== edgeDraft.fromId) ? hitTarget.id : null;
 
-      // Update highlight class on target nodes.
+      // Update highlight class on target nodes + show the 4 hooks over them.
       if (newTargetId !== edgeDraft.currentTarget) {
         if (edgeDraft.currentTarget) {
           const prev = findNodeElementById(edgeDraft.currentTarget, opts.previewPane);
@@ -850,6 +922,21 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
           next?.classList.add('mb-vEdgeTarget');
         }
         edgeDraft.currentTarget = newTargetId;
+      }
+      // Reposition the target-hooks overlay so the user can see the snap points.
+      if (newTargetId) {
+        const targetEl = findNodeElementById(newTargetId, opts.previewPane);
+        if (targetEl) {
+          const r = targetEl.getBoundingClientRect();
+          const hRect = opts.previewPane.getBoundingClientRect();
+          targetHooksLayer.style.left   = `${r.left - hRect.left}px`;
+          targetHooksLayer.style.top    = `${r.top  - hRect.top}px`;
+          targetHooksLayer.style.width  = `${r.width}px`;
+          targetHooksLayer.style.height = `${r.height}px`;
+          targetHooksLayer.classList.remove('mb-hidden');
+        }
+      } else {
+        targetHooksLayer.classList.add('mb-hidden');
       }
 
       // Compute endpoint: snap to target's nearest hook if we're over one,
@@ -931,7 +1018,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     // (set during mousemove via elementFromPoint) since e.target during
     // mouseup can be our draft path or another overlay.
     if (edgeDraft) {
-      // Clear hover highlight regardless.
+      // Hide target hooks + clear hover highlight regardless of outcome.
+      targetHooksLayer.classList.add('mb-hidden');
       if (edgeDraft.currentTarget) {
         const prev = findNodeElementById(edgeDraft.currentTarget, opts.previewPane);
         prev?.classList.remove('mb-vEdgeTarget');
@@ -1235,9 +1323,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       selectionRing.remove();
       for (const r of extraRings) r.remove();
       contextTip.destroy();
+      edgeTip.destroy();
       renameOverlay.destroy();
       pendingPin.remove();
       connectionLayer.remove();
+      targetHooksLayer.remove();
       marqueeEl.remove();
       zoomCtrl.remove();
       for (const b of lockBadges) b.remove();
@@ -1694,6 +1784,144 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   return { el, showBelow, showMulti, setLocked, setStyle, hide, destroy };
 }
 
+// ── Edge context tip (Phase 9) ─────────────────────────────────────────────
+
+interface EdgeTipHandle {
+  el:         HTMLElement;
+  showAt:     (clientX: number, clientY: number) => void;
+  hide:       () => void;
+  setStyle:   (s: EdgeStyle | null) => void;
+  destroy:    () => void;
+}
+
+interface EdgeTipHandlers {
+  onStyleChange: (partial: EdgeStyle) => void;
+  onDelete:      () => void;
+}
+
+function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
+  const el = document.createElement('div');
+  el.className = 'mb-vEdgeCtx mb-hidden';
+  el.contentEditable = 'false';
+
+  // Line type buttons: Solid / Dashed / Dotted
+  const typeGroup = document.createElement('div');
+  typeGroup.className = 'mb-vEdgeCtx-group';
+  const typeBtns: Record<string, HTMLButtonElement> = {};
+  for (const t of ['solid', 'dashed', 'dotted']) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vEdgeCtx-btn mb-vEdgeCtx-type';
+    b.dataset.type = t;
+    b.setAttribute('aria-label', `Line: ${t}`);
+    const dasharray = t === 'dashed' ? '6 4' : t === 'dotted' ? '2 3' : '0';
+    b.innerHTML = `<svg viewBox="0 0 28 12" width="28" height="12"><line x1="2" y1="6" x2="26" y2="6" stroke="currentColor" stroke-width="2" stroke-dasharray="${dasharray}" stroke-linecap="round"/></svg>`;
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      handlers.onStyleChange({ type: t as 'solid' | 'dashed' | 'dotted' });
+    });
+    typeBtns[t] = b;
+    typeGroup.appendChild(b);
+  }
+
+  // Thickness number input
+  const thicknessInput = document.createElement('input');
+  thicknessInput.type = 'number';
+  thicknessInput.className = 'mb-vCtx-num';
+  thicknessInput.min = '1';
+  thicknessInput.max = '10';
+  thicknessInput.step = '0.5';
+  thicknessInput.value = '1.5';
+  thicknessInput.setAttribute('aria-label', 'Line thickness');
+  thicknessInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  thicknessInput.addEventListener('change', () => {
+    const v = parseFloat(thicknessInput.value);
+    if (Number.isFinite(v)) handlers.onStyleChange({ thickness: v });
+  });
+
+  // Color picker (reuse makeColorButton helper)
+  const colorBtn = makeColorButton('●', 'Line color', (c) => handlers.onStyleChange({ color: c }));
+
+  // Opacity slider
+  const opacityWrap = document.createElement('label');
+  opacityWrap.className = 'mb-vEdgeCtx-opacity';
+  opacityWrap.title = 'Opacity';
+  const opacityInput = document.createElement('input');
+  opacityInput.type = 'range';
+  opacityInput.min = '20';
+  opacityInput.max = '100';
+  opacityInput.step = '10';
+  opacityInput.value = '100';
+  opacityInput.setAttribute('aria-label', 'Line opacity');
+  opacityInput.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  opacityInput.addEventListener('input', () => {
+    const v = parseInt(opacityInput.value, 10);
+    if (Number.isFinite(v)) handlers.onStyleChange({ opacity: v / 100 });
+  });
+  opacityWrap.appendChild(opacityInput);
+
+  // Animated toggle
+  const animBtn = document.createElement('button');
+  animBtn.type = 'button';
+  animBtn.className = 'mb-vEdgeCtx-btn mb-vEdgeCtx-anim';
+  animBtn.setAttribute('aria-label', 'Animate (marching ants)');
+  animBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4M10 12h4M18 12h4"/></svg>`;
+  animBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  animBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const wasOn = animBtn.classList.contains('mb-vEdgeCtx-anim-on');
+    handlers.onStyleChange({ animated: !wasOn });
+  });
+
+  const sep = document.createElement('span');
+  sep.className = 'mb-vCtx-sep';
+
+  // Delete
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'mb-vEdgeCtx-btn mb-vCtx-danger';
+  deleteBtn.textContent = '×';
+  deleteBtn.setAttribute('aria-label', 'Delete edge');
+  deleteBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  deleteBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    handlers.onDelete();
+  });
+
+  el.append(typeGroup, thicknessInput, colorBtn.el, opacityWrap, animBtn, sep, deleteBtn);
+
+  function showAt(clientX: number, clientY: number): void {
+    // Position the tip near the click point (above and centered horizontally).
+    // Convert client → host-relative.
+    const host = el.parentElement; // previewPane
+    if (host) {
+      const hostRect = host.getBoundingClientRect();
+      el.style.left = `${clientX - hostRect.left}px`;
+      el.style.top  = `${clientY - hostRect.top + 16}px`;
+    }
+    el.classList.remove('mb-hidden');
+  }
+
+  function hide(): void {
+    el.classList.add('mb-hidden');
+  }
+
+  function setStyle(s: EdgeStyle | null): void {
+    const t = s?.type ?? 'solid';
+    for (const k of Object.keys(typeBtns)) {
+      typeBtns[k].classList.toggle('mb-vEdgeCtx-type-on', k === t);
+    }
+    thicknessInput.value = String(s?.thickness ?? 1.5);
+    opacityInput.value   = String(Math.round((s?.opacity ?? 1) * 100));
+    animBtn.classList.toggle('mb-vEdgeCtx-anim-on', !!s?.animated);
+  }
+
+  function destroy(): void { el.remove(); }
+
+  return { el, showAt, hide, setStyle, destroy };
+}
+
 // ── Rename overlay ──────────────────────────────────────────────────────────
 
 interface RenameOverlayHandle {
@@ -1972,15 +2200,52 @@ function makeColorButton(glyph: string, ariaLabel: string, onPick: (color: strin
   return { el: wrap };
 }
 
-/** Apply per-node style overrides (Phase 5) to the rendered SVG. */
+/** Apply per-node + per-edge style overrides (Phases 5 + 9) to the rendered SVG. */
 export function applyStylesOverlay(ast: Ast, host: HTMLElement): void {
   const styles = getStyles(ast);
-  if (!styles) return;
-  for (const [id, s] of Object.entries(styles)) {
-    const g = findNodeElementById(id, host);
-    if (!g) continue;
-    applyStyleToNode(g as SVGGElement, s);
+  if (styles) {
+    for (const [id, s] of Object.entries(styles)) {
+      const g = findNodeElementById(id, host);
+      if (!g) continue;
+      applyStyleToNode(g as SVGGElement, s);
+    }
   }
+
+  // Per-edge styles
+  const edgeStyles = getEdgeStyles(ast);
+  if (edgeStyles) {
+    // Build index: for each "from-to" pair, track which path is the n-th.
+    const counters = new Map<string, number>();
+    const paths = host.querySelectorAll<SVGPathElement>('g.edgePaths > path, path.flowchart-link');
+    for (const p of Array.from(paths)) {
+      const ep = parseEdgeEndpoints(p);
+      if (!ep) continue;
+      const pair = `${ep.from}->${ep.to}`;
+      const idx = counters.get(pair) ?? 0;
+      counters.set(pair, idx + 1);
+      const key = `${ep.from}->${ep.to}->${idx}`;
+      const s = edgeStyles[key];
+      if (!s) continue;
+      applyEdgeStyle(p, s);
+    }
+  }
+}
+
+function applyEdgeStyle(p: SVGPathElement, s: EdgeStyle): void {
+  if (s.color !== undefined) {
+    p.style.setProperty('stroke', s.color, 'important');
+  }
+  if (s.thickness !== undefined) {
+    p.style.setProperty('stroke-width', `${s.thickness}px`, 'important');
+  }
+  if (s.opacity !== undefined) {
+    p.style.setProperty('opacity', String(s.opacity), 'important');
+  }
+  if (s.type === 'dashed')      p.style.setProperty('stroke-dasharray', '6 4', 'important');
+  else if (s.type === 'dotted') p.style.setProperty('stroke-dasharray', '2 4', 'important');
+  else if (s.type === 'solid')  p.style.setProperty('stroke-dasharray', '0',   'important');
+
+  p.classList.toggle('mb-vEdge-animated', !!s.animated && s.type !== 'solid');
 }
 
 function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
