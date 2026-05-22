@@ -1319,6 +1319,29 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       }
       syncSelectedId();
       refreshSelectionUI();
+
+      // Phase 9 fix: refresh the edge tip from the AST so cap UI / color
+      // swatch reflect the latest state without having to close + reopen.
+      if (selectedEdgeKey) {
+        const style = getEdgeStyle(ast, selectedEdgeKey);
+        edgeTip.setStyle(style);
+        // Re-find the path (it may be a new element after re-render) and
+        // re-apply the selected-edge highlight class.
+        opts.previewPane.querySelectorAll('path.mb-vEdgeSelected').forEach(p => p.classList.remove('mb-vEdgeSelected'));
+        const parts = selectedEdgeKey.split('->');
+        if (parts.length >= 2) {
+          const from = parts[0], to = parts[1];
+          const targetIdx = parts[2] ? parseInt(parts[2], 10) : 0;
+          const paths = opts.previewPane.querySelectorAll<SVGPathElement>('g.edgePaths > path');
+          let seen = 0;
+          for (const p of Array.from(paths)) {
+            const ep = parseEdgeEndpoints(p);
+            if (!ep || ep.from !== from || ep.to !== to) continue;
+            if (seen === targetIdx) { p.classList.add('mb-vEdgeSelected'); break; }
+            seen++;
+          }
+        }
+      }
     },
     destroy(): void {
       opts.block.classList.remove('mb-visual-active');
@@ -1867,6 +1890,19 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   colorBtn.innerHTML = `<span class="mb-vEdgeCtx2-colorswatch" style="background:#111827"></span>`;
   const colorSwatch = colorBtn.querySelector<HTMLElement>('.mb-vEdgeCtx2-colorswatch');
 
+  // Animate toggle — marching ants moving toward the arrow.
+  const animBtn = document.createElement('button');
+  animBtn.type = 'button';
+  animBtn.className = 'mb-vEdgeCtx2-icon mb-vEdgeCtx2-anim';
+  animBtn.setAttribute('aria-label', 'Animate line (marching ants)');
+  animBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="6" y2="12"/><line x1="9" y1="12" x2="12" y2="12"/><line x1="15" y1="12" x2="18" y2="12"/></svg>`;
+  animBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  animBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const wasOn = animBtn.classList.contains('mb-vEdgeCtx2-anim-on');
+    handlers.onStyleChange({ animated: !wasOn });
+  });
+
   const sep1 = document.createElement('span');
   sep1.className = 'mb-vEdgeCtx2-sep';
   const sep2 = document.createElement('span');
@@ -1881,8 +1917,8 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   deleteBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   deleteBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDelete(); });
 
-  // Order: line | startCap | flip | endCap | color | delete
-  topBar.append(lineBtn, sep1, startCapBtn.el, flipBtn, endCapBtn.el, colorBtn, sep2, deleteBtn);
+  // Order: line | startCap | flip | endCap | color | animate | delete
+  topBar.append(lineBtn, sep1, startCapBtn.el, flipBtn, endCapBtn.el, colorBtn, animBtn, sep2, deleteBtn);
 
   // ── Line panel (compact: type + thickness + opacity) ────────────────
   const linePanel = document.createElement('div');
@@ -1986,6 +2022,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     startCapBtn.setCap(s?.startCap ?? 'none');
     endCapBtn.setCap(s?.endCap ?? 'arrow');
     if (colorSwatch) colorSwatch.style.background = s?.color ?? '#111827';
+    animBtn.classList.toggle('mb-vEdgeCtx2-anim-on', !!s?.animated);
   }
 
   function destroy(): void { wrap.remove(); }
@@ -2446,12 +2483,12 @@ export function applyStylesOverlay(ast: Ast, host: HTMLElement): void {
       const key = `${ep.from}->${ep.to}->${idx}`;
       const s = edgeStyles[key];
       if (!s) continue;
-      applyEdgeStyle(p, s);
+      applyEdgeStyle(p, s, key);
     }
   }
 }
 
-function applyEdgeStyle(p: SVGPathElement, s: EdgeStyle): void {
+function applyEdgeStyle(p: SVGPathElement, s: EdgeStyle, key: string): void {
   if (s.color !== undefined) {
     p.style.setProperty('stroke', s.color, 'important');
   }
@@ -2461,36 +2498,111 @@ function applyEdgeStyle(p: SVGPathElement, s: EdgeStyle): void {
   if (s.opacity !== undefined) {
     p.style.setProperty('opacity', String(s.opacity), 'important');
   }
-  if (s.type === 'dashed')      p.style.setProperty('stroke-dasharray', '6 4', 'important');
-  else if (s.type === 'dotted') p.style.setProperty('stroke-dasharray', '2 4', 'important');
-  else if (s.type === 'solid')  p.style.setProperty('stroke-dasharray', '0',   'important');
+  if (s.type === 'dashed' || s.type === 'dotted') {
+    p.style.setProperty('stroke-dasharray', s.type === 'dashed' ? '6 4' : '2 4', 'important');
+    // Round line caps make dashes look like pills (much nicer than square ends).
+    p.style.setProperty('stroke-linecap', 'round', 'important');
+  } else if (s.type === 'solid') {
+    p.style.setProperty('stroke-dasharray', '0', 'important');
+    p.style.setProperty('stroke-linecap', 'butt', 'important');
+  }
 
   p.classList.toggle('mb-vEdge-animated', !!s.animated && s.type !== 'solid');
 
-  // Endpoint caps via mermaid's built-in markers (overridden by id pattern).
+  // Endpoint caps. If color OR thickness is overridden we build a per-edge
+  // custom marker so its color tracks the line and its size scales with
+  // thickness (logarithmic mapping, capped). Otherwise we point to the
+  // shared mermaid marker.
+  const wantsCustom = (s.color !== undefined) || (s.thickness !== undefined && s.thickness > 1.6);
   if (s.startCap !== undefined) {
-    p.setAttribute('marker-start', markerUrlFor(p, 'start', s.startCap) ?? '');
+    p.setAttribute('marker-start', resolveMarker(p, 'start', s.startCap, key, s, wantsCustom) ?? '');
   }
   if (s.endCap !== undefined) {
-    p.setAttribute('marker-end',   markerUrlFor(p, 'end',   s.endCap)   ?? '');
+    p.setAttribute('marker-end',   resolveMarker(p, 'end',   s.endCap,   key, s, wantsCustom) ?? '');
+  }
+  // Even if the user didn't pick caps explicitly, recolor the default end
+  // marker (which is what most edges land on) when a line color is set.
+  if (wantsCustom && s.endCap === undefined) {
+    const currentEnd = p.getAttribute('marker-end');
+    if (currentEnd && currentEnd !== 'none') {
+      p.setAttribute('marker-end', resolveMarker(p, 'end', detectCapFromUrl(currentEnd), key, s, true) ?? currentEnd);
+    }
   }
 }
 
-/** Compose a marker url() reference using the diagram-prefix that mermaid
-    inserted on its <marker id> elements. Returns null for 'none' (caller
-    sets marker-* to empty). */
-function markerUrlFor(p: SVGPathElement, which: 'start' | 'end', cap: EdgeCap): string | null {
+function detectCapFromUrl(url: string): EdgeCap {
+  if (/circle(Start|End)/.test(url)) return 'circle';
+  if (/cross(Start|End)/.test(url))  return 'arrow';   // fallback
+  if (/point(Start|End)/.test(url))  return 'arrow';
+  return 'none';
+}
+
+function resolveMarker(p: SVGPathElement, which: 'start' | 'end', cap: EdgeCap, key: string, s: EdgeStyle, wantsCustom: boolean): string | null {
   if (cap === 'none') return null;
-  // Existing marker-end on the path looks like:
-  //   url(#mmd-1779388518000_flowchart-v2-pointEnd)
-  // We extract the prefix before "pointEnd" / "circleEnd" / etc.
-  const cur = p.getAttribute('marker-end') ?? p.getAttribute('marker-start') ?? '';
-  const prefixMatch = cur.match(/url\(#(.+?)(?:point|circle|cross)(?:Start|End)\b/);
-  const prefix = prefixMatch?.[1] ?? '';
+  const svg = p.ownerSVGElement;
+  if (!svg) return null;
+
+  // Extract the mermaid prefix from any marker reference on the page.
+  const refAttr = p.getAttribute(which === 'start' ? 'marker-start' : 'marker-end')
+                ?? p.getAttribute(which === 'end'   ? 'marker-end'   : 'marker-start')
+                ?? '';
+  let prefix = '';
+  const m = refAttr.match(/url\(#(.+?)(point|circle|cross)(Start|End)\b/);
+  if (m) prefix = m[1];
+  else {
+    const sample = svg.querySelector<SVGMarkerElement>('marker[id*="pointEnd"]');
+    if (sample) {
+      const im = sample.id.match(/^(.+?)point(Start|End)/);
+      if (im) prefix = im[1];
+    }
+  }
   const kind = cap === 'arrow' ? 'point' : cap === 'circle' ? 'circle' : '';
-  if (!kind) return null;
+  if (!kind || !prefix) return null;
   const suffix = which === 'start' ? 'Start' : 'End';
-  return `url(#${prefix}${kind}${suffix})`;
+  const baseId = `${prefix}${kind}${suffix}`;
+
+  if (!wantsCustom) {
+    return `url(#${baseId})`;
+  }
+
+  // Build (or update) a custom marker so its color + size follow the edge.
+  const baseMarker = svg.querySelector<SVGMarkerElement>(`#${cssEscape(baseId)}`);
+  if (!baseMarker) return `url(#${baseId})`;
+
+  const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const customId = `mb-marker-${safeKey}-${which}-${kind}`;
+  let custom = svg.querySelector<SVGMarkerElement>(`#${cssEscape(customId)}`);
+  if (!custom) {
+    custom = baseMarker.cloneNode(true) as SVGMarkerElement;
+    custom.setAttribute('id', customId);
+    baseMarker.parentNode?.appendChild(custom);
+  }
+
+  // Color the marker's children (path/polygon/circle).
+  const color = s.color;
+  if (color) {
+    for (const el of Array.from(custom.querySelectorAll<SVGGraphicsElement>('path, polygon, circle'))) {
+      el.style.setProperty('fill',   color, 'important');
+      el.style.setProperty('stroke', color, 'important');
+    }
+  }
+
+  // Scale with thickness — logarithmic, capped to avoid huge or tiny heads.
+  const baseW = parseFloat(baseMarker.getAttribute('markerWidth')  ?? '12');
+  const baseH = parseFloat(baseMarker.getAttribute('markerHeight') ?? '12');
+  const t = s.thickness ?? 1.5;
+  const scale = Math.min(2.5, Math.max(0.8, 0.6 + Math.log2(t + 1) * 0.5));
+  custom.setAttribute('markerWidth',  String(Math.round(baseW * scale)));
+  custom.setAttribute('markerHeight', String(Math.round(baseH * scale)));
+
+  return `url(#${customId})`;
+}
+
+function cssEscape(s: string): string {
+  // CSS.escape isn't universal; we mostly need to escape the underscore in
+  // mermaid's id format. A conservative escape just adds backslashes before
+  // special chars. For our generated ids we can do a simpler swap.
+  return (window as unknown as { CSS?: { escape?: (s: string) => string } }).CSS?.escape?.(s) ?? s;
 }
 
 function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {

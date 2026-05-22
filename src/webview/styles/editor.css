@@ -3427,6 +3427,12 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: var(--link);
 }
 
+/* Animate toggle: shows blue when the edge is set to animate. */
+.ProseMirror .mb-vEdgeCtx2-anim.mb-vEdgeCtx2-anim-on {
+  background: var(--callout-note-bg);
+  color: var(--link);
+}
+
 .ProseMirror .mb-vEdgeCtx2-panel {
   width: 260px;
   padding: 12px 14px;
