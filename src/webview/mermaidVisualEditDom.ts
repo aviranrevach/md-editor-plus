@@ -16,7 +16,7 @@ import {
   getLocks, isLocked, toggleLock,
   getStyles, getNodeStyle, setNodeStyle, NodeStyle, StyleMap,
   getEdgeStyles, getEdgeStyle, setEdgeStyle, deleteEdgeByKey, edgeKey,
-  EdgeStyle, EdgeCap,
+  EdgeStyle, EdgeCap, EdgeAnimation, EdgeAnimationDirection,
 } from './mermaidVisualEdit';
 
 export type Tool = 'select' | 'pan' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text' | 'sticky';
@@ -375,9 +375,9 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
             const ast = parseMermaid(opts.getSource());
             edgeTip.setStyle(getEdgeStyle(ast, key));
             edgeTip.showAt(e.clientX, e.clientY);
-            // Highlight the path with a class for the selection look.
-            opts.previewPane.querySelectorAll('path.mb-vEdgeSelected').forEach(p => p.classList.remove('mb-vEdgeSelected'));
-            hitEdgePath.classList.add('mb-vEdgeSelected');
+            // Highlight the path (path turns blue + arrow heads follow).
+            clearAllEdgeSelections(opts.previewPane);
+            setEdgePathSelected(hitEdgePath, true);
             return;
           }
         }
@@ -387,7 +387,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
           if (selectedEdgeKey) {
             selectedEdgeKey = null;
             edgeTip.hide();
-            opts.previewPane.querySelectorAll('path.mb-vEdgeSelected').forEach(p => p.classList.remove('mb-vEdgeSelected'));
+            clearAllEdgeSelections(opts.previewPane);
           }
         }
       }
@@ -1326,8 +1326,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
         const style = getEdgeStyle(ast, selectedEdgeKey);
         edgeTip.setStyle(style);
         // Re-find the path (it may be a new element after re-render) and
-        // re-apply the selected-edge highlight class.
-        opts.previewPane.querySelectorAll('path.mb-vEdgeSelected').forEach(p => p.classList.remove('mb-vEdgeSelected'));
+        // re-apply the selected-edge highlight (path + marker heads blue).
+        clearAllEdgeSelections(opts.previewPane);
         const parts = selectedEdgeKey.split('->');
         if (parts.length >= 2) {
           const from = parts[0], to = parts[1];
@@ -1337,7 +1337,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
           for (const p of Array.from(paths)) {
             const ep = parseEdgeEndpoints(p);
             if (!ep || ep.from !== from || ep.to !== to) continue;
-            if (seen === targetIdx) { p.classList.add('mb-vEdgeSelected'); break; }
+            if (seen === targetIdx) { setEdgePathSelected(p, true); break; }
             seen++;
           }
         }
@@ -1890,18 +1890,10 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   colorBtn.innerHTML = `<span class="mb-vEdgeCtx2-colorswatch" style="background:#111827"></span>`;
   const colorSwatch = colorBtn.querySelector<HTMLElement>('.mb-vEdgeCtx2-colorswatch');
 
-  // Animate toggle — marching ants moving toward the arrow.
-  const animBtn = document.createElement('button');
-  animBtn.type = 'button';
-  animBtn.className = 'mb-vEdgeCtx2-icon mb-vEdgeCtx2-anim';
-  animBtn.setAttribute('aria-label', 'Animate line (marching ants)');
-  animBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="6" y2="12"/><line x1="9" y1="12" x2="12" y2="12"/><line x1="15" y1="12" x2="18" y2="12"/></svg>`;
-  animBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  animBtn.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    const wasOn = animBtn.classList.contains('mb-vEdgeCtx2-anim-on');
-    handlers.onStyleChange({ animated: !wasOn });
-  });
+  // Animate button — opens a popover with speed (None/Slow/Fast) and direction
+  // (Left/Right) rows. The button itself is a play triangle that lights up
+  // when an animation is active.
+  const animCtl = makeAnimButton((partial) => handlers.onStyleChange(partial));
 
   const sep1 = document.createElement('span');
   sep1.className = 'mb-vEdgeCtx2-sep';
@@ -1918,7 +1910,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   deleteBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDelete(); });
 
   // Order: line | startCap | flip | endCap | color | animate | delete
-  topBar.append(lineBtn, sep1, startCapBtn.el, flipBtn, endCapBtn.el, colorBtn, animBtn, sep2, deleteBtn);
+  topBar.append(lineBtn, sep1, startCapBtn.el, flipBtn, endCapBtn.el, colorBtn, animCtl.el, sep2, deleteBtn);
 
   // ── Line panel (compact: type + thickness + opacity) ────────────────
   const linePanel = document.createElement('div');
@@ -2022,7 +2014,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     startCapBtn.setCap(s?.startCap ?? 'none');
     endCapBtn.setCap(s?.endCap ?? 'arrow');
     if (colorSwatch) colorSwatch.style.background = s?.color ?? '#111827';
-    animBtn.classList.toggle('mb-vEdgeCtx2-anim-on', !!s?.animated);
+    animCtl.setState(s?.animation ?? 'none', s?.animationDirection ?? 'forward');
   }
 
   function destroy(): void { wrap.remove(); }
@@ -2074,7 +2066,9 @@ function makeCapButton(which: 'start' | 'end', onPick: (cap: EdgeCap) => void): 
     setCap(c) {
       currentCap = c;
       btn.innerHTML = capGlyph(c, which);
-      btn.classList.toggle('mb-vEdgeCtx2-cap-active', c !== 'none');
+      // The toolbar button itself stays neutral; only the dropdown item gets
+      // the highlighted state so users can see the current pick without the
+      // toolbar lighting up blue.
       for (const [cap, item] of itemsByCap) {
         item.classList.toggle('mb-vEdgeCtx2-capitem-on', cap === currentCap);
       }
@@ -2092,6 +2086,97 @@ function capGlyph(cap: EdgeCap, which: 'start' | 'end'): string {
                        : `<circle cx="4" cy="10" r="2.5" fill="currentColor"/><line x1="7" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`)
     : /* none */         `<line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`;
   return `<svg viewBox="0 0 20 20" width="18" height="18" fill="none">${path}</svg>`;
+}
+
+// Animate-button popover: a play-triangle that opens a small menu with two
+// rows — speed (None / Slow / Fast) and direction (Left / Right). The button
+// lights up when an animation is active.
+function makeAnimButton(
+  onChange: (partial: { animation?: EdgeAnimation; animationDirection?: EdgeAnimationDirection }) => void,
+): {
+  el: HTMLElement;
+  setState: (a: EdgeAnimation, d: EdgeAnimationDirection) => void;
+} {
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-vEdgeCtx2-cap mb-vEdgeCtx2-anim';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mb-vEdgeCtx2-icon mb-vEdgeCtx2-anim-btn';
+  btn.setAttribute('aria-label', 'Animate line');
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>`;
+
+  const pop = document.createElement('div');
+  pop.className = 'mb-vEdgeCtx2-cappop mb-vEdgeCtx2-animpop mb-hidden';
+
+  function makeRow(
+    label: string,
+    options: Array<[string, string]>,
+    onPick: (value: string) => void,
+  ): { row: HTMLElement; setValue: (v: string) => void } {
+    const row = document.createElement('div');
+    row.className = 'mb-vEdgeCtx2-animrow';
+    const lab = document.createElement('div');
+    lab.className = 'mb-vEdgeCtx2-animlabel';
+    lab.textContent = label;
+    const seg = document.createElement('div');
+    seg.className = 'mb-vEdgeCtx2-animseg';
+    const buttons = new Map<string, HTMLButtonElement>();
+    for (const [val, text] of options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mb-vEdgeCtx2-animseg-btn';
+      b.dataset.value = val;
+      b.textContent = text;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        onPick(val);
+      });
+      buttons.set(val, b);
+      seg.appendChild(b);
+    }
+    row.append(lab, seg);
+    return {
+      row,
+      setValue(v) {
+        for (const [val, b] of buttons) {
+          b.classList.toggle('mb-vEdgeCtx2-animseg-on', val === v);
+        }
+      },
+    };
+  }
+
+  let currentAnim: EdgeAnimation = 'none';
+  let currentDir: EdgeAnimationDirection = 'forward';
+
+  const speedRow = makeRow('Speed', [['none', 'None'], ['slow', 'Slow'], ['fast', 'Fast']], (v) => {
+    currentAnim = v as EdgeAnimation;
+    onChange({ animation: currentAnim });
+  });
+  const dirRow = makeRow('Direction', [['forward', 'Right'], ['reverse', 'Left']], (v) => {
+    currentDir = v as EdgeAnimationDirection;
+    onChange({ animationDirection: currentDir });
+  });
+  pop.append(speedRow.row, dirRow.row);
+
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    pop.classList.toggle('mb-hidden');
+  });
+
+  wrap.append(btn, pop);
+  return {
+    el: wrap,
+    setState(a, d) {
+      currentAnim = a;
+      currentDir = d;
+      speedRow.setValue(a);
+      dirRow.setValue(d);
+      btn.classList.toggle('mb-vEdgeCtx2-anim-on', a !== 'none');
+    },
+  };
 }
 
 function makeLabelledSlider(label: string, min: number, max: number, step: number, initial: number, suffix: string, onChange: (v: number) => void): { el: HTMLElement; setValue: (v: number) => void } {
@@ -2507,7 +2592,12 @@ function applyEdgeStyle(p: SVGPathElement, s: EdgeStyle, key: string): void {
     p.style.setProperty('stroke-linecap', 'butt', 'important');
   }
 
-  p.classList.toggle('mb-vEdge-animated', !!s.animated && s.type !== 'solid');
+  // Animation: slow/fast classes drive the keyframes duration; the reverse
+  // class flips `animation-direction` so dashes travel away from the arrow.
+  const wantsAnim = s.animation && s.animation !== 'none' && s.type !== 'solid';
+  p.classList.toggle('mb-vEdge-anim-slow',    wantsAnim && s.animation === 'slow');
+  p.classList.toggle('mb-vEdge-anim-fast',    wantsAnim && s.animation === 'fast');
+  p.classList.toggle('mb-vEdge-anim-reverse', !!wantsAnim && s.animationDirection === 'reverse');
 
   // Endpoint caps. If color OR thickness is overridden we build a per-edge
   // custom marker so its color tracks the line and its size scales with
@@ -2603,6 +2693,77 @@ function cssEscape(s: string): string {
   // mermaid's id format. A conservative escape just adds backslashes before
   // special chars. For our generated ids we can do a simpler swap.
   return (window as unknown as { CSS?: { escape?: (s: string) => string } }).CSS?.escape?.(s) ?? s;
+}
+
+// ── Edge selection marker tint ─────────────────────────────────────────────
+// When an edge is selected its path turns blue (CSS). Mermaid arrow heads are
+// rendered via SVG <marker> referenced from the path's marker-start /
+// marker-end, and SVG markers don't inherit the path's stroke. So we swap the
+// path's marker URLs to a blue-tinted clone while selected, then restore them
+// when the edge is deselected.
+
+const SELECTION_BLUE = '#6366f1';
+
+function selectionMarkerId(baseId: string): string { return `mb-marker-sel-${baseId}`; }
+
+function buildSelectionMarker(p: SVGPathElement, currentUrl: string): string | null {
+  const m = currentUrl.match(/url\(#(.+?)\)/);
+  if (!m) return null;
+  const baseId = m[1];
+  const svg = p.ownerSVGElement;
+  if (!svg) return null;
+  const baseMarker = svg.querySelector<SVGMarkerElement>(`#${cssEscape(baseId)}`);
+  if (!baseMarker) return null;
+  const selId = selectionMarkerId(baseId);
+  let sel = svg.querySelector<SVGMarkerElement>(`#${cssEscape(selId)}`);
+  if (!sel) {
+    sel = baseMarker.cloneNode(true) as SVGMarkerElement;
+    sel.setAttribute('id', selId);
+    baseMarker.parentNode?.appendChild(sel);
+  } else {
+    // Keep the clone's geometry in sync with the (possibly thickness-scaled)
+    // base — otherwise the head shrinks back to default size on re-selection.
+    const w = baseMarker.getAttribute('markerWidth');
+    const h = baseMarker.getAttribute('markerHeight');
+    if (w) sel.setAttribute('markerWidth',  w);
+    if (h) sel.setAttribute('markerHeight', h);
+  }
+  for (const el of Array.from(sel.querySelectorAll<SVGGraphicsElement>('path, polygon, circle'))) {
+    el.style.setProperty('fill',   SELECTION_BLUE, 'important');
+    el.style.setProperty('stroke', SELECTION_BLUE, 'important');
+  }
+  return `url(#${selId})`;
+}
+
+function setEdgePathSelected(p: SVGPathElement, selected: boolean): void {
+  if (selected) {
+    if (p.classList.contains('mb-vEdgeSelected')) return;
+    p.classList.add('mb-vEdgeSelected');
+    for (const which of ['start', 'end'] as const) {
+      const attr = which === 'start' ? 'marker-start' : 'marker-end';
+      const cur = p.getAttribute(attr);
+      if (!cur || cur === 'none') continue;
+      const datasetKey = which === 'start' ? 'mbOrigMarkerStart' : 'mbOrigMarkerEnd';
+      if (!p.dataset[datasetKey]) p.dataset[datasetKey] = cur;
+      const blueUrl = buildSelectionMarker(p, cur);
+      if (blueUrl) p.setAttribute(attr, blueUrl);
+    }
+  } else {
+    if (!p.classList.contains('mb-vEdgeSelected')) return;
+    p.classList.remove('mb-vEdgeSelected');
+    if (p.dataset.mbOrigMarkerStart) {
+      p.setAttribute('marker-start', p.dataset.mbOrigMarkerStart);
+      delete p.dataset.mbOrigMarkerStart;
+    }
+    if (p.dataset.mbOrigMarkerEnd) {
+      p.setAttribute('marker-end', p.dataset.mbOrigMarkerEnd);
+      delete p.dataset.mbOrigMarkerEnd;
+    }
+  }
+}
+
+function clearAllEdgeSelections(root: Element): void {
+  root.querySelectorAll<SVGPathElement>('path.mb-vEdgeSelected').forEach(p => setEdgePathSelected(p, false));
 }
 
 function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {

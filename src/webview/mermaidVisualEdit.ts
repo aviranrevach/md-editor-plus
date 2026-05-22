@@ -59,12 +59,18 @@ export type StyleMap = Record<string, NodeStyle>;
 /** Per-edge visual style. Key in the EdgeStyleMap is `<from>->-<to>->-<index>`
     where index disambiguates parallel edges. */
 export type EdgeCap = 'none' | 'arrow' | 'circle';
+export type EdgeAnimation = 'none' | 'slow' | 'fast';
+export type EdgeAnimationDirection = 'forward' | 'reverse';
 export interface EdgeStyle {
   type?:      'solid' | 'dashed' | 'dotted';
   thickness?: number;     // stroke-width in SVG units
   color?:     string;     // hex or 'none' to hide
   opacity?:   number;     // 0..1
-  animated?:  boolean;    // dashed/dotted "marching ants"
+  // Marching-ants animation. `animation` picks the speed; `animationDirection`
+  // controls whether dashes travel toward the arrow (forward) or away (reverse).
+  // Legacy `animated: true` files map to `animation: 'slow'` on read.
+  animation?:          EdgeAnimation;
+  animationDirection?: EdgeAnimationDirection;
   startCap?:  EdgeCap;
   endCap?:    EdgeCap;
 }
@@ -434,7 +440,8 @@ function writeEdgeStylesLine(ast: Ast, map: EdgeStyleMap): void {
   const filtered: EdgeStyleMap = {};
   for (const [k, v] of Object.entries(map)) {
     if (v.type || v.thickness !== undefined || v.color || v.opacity !== undefined
-        || v.animated !== undefined || v.startCap !== undefined || v.endCap !== undefined) {
+        || v.animation !== undefined || v.animationDirection !== undefined
+        || v.startCap !== undefined || v.endCap !== undefined) {
       filtered[k] = v;
     }
   }
@@ -520,7 +527,15 @@ function tryParseEdgeStylesLine(trimmed: string): EdgeStyleMap | null {
       if (typeof s.thickness === 'number') entry.thickness = s.thickness;
       if (typeof s.color     === 'string') entry.color     = s.color;
       if (typeof s.opacity   === 'number') entry.opacity   = s.opacity;
-      if (typeof s.animated  === 'boolean') entry.animated = s.animated;
+      if (s.animation === 'none' || s.animation === 'slow' || s.animation === 'fast') {
+        entry.animation = s.animation;
+      } else if (typeof s.animated === 'boolean') {
+        // Back-compat with old `animated: true/false` files.
+        entry.animation = s.animated ? 'slow' : 'none';
+      }
+      if (s.animationDirection === 'forward' || s.animationDirection === 'reverse') {
+        entry.animationDirection = s.animationDirection;
+      }
       if (s.startCap === 'none' || s.startCap === 'arrow' || s.startCap === 'circle') entry.startCap = s.startCap;
       if (s.endCap   === 'none' || s.endCap   === 'arrow' || s.endCap   === 'circle') entry.endCap   = s.endCap;
       out[k] = entry;

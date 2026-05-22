@@ -3314,9 +3314,18 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 
 /* Phase 9: edge animation + edge selection + target hooks. */
-.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-animated,
-.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-animated {
-  animation: mb-edge-march 600ms linear infinite;
+/* Marching ants — two speeds and a reverse-direction modifier. */
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-anim-slow,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-anim-slow {
+  animation: mb-edge-march 1400ms linear infinite;
+}
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-anim-fast,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-anim-fast {
+  animation: mb-edge-march 450ms linear infinite;
+}
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-anim-reverse,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-anim-reverse {
+  animation-direction: reverse;
 }
 @keyframes mb-edge-march {
   to { stroke-dashoffset: -20; }
@@ -3421,16 +3430,58 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: var(--callout-note-accent);
 }
 
-/* When a cap is set (not "none"), tint the cap button blue so the active
-   side is obvious at a glance. */
-.ProseMirror .mb-vEdgeCtx2-icon.mb-vEdgeCtx2-cap-active {
-  color: var(--link);
+/* Animate button: when an animation is active the play icon gets a soft
+   highlight so users can tell at a glance. Cap toolbar buttons stay neutral
+   on purpose — the active pick shows in the dropdown, not on the chip. */
+.ProseMirror .mb-vEdgeCtx2-anim-btn.mb-vEdgeCtx2-anim-on {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
 }
 
-/* Animate toggle: shows blue when the edge is set to animate. */
-.ProseMirror .mb-vEdgeCtx2-anim.mb-vEdgeCtx2-anim-on {
-  background: var(--callout-note-bg);
-  color: var(--link);
+/* Animate popover: a two-row menu with Speed and Direction segmented
+   controls. Reuses the cap-popover container styling for consistency. */
+.ProseMirror .mb-vEdgeCtx2-animpop {
+  /* Anchor from the right so the menu stays inside the tip bar when the
+     animate button is near the right edge. */
+  left: auto;
+  right: 0;
+  min-width: 200px;
+  padding: 10px;
+  gap: 10px;
+}
+.ProseMirror .mb-vEdgeCtx2-animrow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ProseMirror .mb-vEdgeCtx2-animlabel {
+  font: 600 11px var(--font-body);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ProseMirror .mb-vEdgeCtx2-animseg {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.ProseMirror .mb-vEdgeCtx2-animseg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font: 500 12px var(--font-body);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.ProseMirror .mb-vEdgeCtx2-animseg-btn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-animseg-btn.mb-vEdgeCtx2-animseg-on {
+  background: var(--bg);
+  color: var(--callout-note-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .ProseMirror .mb-vEdgeCtx2-panel {
