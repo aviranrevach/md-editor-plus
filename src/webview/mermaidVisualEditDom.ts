@@ -1866,6 +1866,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   lineBtn.type = 'button';
   lineBtn.className = 'mb-vEdgeCtx2-line';
   lineBtn.setAttribute('aria-label', 'Line style and thickness');
+  lineBtn.title = 'Line style, thickness, opacity';
   lineBtn.innerHTML = lineGlyph('solid');
 
   // Flip endpoints
@@ -1873,6 +1874,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   flipBtn.type = 'button';
   flipBtn.className = 'mb-vEdgeCtx2-icon';
   flipBtn.setAttribute('aria-label', 'Flip endpoints');
+  flipBtn.title = 'Flip endpoints';
   flipBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v16m-3-3l3 3 3-3M16 20V4m3 3l-3-3-3 3"/></svg>`;
   flipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   flipBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onFlip(); });
@@ -1887,6 +1889,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   colorBtn.type = 'button';
   colorBtn.className = 'mb-vEdgeCtx2-color';
   colorBtn.setAttribute('aria-label', 'Line color');
+  colorBtn.title = 'Line color';
   colorBtn.innerHTML = `<span class="mb-vEdgeCtx2-colorswatch" style="background:#111827"></span>`;
   const colorSwatch = colorBtn.querySelector<HTMLElement>('.mb-vEdgeCtx2-colorswatch');
 
@@ -1905,6 +1908,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   deleteBtn.type = 'button';
   deleteBtn.className = 'mb-vEdgeCtx2-icon mb-vEdgeCtx2-danger';
   deleteBtn.setAttribute('aria-label', 'Delete edge');
+  deleteBtn.title = 'Delete edge';
   deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>`;
   deleteBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   deleteBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDelete(); });
@@ -1926,6 +1930,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     b.className = 'mb-vEdgeCtx2-type';
     b.dataset.type = t;
     b.setAttribute('aria-label', `Line: ${t}`);
+    b.title = `Line: ${t}`;
     b.innerHTML = lineGlyph(t as 'solid' | 'dashed' | 'dotted', 26);
     b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     b.addEventListener('click', (e) => {
@@ -1948,6 +1953,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   const noColorBtn = document.createElement('button');
   noColorBtn.type = 'button';
   noColorBtn.className = 'mb-vEdgeCtx2-nocolor';
+  noColorBtn.title = 'No color';
   noColorBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5" y1="5" x2="19" y2="19"/></svg><span>No color</span>`;
   noColorBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   noColorBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onStyleChange({ color: 'transparent' }); });
@@ -2014,7 +2020,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     startCapBtn.setCap(s?.startCap ?? 'none');
     endCapBtn.setCap(s?.endCap ?? 'arrow');
     if (colorSwatch) colorSwatch.style.background = s?.color ?? '#111827';
-    animCtl.setState(s?.animation ?? 'none', s?.animationDirection ?? 'forward');
+    animCtl.setState(s?.animation ?? 'none', s?.animationDirection ?? 'forward', s?.type ?? 'solid');
   }
 
   function destroy(): void { wrap.remove(); }
@@ -2034,6 +2040,7 @@ function makeCapButton(which: 'start' | 'end', onPick: (cap: EdgeCap) => void): 
   btn.type = 'button';
   btn.className = 'mb-vEdgeCtx2-icon';
   btn.setAttribute('aria-label', which === 'start' ? 'Start cap' : 'End cap');
+  btn.title = which === 'start' ? 'Start cap (left endpoint)' : 'End cap (right endpoint)';
   btn.innerHTML = capGlyph(which === 'end' ? 'arrow' : 'none', which);
   const pop = document.createElement('div');
   pop.className = 'mb-vEdgeCtx2-cappop mb-hidden';
@@ -2044,6 +2051,7 @@ function makeCapButton(which: 'start' | 'end', onPick: (cap: EdgeCap) => void): 
     item.type = 'button';
     item.className = 'mb-vEdgeCtx2-capitem';
     item.dataset.cap = cap;
+    item.title = label;
     item.innerHTML = `${capGlyph(cap, which)}<span>${label}</span>`;
     item.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     item.addEventListener('click', (e) => {
@@ -2092,10 +2100,10 @@ function capGlyph(cap: EdgeCap, which: 'start' | 'end'): string {
 // rows — speed (None / Slow / Fast) and direction (Left / Right). The button
 // lights up when an animation is active.
 function makeAnimButton(
-  onChange: (partial: { animation?: EdgeAnimation; animationDirection?: EdgeAnimationDirection }) => void,
+  onChange: (partial: { animation?: EdgeAnimation; animationDirection?: EdgeAnimationDirection; type?: 'solid' | 'dashed' | 'dotted' }) => void,
 ): {
   el: HTMLElement;
-  setState: (a: EdgeAnimation, d: EdgeAnimationDirection) => void;
+  setState: (a: EdgeAnimation, d: EdgeAnimationDirection, t: 'solid' | 'dashed' | 'dotted') => void;
 } {
   const wrap = document.createElement('div');
   wrap.className = 'mb-vEdgeCtx2-cap mb-vEdgeCtx2-anim';
@@ -2104,6 +2112,7 @@ function makeAnimButton(
   btn.type = 'button';
   btn.className = 'mb-vEdgeCtx2-icon mb-vEdgeCtx2-anim-btn';
   btn.setAttribute('aria-label', 'Animate line');
+  btn.title = 'Animate line';
   btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>`;
 
   const pop = document.createElement('div');
@@ -2128,6 +2137,7 @@ function makeAnimButton(
       b.className = 'mb-vEdgeCtx2-animseg-btn';
       b.dataset.value = val;
       b.textContent = text;
+      b.title = `${label}: ${text}`;
       b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
       b.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
@@ -2149,10 +2159,20 @@ function makeAnimButton(
 
   let currentAnim: EdgeAnimation = 'none';
   let currentDir: EdgeAnimationDirection = 'forward';
+  let currentType: 'solid' | 'dashed' | 'dotted' = 'solid';
 
   const speedRow = makeRow('Speed', [['none', 'None'], ['slow', 'Slow'], ['fast', 'Fast']], (v) => {
-    currentAnim = v as EdgeAnimation;
-    onChange({ animation: currentAnim });
+    const next = v as EdgeAnimation;
+    currentAnim = next;
+    // Marching ants only work on a dashed/dotted stroke. If the user enables
+    // animation on a solid line, promote it to dashed in the same edit so the
+    // effect is visible right away.
+    if (next !== 'none' && currentType === 'solid') {
+      currentType = 'dashed';
+      onChange({ animation: next, type: 'dashed' });
+    } else {
+      onChange({ animation: next });
+    }
   });
   const dirRow = makeRow('Direction', [['forward', 'Right'], ['reverse', 'Left']], (v) => {
     currentDir = v as EdgeAnimationDirection;
@@ -2169,9 +2189,10 @@ function makeAnimButton(
   wrap.append(btn, pop);
   return {
     el: wrap,
-    setState(a, d) {
+    setState(a, d, t) {
       currentAnim = a;
       currentDir = d;
+      currentType = t;
       speedRow.setValue(a);
       dirRow.setValue(d);
       btn.classList.toggle('mb-vEdgeCtx2-anim-on', a !== 'none');
@@ -2221,6 +2242,7 @@ function makeSwatchGrid(colors: string[], onPick: (c: string) => void): HTMLElem
     s.style.background = c;
     s.dataset.color = c;
     s.setAttribute('aria-label', `Color ${c}`);
+    s.title = c;
     s.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     s.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onPick(c); });
     grid.appendChild(s);
