@@ -3306,6 +3306,13 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
    harmless no-op in case any cached DOM has the class. */
 .ProseMirror .mb-vLockBadge { display: none !important; }
 
+/* Phase 9: edges become first-class selectable objects. */
+.ProseMirror .mb-visual g.edgePaths > path,
+.ProseMirror .mb-visual path.flowchart-link {
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
 /* Phase 9: edge animation + edge selection + target hooks. */
 .ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-animated,
 .ProseMirror .mb-visual path.flowchart-link.mb-vEdge-animated {

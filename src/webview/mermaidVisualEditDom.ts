@@ -342,8 +342,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
           setSelected(targetNode.id, 'replace');
         }
       } else {
-        // Maybe the user clicked an edge path?
-        const hitEdgePath = (e.target as Element).closest?.('g.edgePaths > path, path.flowchart-link') as SVGPathElement | null;
+        // Maybe the user clicked (near) an edge path? Mermaid edges are 1.5px
+        // strokes, so a pixel-perfect click is hard. We accept exact hits via
+        // closest() and fall back to a fuzzy distance test.
+        const exact = (e.target as Element).closest?.('g.edgePaths > path, path.flowchart-link') as SVGPathElement | null;
+        const hitEdgePath = exact ?? findEdgePathNearClick(e.clientX, e.clientY, opts.previewPane);
         if (hitEdgePath) {
           const ep = parseEdgeEndpoints(hitEdgePath);
           if (ep) {
@@ -2106,6 +2109,42 @@ function svgUnitsPerPixel(svg: SVGSVGElement): number {
   const cssWidth = svg.getBoundingClientRect().width || 1;
   if (vb && vb.width > 0 && cssWidth > 0) return vb.width / cssWidth;
   return 1;
+}
+
+/** Fuzzy edge hit-test. Mermaid edges are ~1.5px strokes; we want a click
+    within ~8 CSS px of the visible path to count. Samples the path with
+    getPointAtLength and finds the closest one. */
+function findEdgePathNearClick(clientX: number, clientY: number, host: HTMLElement): SVGPathElement | null {
+  const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (!svg) return null;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  let local: { x: number; y: number };
+  try {
+    const pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    local = pt.matrixTransform(ctm.inverse());
+  } catch { return null; }
+  const tolSvg = 8 * svgUnitsPerPixel(svg); // 8 CSS px → svg units
+  const paths = host.querySelectorAll<SVGPathElement>('g.edgePaths > path, path.flowchart-link');
+  let best: SVGPathElement | null = null;
+  let bestDist = Infinity;
+  for (const p of Array.from(paths)) {
+    let len = 0;
+    try { len = p.getTotalLength(); } catch { continue; }
+    if (len === 0) continue;
+    const samples = Math.min(50, Math.max(12, Math.round(len / 8)));
+    for (let i = 0; i <= samples; i++) {
+      let s: DOMPoint;
+      try { s = p.getPointAtLength((len * i) / samples) as unknown as DOMPoint; } catch { continue; }
+      const d = Math.hypot(s.x - local.x, s.y - local.y);
+      if (d < tolSvg && d < bestDist) {
+        bestDist = d;
+        best = p;
+      }
+    }
+  }
+  return best;
 }
 
 /** Map an absolute client (event) coordinate to a point in the rendered
