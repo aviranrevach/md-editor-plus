@@ -51,11 +51,21 @@
         "viewType": "md-editor-plus.editor",
         "displayName": "MD Editor Plus",
         "selector": [
-          { "filenamePattern": "*.md" },
-          { "filenamePattern": "*.markdown" },
-          { "filenamePattern": "*.mdown" },
-          { "filenamePattern": "*.mkd" },
-          { "filenamePattern": "*.mdx" }
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          },
+          {
+            "filenamePattern": "*.mdown"
+          },
+          {
+            "filenamePattern": "*.mkd"
+          },
+          {
+            "filenamePattern": "*.mdx"
+          }
         ],
         "priority": "default"
       }
@@ -75,7 +85,15 @@
       "properties": {
         "mdEditorPlus.theme": {
           "type": "string",
-          "enum": ["light", "sepia", "claude", "dark", "sync-os", "sync-ide", "auto"],
+          "enum": [
+            "light",
+            "sepia",
+            "claude",
+            "dark",
+            "sync-os",
+            "sync-ide",
+            "auto"
+          ],
           "enumDescriptions": [
             "Light — Notion-style white",
             "Sepia — warm paper",
@@ -90,13 +108,22 @@
         },
         "mdEditorPlus.font": {
           "type": "string",
-          "enum": ["sans", "serif", "mono"],
+          "enum": [
+            "sans",
+            "serif",
+            "mono"
+          ],
           "default": "sans",
           "description": "Default font family"
         },
         "mdEditorPlus.textSize": {
           "type": "string",
-          "enum": ["s", "m", "l", "xl"],
+          "enum": [
+            "s",
+            "m",
+            "l",
+            "xl"
+          ],
           "default": "m",
           "description": "Default text size"
         },
@@ -181,12 +208,14 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.74.0",
     "@vscode/vsce": "^2.0.0",
-    "ovsx": "^0.9.0",
     "concurrently": "^8.0.0",
     "esbuild": "^0.21.0",
     "jest": "^29.0.0",
     "lowlight": "^3.1.0",
+    "mermaid": "^11.15.0",
+    "ovsx": "^0.9.0",
     "tiptap-extension-global-drag-handle": "^0.1.18",
+    "tiptap-extension-mermaid": "^0.0.0",
     "tiptap-markdown": "^0.8.10",
     "ts-jest": "^29.0.0",
     "typescript": "^5.4.0"
@@ -198,7 +227,8 @@
       "**/tests/**/*.test.ts"
     ],
     "moduleNameMapper": {
-      "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js"
+      "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js",
+      "^mermaid$": "<rootDir>/tests/__mocks__/mermaid.js"
     },
     "transform": {
       "^.+\\.tsx?$": [

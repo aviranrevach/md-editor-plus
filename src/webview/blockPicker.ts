@@ -294,6 +294,20 @@ export const BLOCK_DEFS: BlockDef[] = [
     convert: (editor, blockPos) => replaceBlockWith(editor, blockPos, 'codeBlock', { language: null }),
   },
   {
+    id: 'mermaidBlock',
+    label: 'Mermaid diagram',
+    description: 'Flowchart, sequence, or other diagram',
+    iconHtml: ICO.code,
+    section: 'other',
+    aliases: ['diagram', 'flowchart', 'sequence', 'graph'],
+    isActive: (t) => t === 'mermaidBlock',
+    insert: (editor, pos) =>
+      editor.chain().focus().insertContentAt(pos, {
+        type: 'mermaidBlock',
+        attrs: { code: 'graph TD\n    A[Start] --> B[End]' },
+      }).run(),
+  },
+  {
     id: 'horizontalRule',
     label: 'Divider',
     description: 'Horizontal rule',

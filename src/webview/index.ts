@@ -169,6 +169,7 @@ function init(): void {
   const readOnlyActionBtn     = document.getElementById('act-toggle-readonly')     as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
+  const openVscodeBtn         = document.getElementById('open-vscode-btn')          as HTMLElement | null;
 
   function setAlwaysDarkCode(on: boolean): void {
     document.documentElement.classList.toggle('code-always-dark', on);
@@ -235,6 +236,10 @@ function init(): void {
 
   refreshBtn?.addEventListener('click', () => {
     vscode.postMessage({ type: 'refresh' });
+  });
+
+  openVscodeBtn?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openInVscodeEditor' });
   });
 
   // External-edit conflict banner. Rendered once and toggled via 'visible'.
