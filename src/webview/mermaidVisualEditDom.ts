@@ -181,12 +181,10 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   const resizeOverlay = buildResizeOverlay({
     onResize: (id, sx, sy) => {
       // Live update while dragging — keeps it snappy by skipping the source
-      // mutation. The DOM transform is the source of truth until release.
+      // mutation. The DOM mutation is the source of truth until release.
       const el = findNodeElementById(id, opts.previewPane) as SVGGElement | null;
       if (!el) return;
-      el.style.setProperty('transform', `scale(${sx}, ${sy})`, 'important');
-      el.style.setProperty('transform-box', 'fill-box', 'important');
-      el.style.setProperty('transform-origin', 'center', 'important');
+      applyNodeScale(el, sx, sy);
       // Keep the selection ring + handles glued to the visually-scaled node.
       positionRingAround(selectionRing, el, opts.previewPane);
       resizeOverlay.positionAround(el, opts.previewPane);
@@ -1256,6 +1254,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       const locked = isLocked(ast, ids[0]);
       contextTip.setLocked(locked);
       contextTip.setStyle(getNodeStyle(ast, ids[0]));
+      const nodeDecl = collectNodes(ast).get(ids[0]);
+      if (nodeDecl) contextTip.setShape(nodeDecl.shape);
       showConnectionPoints(pivotEl);
       // Resize handles: only when unlocked. Seed with the persisted scale so
       // dragging continues from where the last edit left off.
@@ -1605,6 +1605,7 @@ interface ContextTipHandle {
   showMulti:  (count: number, host: HTMLElement, pivot: Element) => void;
   setLocked:  (locked: boolean) => void;
   setStyle:   (s: NodeStyle | null) => void;
+  setShape:   (shape: NodeShape) => void;
   hide:       () => void;
   destroy:    () => void;
 }
@@ -1630,41 +1631,10 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   el.appendChild(multiLabel);
 
   // ── Shape ────────────────────────────────────────────────────────────
-  const shapeBtn = document.createElement('button');
-  shapeBtn.type = 'button';
-  shapeBtn.className = 'mb-vCtx-btn mb-vCtx-shapebtn';
-  shapeBtn.title = 'Change shape';
-  shapeBtn.textContent = 'Shape ▾';
-  const shapeMenu = document.createElement('div');
-  shapeMenu.className = 'mb-vCtx-menu mb-vCtx-popLight mb-hidden';
-  const shapeOptions: Array<[NodeShape, string]> = [
-    ['rect',    'Rectangle'],
-    ['pill',    'Pill'],
-    ['circle',  'Circle'],
-    ['diamond', 'Diamond'],
-  ];
-  for (const [shape, label] of shapeOptions) {
-    const opt = document.createElement('button');
-    opt.type = 'button';
-    opt.className = 'mb-vCtx-menu-item';
-    opt.title = label;
-    opt.textContent = label;
-    opt.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-    opt.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      shapeMenu.classList.add('mb-hidden');
-      handlers.onShape(shape);
-    });
-    shapeMenu.appendChild(opt);
-  }
-  shapeBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  shapeBtn.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    shapeMenu.classList.toggle('mb-hidden');
-  });
-  const shapeWrap = document.createElement('div');
-  shapeWrap.className = 'mb-vCtx-popwrap';
-  shapeWrap.append(shapeBtn, shapeMenu);
+  // Trigger shows the current shape's icon; popover is an icon grid.
+  const shapeCtl = makeShapePicker((shape) => handlers.onShape(shape));
+  const shapeWrap = shapeCtl.el;
+  const shapeMenu = shapeCtl.menu;
 
   const sep1 = sepEl();
 
@@ -1866,11 +1836,20 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
       underline: !!s?.underline,
       strike:    !!s?.strike,
     });
-    alignCtl.setState(s?.textAlign ?? 'center', s?.verticalAlign ?? 'middle');
+    alignCtl.setState({
+      textAlign:     s?.textAlign     ?? 'center',
+      verticalAlign: s?.verticalAlign ?? 'middle',
+      padding:       s?.padding       ?? 'spacious',
+      lineHeight:    s?.lineHeight    ?? 'normal',
+    });
     const opacity = s?.opacity ?? 1;
     textCtl.setState(  { color: s?.text   ?? null, opacity });
     strokeCtl.setState({ color: s?.border ?? null, opacity, thickness: s?.borderWidth ?? 1, lineType: s?.strokeType ?? 'solid' });
     fillCtl.setState(  { color: s?.fill   ?? null, opacity });
+  }
+
+  function setShape(shape: NodeShape): void {
+    shapeCtl.setShape(shape);
   }
 
   function hide(): void {
@@ -1881,7 +1860,7 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
 
   function destroy(): void { el.remove(); }
 
-  return { el, showBelow, showMulti, setLocked, setStyle, hide, destroy };
+  return { el, showBelow, showMulti, setLocked, setStyle, setShape, hide, destroy };
 }
 
 function sepEl(): HTMLSpanElement {
@@ -2735,6 +2714,96 @@ export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
 /** For each g.cluster, recompute the `<rect>` (or `<polygon>`) so it
     encloses its contained nodes after positions are applied. Padded so the
     box doesn't kiss the node edges. */
+// Shape picker — trigger shows the current shape's glyph; popover is an icon
+// grid of all supported shapes. Replaces the old text dropdown.
+function makeShapePicker(
+  onPick: (shape: NodeShape) => void,
+): { el: HTMLElement; menu: HTMLElement; setShape: (shape: NodeShape) => void } {
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-vCtx-popwrap';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mb-vCtx-btn mb-vCtx-shapetrigger';
+  btn.setAttribute('aria-label', 'Change shape');
+  btn.title = 'Change shape';
+  btn.innerHTML = shapeIconSvg('rect');
+
+  const menu = document.createElement('div');
+  menu.className = 'mb-vCtx-menu mb-vCtx-popLight mb-vCtx-shapegrid mb-hidden';
+
+  const shapes: Array<[NodeShape, string]> = [
+    ['rect',       'Rectangle'],
+    ['round',      'Rounded rectangle'],
+    ['pill',       'Pill'],
+    ['circle',     'Circle'],
+    ['diamond',    'Diamond'],
+    ['hexagon',    'Hexagon'],
+    ['cylinder',   'Cylinder'],
+    ['subroutine', 'Subroutine'],
+  ];
+  const buttons = new Map<NodeShape, HTMLButtonElement>();
+  for (const [shape, label] of shapes) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vCtx-shapebtn';
+    b.dataset.shape = shape;
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = shapeIconSvg(shape);
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      menu.classList.add('mb-hidden');
+      onPick(shape);
+    });
+    buttons.set(shape, b);
+    menu.appendChild(b);
+  }
+
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    menu.classList.toggle('mb-hidden');
+  });
+
+  wrap.append(btn, menu);
+  return {
+    el: wrap,
+    menu,
+    setShape(shape) {
+      btn.innerHTML = shapeIconSvg(shape);
+      for (const [s, b] of buttons) b.classList.toggle('mb-vCtx-shapebtn-on', s === shape);
+    },
+  };
+}
+
+function shapeIconSvg(shape: NodeShape): string {
+  // 24x24 line glyphs sized to look balanced next to the other toolbar icons.
+  const stroke = `fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"`;
+  switch (shape) {
+    case 'rect':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><rect x="4" y="6" width="16" height="12"/></svg>`;
+    case 'round':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><rect x="4" y="6" width="16" height="12" rx="4"/></svg>`;
+    case 'pill':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><rect x="3" y="8" width="18" height="8" rx="4"/></svg>`;
+    case 'circle':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><circle cx="12" cy="12" r="7"/></svg>`;
+    case 'diamond':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>`;
+    case 'hexagon':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><path d="M7 5h10l5 7-5 7H7l-5-7 5-7z"/></svg>`;
+    case 'cylinder':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><ellipse cx="12" cy="7" rx="6" ry="2"/><path d="M6 7v10c0 1.1 2.7 2 6 2s6-.9 6-2V7"/></svg>`;
+    case 'subroutine':
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><rect x="4" y="6" width="16" height="12"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/></svg>`;
+    case 'text':
+    default:
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><path d="M5 8h14M12 8v10"/></svg>`;
+  }
+}
+
 // ── Unified color/style popover ─────────────────────────────────────────────
 // One popover with optional line-type row, optional thickness slider, opacity
 // slider, "No color" button, and brand + all color swatches. Used by Fill,
@@ -3006,12 +3075,19 @@ function makeTypeStylePopover(
   };
 }
 
-// Alignment popover: 3 horizontal + 3 vertical buttons.
+// Alignment popover: 3 horizontal + 3 vertical buttons, plus padding +
+// line-height segmented controls.
+interface AlignmentState {
+  textAlign:     'left' | 'center' | 'right';
+  verticalAlign: 'top'  | 'middle' | 'bottom';
+  padding:       'tight' | 'normal' | 'spacious';
+  lineHeight:    'tight' | 'normal';
+}
 function makeAlignmentPopover(
-  onChange: (partial: { textAlign?: 'left' | 'center' | 'right'; verticalAlign?: 'top' | 'middle' | 'bottom' }) => void,
+  onChange: (partial: Partial<AlignmentState>) => void,
 ): {
   el: HTMLElement;
-  setState: (textAlign: 'left' | 'center' | 'right', verticalAlign: 'top' | 'middle' | 'bottom') => void;
+  setState: (s: AlignmentState) => void;
 } {
   const wrap = document.createElement('div');
   wrap.className = 'mb-vCtx-popwrap';
@@ -3081,7 +3157,29 @@ function makeAlignmentPopover(
 
   const div = document.createElement('div');
   div.className = 'mb-vCtx-aligndivider';
-  pop.append(hRow, div, vRow);
+
+  // Padding segmented control (tight / normal / spacious).
+  const padLabel = document.createElement('div');
+  padLabel.className = 'mb-vCtx-segLabel';
+  padLabel.textContent = 'Padding';
+  const padRow = makeSegRow<'tight' | 'normal' | 'spacious'>(
+    [['tight', 'Tight'], ['normal', 'Normal'], ['spacious', 'Spacious']],
+    (v) => onChange({ padding: v }),
+  );
+
+  // Line-height segmented control (tight / normal).
+  const lhLabel = document.createElement('div');
+  lhLabel.className = 'mb-vCtx-segLabel';
+  lhLabel.textContent = 'Line height';
+  const lhRow = makeSegRow<'tight' | 'normal'>(
+    [['tight', 'Tight'], ['normal', 'Normal']],
+    (v) => onChange({ lineHeight: v }),
+  );
+
+  const div2 = document.createElement('div');
+  div2.className = 'mb-vCtx-aligndivider';
+
+  pop.append(hRow, div, vRow, div2, padLabel, padRow.el, lhLabel, lhRow.el);
 
   btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   btn.addEventListener('click', (e) => {
@@ -3092,9 +3190,40 @@ function makeAlignmentPopover(
   wrap.append(btn, pop);
   return {
     el: wrap,
-    setState(h, v) {
-      for (const [k, b] of hButtons) b.classList.toggle('mb-vCtx-alignbtn-on', k === h);
-      for (const [k, b] of vButtons) b.classList.toggle('mb-vCtx-alignbtn-on', k === v);
+    setState(s) {
+      for (const [k, b] of hButtons) b.classList.toggle('mb-vCtx-alignbtn-on', k === s.textAlign);
+      for (const [k, b] of vButtons) b.classList.toggle('mb-vCtx-alignbtn-on', k === s.verticalAlign);
+      padRow.setValue(s.padding);
+      lhRow.setValue(s.lineHeight);
+    },
+  };
+}
+
+// Tiny segmented control used in the alignment popover for padding +
+// line-height. Returns the row element + a setter that highlights the active.
+function makeSegRow<T extends string>(
+  options: Array<[T, string]>,
+  onPick: (value: T) => void,
+): { el: HTMLElement; setValue: (v: T) => void } {
+  const row = document.createElement('div');
+  row.className = 'mb-vCtx-segrow';
+  const buttons = new Map<T, HTMLButtonElement>();
+  for (const [value, label] of options) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vCtx-segbtn';
+    b.dataset.value = value;
+    b.title = label;
+    b.textContent = label;
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onPick(value); });
+    buttons.set(value, b);
+    row.appendChild(b);
+  }
+  return {
+    el: row,
+    setValue(v) {
+      for (const [k, b] of buttons) b.classList.toggle('mb-vCtx-segbtn-on', k === v);
     },
   };
 }
@@ -3359,15 +3488,12 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
   if (s.opacity !== undefined) {
     g.style.setProperty('opacity', String(s.opacity), 'important');
   }
-  // Resize: scale the node from its center via CSS transform. We use
-  // transform-box: fill-box so transform-origin is local to the node's bbox
-  // rather than the SVG root, which keeps the node anchored where mermaid
-  // laid it out.
+  // Resize: rewrite the shape's geometric attributes (width/height for rect,
+  // r for circle, points for polygon, etc.). This keeps the node anchored at
+  // mermaid's translate(x,y) so it doesn't visually jump, and leaves the
+  // label + stroke at their natural size — only the container grows.
   if (s.scale) {
-    const [sx, sy] = s.scale;
-    g.style.setProperty('transform', `scale(${sx}, ${sy})`, 'important');
-    g.style.setProperty('transform-box', 'fill-box', 'important');
-    g.style.setProperty('transform-origin', 'center', 'important');
+    applyNodeScale(g, s.scale[0], s.scale[1]);
   }
 
   // Label color + font size + weight live in a foreignObject containing
@@ -3387,6 +3513,16 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
       if (s.underline) parts.push('underline');
       if (s.strike)    parts.push('line-through');
       labelDiv.style.setProperty('text-decoration', parts.length ? parts.join(' ') : 'none', 'important');
+    }
+    if (s.lineHeight !== undefined) {
+      const lh = s.lineHeight === 'tight' ? '1.1' : '1.4';
+      labelDiv.style.setProperty('line-height', lh, 'important');
+    }
+    if (s.padding !== undefined) {
+      const p = s.padding === 'tight' ? '2px 6px'
+              : s.padding === 'normal' ? '6px 12px'
+              : '12px 20px';
+      labelDiv.style.setProperty('padding', p, 'important');
     }
   }
   // The foreignObject hosts the label. We can shift it vertically inside the
@@ -3431,6 +3567,97 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
       textEl.setAttribute('text-anchor',
         s.textAlign === 'left' ? 'start' : s.textAlign === 'right' ? 'end' : 'middle');
     }
+  }
+}
+
+// ── Geometric resize ──────────────────────────────────────────────────────
+// Instead of CSS transform (which scales the label + stroke too, and jumps
+// around because of transform-origin vs mermaid's translate), we rewrite the
+// shape's geometric attributes: width/height for rect, r for circle, points
+// for polygon, etc. The label stays at its natural size, the stroke keeps
+// its width, and the node stays anchored at mermaid's translate(x,y).
+//
+// Each rerender, the SVG comes back fresh from mermaid (default dimensions),
+// so we cache the original dimensions in dataset on first apply per render
+// and compute the scaled values from those.
+
+function findPrimaryShape(g: SVGGElement): SVGGraphicsElement | null {
+  // Mermaid v11 wraps the background shape in g.basic (sometimes nested).
+  // Prefer the first shape inside that wrapper; fall back to direct children
+  // of g.node. Skip label-related shapes living inside foreignObject / .label.
+  const inBasic = g.querySelector<SVGGraphicsElement>(
+    'g.basic > rect, g.basic > circle, g.basic > ellipse, g.basic > polygon, g.basic > path',
+  );
+  if (inBasic) return inBasic;
+  for (const child of Array.from(g.children) as Element[]) {
+    const tag = child.tagName.toLowerCase();
+    if (tag === 'rect' || tag === 'circle' || tag === 'ellipse' || tag === 'polygon' || tag === 'path') {
+      return child as SVGGraphicsElement;
+    }
+  }
+  return null;
+}
+
+function applyNodeScale(g: SVGGElement, sx: number, sy: number): void {
+  const shape = findPrimaryShape(g);
+  if (!shape) return;
+  const tag = shape.tagName.toLowerCase();
+  const ds = (shape as SVGGraphicsElement & { dataset: DOMStringMap }).dataset;
+
+  if (tag === 'rect') {
+    let oW = parseFloat(ds.mbOrigW ?? '');
+    let oH = parseFloat(ds.mbOrigH ?? '');
+    if (!isFinite(oW) || !isFinite(oH)) {
+      oW = parseFloat(shape.getAttribute('width') ?? '0');
+      oH = parseFloat(shape.getAttribute('height') ?? '0');
+      ds.mbOrigW = String(oW);
+      ds.mbOrigH = String(oH);
+    }
+    const newW = oW * sx;
+    const newH = oH * sy;
+    shape.setAttribute('width',  String(newW));
+    shape.setAttribute('height', String(newH));
+    // Recenter around (0,0) so mermaid's translate keeps the node in place.
+    shape.setAttribute('x', String(-newW / 2));
+    shape.setAttribute('y', String(-newH / 2));
+  } else if (tag === 'circle') {
+    let oR = parseFloat(ds.mbOrigR ?? '');
+    if (!isFinite(oR)) {
+      oR = parseFloat(shape.getAttribute('r') ?? '0');
+      ds.mbOrigR = String(oR);
+    }
+    // Use the average scale so a non-uniform drag still grows the circle.
+    shape.setAttribute('r', String(oR * (sx + sy) / 2));
+  } else if (tag === 'ellipse') {
+    let oRx = parseFloat(ds.mbOrigRx ?? '');
+    let oRy = parseFloat(ds.mbOrigRy ?? '');
+    if (!isFinite(oRx) || !isFinite(oRy)) {
+      oRx = parseFloat(shape.getAttribute('rx') ?? '0');
+      oRy = parseFloat(shape.getAttribute('ry') ?? '0');
+      ds.mbOrigRx = String(oRx);
+      ds.mbOrigRy = String(oRy);
+    }
+    shape.setAttribute('rx', String(oRx * sx));
+    shape.setAttribute('ry', String(oRy * sy));
+  } else if (tag === 'polygon') {
+    let orig = ds.mbOrigPoints;
+    if (!orig) {
+      orig = shape.getAttribute('points') ?? '';
+      ds.mbOrigPoints = orig;
+    }
+    const scaled = orig.trim().split(/\s+/).map((pt: string) => {
+      const [px, py] = pt.split(',').map(parseFloat);
+      return `${px * sx},${py * sy}`;
+    }).join(' ');
+    shape.setAttribute('points', scaled);
+  } else {
+    // Path-based shapes (cylinder, subroutine, callout). Geometric resize of
+    // arbitrary paths is hard — fall back to CSS transform with the
+    // transform-origin set to the node center. The label still scales here,
+    // but at least the position stays put.
+    g.style.setProperty('transform', `scale(${sx}, ${sy})`, 'important');
+    g.style.setProperty('transform-box', 'fill-box', 'important');
+    g.style.setProperty('transform-origin', 'center', 'important');
   }
 }
 

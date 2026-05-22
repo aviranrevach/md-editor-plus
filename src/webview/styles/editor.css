@@ -3968,6 +3968,38 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   margin: 4px 0;
 }
 
+/* Segmented controls inside the alignment popover (padding + line height). */
+.ProseMirror .mb-vCtx2 .mb-vCtx-segLabel {
+  font: 600 11px var(--font-body);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-segrow {
+  display: inline-flex;
+  width: 100%;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-segbtn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font: 500 12px var(--font-body);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-segbtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-segbtn.mb-vCtx-segbtn-on {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+
 /* Light variant of the shape / more menus. */
 .ProseMirror .mb-vCtx2 .mb-vCtx-popLight {
   background: var(--bg);
@@ -3991,6 +4023,41 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   min-width: 200px;
   display: flex;
   flex-direction: column;
+}
+
+/* Shape picker — trigger icon + popover icon grid. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapetrigger {
+  padding: 4px 6px;
+  border: 1.5px solid transparent;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-shapegrid:not(.mb-hidden)) > .mb-vCtx-shapetrigger {
+  border-color: var(--link);
+  border-radius: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapegrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 8px;
+  min-width: 200px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  padding: 0;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapebtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapebtn.mb-vCtx-shapebtn-on {
+  background: var(--block-hover);
+  border-color: var(--link);
 }
 
 /* Resize handles around a single-selected, unlocked node. */

@@ -61,6 +61,8 @@ export interface NodeStyle {
   strokeType?:  'solid' | 'dashed' | 'dotted';
   textAlign?:     'left' | 'center' | 'right';
   verticalAlign?: 'top'  | 'middle' | 'bottom';
+  padding?:       'tight' | 'normal' | 'spacious';
+  lineHeight?:    'tight' | 'normal';
   // Per-node scale override (width / height multipliers). Stored together
   // because resize handles always set both at once. CSS transform on g.node.
   scale?: [number, number];
@@ -397,6 +399,7 @@ function writeStylesLine(ast: Ast, map: StyleMap): void {
         || v.italic !== undefined || v.underline !== undefined || v.strike !== undefined
         || v.borderWidth !== undefined || v.opacity !== undefined
         || v.strokeType !== undefined || v.textAlign !== undefined || v.verticalAlign !== undefined
+        || v.padding !== undefined || v.lineHeight !== undefined
         || v.scale !== undefined) {
       filtered[k] = v;
     }
@@ -591,6 +594,12 @@ function tryParseStylesLine(trimmed: string): StyleMap | null {
       }
       if (s.verticalAlign === 'top' || s.verticalAlign === 'middle' || s.verticalAlign === 'bottom') {
         entry.verticalAlign = s.verticalAlign;
+      }
+      if (s.padding === 'tight' || s.padding === 'normal' || s.padding === 'spacious') {
+        entry.padding = s.padding;
+      }
+      if (s.lineHeight === 'tight' || s.lineHeight === 'normal') {
+        entry.lineHeight = s.lineHeight;
       }
       if (Array.isArray(s.scale) && s.scale.length === 2
           && typeof s.scale[0] === 'number' && typeof s.scale[1] === 'number') {
