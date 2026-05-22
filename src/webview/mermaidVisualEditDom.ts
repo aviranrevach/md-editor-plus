@@ -1838,11 +1838,11 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   const topBar = document.createElement('div');
   topBar.className = 'mb-vEdgeCtx2-top';
 
-  // Line style preview (clicking opens the expanded panel)
+  // Line style preview (clicking opens the expanded line panel)
   const lineBtn = document.createElement('button');
   lineBtn.type = 'button';
   lineBtn.className = 'mb-vEdgeCtx2-line';
-  lineBtn.setAttribute('aria-label', 'Line style and color');
+  lineBtn.setAttribute('aria-label', 'Line style and thickness');
   lineBtn.innerHTML = lineGlyph('solid');
 
   // Flip endpoints
@@ -1854,10 +1854,18 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   flipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   flipBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onFlip(); });
 
-  // End cap dropdown (right-side)
-  const endCapBtn = makeCapButton('end', (cap) => handlers.onStyleChange({ endCap: cap }));
-  // Start cap dropdown (left-side)
+  // Start cap (left-side) and end cap (right-side) — ordered visually
+  // start | flip | end so the layout matches the actual edge direction.
   const startCapBtn = makeCapButton('start', (cap) => handlers.onStyleChange({ startCap: cap }));
+  const endCapBtn   = makeCapButton('end',   (cap) => handlers.onStyleChange({ endCap:   cap }));
+
+  // Color button — opens its own popover (no longer inside the line panel).
+  const colorBtn = document.createElement('button');
+  colorBtn.type = 'button';
+  colorBtn.className = 'mb-vEdgeCtx2-color';
+  colorBtn.setAttribute('aria-label', 'Line color');
+  colorBtn.innerHTML = `<span class="mb-vEdgeCtx2-colorswatch" style="background:#111827"></span>`;
+  const colorSwatch = colorBtn.querySelector<HTMLElement>('.mb-vEdgeCtx2-colorswatch');
 
   const sep1 = document.createElement('span');
   sep1.className = 'mb-vEdgeCtx2-sep';
@@ -1873,11 +1881,12 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   deleteBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   deleteBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDelete(); });
 
-  topBar.append(lineBtn, sep1, flipBtn, endCapBtn.el, startCapBtn.el, sep2, deleteBtn);
+  // Order: line | startCap | flip | endCap | color | delete
+  topBar.append(lineBtn, sep1, startCapBtn.el, flipBtn, endCapBtn.el, colorBtn, sep2, deleteBtn);
 
-  // ── Expanded panel ──────────────────────────────────────────────────
-  const panel = document.createElement('div');
-  panel.className = 'mb-vEdgeCtx2-panel mb-hidden';
+  // ── Line panel (compact: type + thickness + opacity) ────────────────
+  const linePanel = document.createElement('div');
+  linePanel.className = 'mb-vEdgeCtx2-panel mb-hidden';
 
   // Line type (3 buttons in a row)
   const typeRow = document.createElement('div');
@@ -1889,7 +1898,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     b.className = 'mb-vEdgeCtx2-type';
     b.dataset.type = t;
     b.setAttribute('aria-label', `Line: ${t}`);
-    b.innerHTML = lineGlyph(t as 'solid' | 'dashed' | 'dotted', 30);
+    b.innerHTML = lineGlyph(t as 'solid' | 'dashed' | 'dotted', 26);
     b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     b.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -1899,12 +1908,15 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     typeRow.appendChild(b);
   }
 
-  // Thickness slider with value label
   const thicknessSlider = makeLabelledSlider('Thickness', 0.5, 6, 0.5, 1.5, 'px', (v) => handlers.onStyleChange({ thickness: v }));
-  // Opacity slider with value label
-  const opacitySlider = makeLabelledSlider('Opacity', 10, 100, 5, 100, '%', (v) => handlers.onStyleChange({ opacity: v / 100 }));
+  const opacitySlider   = makeLabelledSlider('Opacity', 10, 100, 5, 100, '%', (v) => handlers.onStyleChange({ opacity: v / 100 }));
 
-  // No color button
+  linePanel.append(typeRow, thicknessSlider.el, opacitySlider.el);
+
+  // ── Color panel (own popover, opened by the color button) ────────────
+  const colorPanel = document.createElement('div');
+  colorPanel.className = 'mb-vEdgeCtx2-panel mb-vEdgeCtx2-colorpanel mb-hidden';
+
   const noColorBtn = document.createElement('button');
   noColorBtn.type = 'button';
   noColorBtn.className = 'mb-vEdgeCtx2-nocolor';
@@ -1912,28 +1924,40 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   noColorBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   noColorBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onStyleChange({ color: 'transparent' }); });
 
-  // Brand colors
   const brandLabel = document.createElement('div');
   brandLabel.className = 'mb-vEdgeCtx2-grouplabel';
   brandLabel.textContent = 'Brand colors';
   const brandGrid = makeSwatchGrid(BRAND_COLORS, (c) => handlers.onStyleChange({ color: c }));
 
-  // All colors
   const allLabel = document.createElement('div');
   allLabel.className = 'mb-vEdgeCtx2-grouplabel';
   allLabel.textContent = 'All colors';
   const allGrid = makeSwatchGrid(ALL_COLORS, (c) => handlers.onStyleChange({ color: c }));
 
-  panel.append(typeRow, thicknessSlider.el, opacitySlider.el, noColorBtn, brandLabel, brandGrid, allLabel, allGrid);
+  colorPanel.append(noColorBtn, brandLabel, brandGrid, allLabel, allGrid);
 
-  // Toggle panel on lineBtn click
+  // Toggle panels on their buttons. Opening one closes the other to keep
+  // only one expanded at a time.
+  function closeAllPanels(): void {
+    linePanel.classList.add('mb-hidden');
+    colorPanel.classList.add('mb-hidden');
+  }
   lineBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   lineBtn.addEventListener('click', (e) => {
     e.preventDefault(); e.stopPropagation();
-    panel.classList.toggle('mb-hidden');
+    const wasOpen = !linePanel.classList.contains('mb-hidden');
+    closeAllPanels();
+    if (!wasOpen) linePanel.classList.remove('mb-hidden');
+  });
+  colorBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  colorBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const wasOpen = !colorPanel.classList.contains('mb-hidden');
+    closeAllPanels();
+    if (!wasOpen) colorPanel.classList.remove('mb-hidden');
   });
 
-  wrap.append(topBar, panel);
+  wrap.append(topBar, linePanel, colorPanel);
 
   function showAt(clientX: number, clientY: number): void {
     const host = wrap.parentElement;
@@ -1947,7 +1971,8 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
 
   function hide(): void {
     wrap.classList.add('mb-hidden');
-    panel.classList.add('mb-hidden');
+    linePanel.classList.add('mb-hidden');
+    colorPanel.classList.add('mb-hidden');
   }
 
   function setStyle(s: EdgeStyle | null): void {
@@ -1960,6 +1985,7 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     opacitySlider.setValue(Math.round((s?.opacity ?? 1) * 100));
     startCapBtn.setCap(s?.startCap ?? 'none');
     endCapBtn.setCap(s?.endCap ?? 'arrow');
+    if (colorSwatch) colorSwatch.style.background = s?.color ?? '#111827';
   }
 
   function destroy(): void { wrap.remove(); }
@@ -1983,6 +2009,7 @@ function makeCapButton(which: 'start' | 'end', onPick: (cap: EdgeCap) => void): 
   const pop = document.createElement('div');
   pop.className = 'mb-vEdgeCtx2-cappop mb-hidden';
   const opts: Array<[EdgeCap, string]> = [['none', 'None'], ['arrow', 'Arrow'], ['circle', 'Circle']];
+  const itemsByCap = new Map<EdgeCap, HTMLButtonElement>();
   for (const [cap, label] of opts) {
     const item = document.createElement('button');
     item.type = 'button';
@@ -1995,8 +2022,10 @@ function makeCapButton(which: 'start' | 'end', onPick: (cap: EdgeCap) => void): 
       pop.classList.add('mb-hidden');
       onPick(cap);
     });
+    itemsByCap.set(cap, item);
     pop.appendChild(item);
   }
+  let currentCap: EdgeCap = which === 'end' ? 'arrow' : 'none';
   btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   btn.addEventListener('click', (e) => {
     e.preventDefault(); e.stopPropagation();
@@ -2005,7 +2034,14 @@ function makeCapButton(which: 'start' | 'end', onPick: (cap: EdgeCap) => void): 
   wrap.append(btn, pop);
   return {
     el: wrap,
-    setCap(c) { btn.innerHTML = capGlyph(c, which); },
+    setCap(c) {
+      currentCap = c;
+      btn.innerHTML = capGlyph(c, which);
+      btn.classList.toggle('mb-vEdgeCtx2-cap-active', c !== 'none');
+      for (const [cap, item] of itemsByCap) {
+        item.classList.toggle('mb-vEdgeCtx2-capitem-on', cap === currentCap);
+      }
+    },
   };
 }
 

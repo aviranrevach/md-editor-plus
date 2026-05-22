@@ -3416,10 +3416,20 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   text-align: left;
 }
 .ProseMirror .mb-vEdgeCtx2-capitem:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-capitem.mb-vEdgeCtx2-capitem-on {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+
+/* When a cap is set (not "none"), tint the cap button blue so the active
+   side is obvious at a glance. */
+.ProseMirror .mb-vEdgeCtx2-icon.mb-vEdgeCtx2-cap-active {
+  color: var(--link);
+}
 
 .ProseMirror .mb-vEdgeCtx2-panel {
-  width: 300px;
-  padding: 14px 16px;
+  width: 260px;
+  padding: 12px 14px;
   background: var(--bg);
   color: var(--text-primary);
   border: 1px solid var(--border);
@@ -3428,6 +3438,28 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   font-family: var(--font-body);
 }
 .ProseMirror .mb-vEdgeCtx2-panel.mb-hidden { display: none; }
+.ProseMirror .mb-vEdgeCtx2-colorpanel { width: 240px; }
+
+/* Color button in the top mini-bar: shows the current line color. */
+.ProseMirror .mb-vEdgeCtx2-color {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ProseMirror .mb-vEdgeCtx2-color:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-colorswatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  display: inline-block;
+}
 
 .ProseMirror .mb-vEdgeCtx2-types {
   display: grid;
@@ -3495,20 +3527,20 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 .ProseMirror .mb-vEdgeCtx2-swatches {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
 }
 .ProseMirror .mb-vEdgeCtx2-swatch {
   aspect-ratio: 1 / 1;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 999px;
   cursor: pointer;
   padding: 0;
-  width: 40px;
-  height: 40px;
+  width: 26px;
+  height: 26px;
   margin: 0 auto;
 }
-.ProseMirror .mb-vEdgeCtx2-swatch:hover { transform: scale(1.08); }
+.ProseMirror .mb-vEdgeCtx2-swatch:hover { transform: scale(1.1); }
 
 /* Target hooks layer — same chrome as the source connection layer. */
 .ProseMirror .mb-vTargetHooks .mb-vConn-dot {
