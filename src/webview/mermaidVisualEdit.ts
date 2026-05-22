@@ -53,8 +53,14 @@ export interface NodeStyle {
   text?:        string;
   fontSize?:    number;
   bold?:        boolean;
+  italic?:      boolean;
+  underline?:   boolean;
+  strike?:      boolean;
   borderWidth?: number;    // stroke-width on the shape (px)
   opacity?:     number;    // 0..1 — applied to the whole node g
+  strokeType?:  'solid' | 'dashed' | 'dotted';
+  textAlign?:     'left' | 'center' | 'right';
+  verticalAlign?: 'top'  | 'middle' | 'bottom';
   // Per-node scale override (width / height multipliers). Stored together
   // because resize handles always set both at once. CSS transform on g.node.
   scale?: [number, number];
@@ -388,7 +394,10 @@ function writeStylesLine(ast: Ast, map: StyleMap): void {
   const filtered: StyleMap = {};
   for (const [k, v] of Object.entries(map)) {
     if (v.fill || v.border || v.text || v.fontSize !== undefined || v.bold !== undefined
-        || v.borderWidth !== undefined || v.opacity !== undefined || v.scale !== undefined) {
+        || v.italic !== undefined || v.underline !== undefined || v.strike !== undefined
+        || v.borderWidth !== undefined || v.opacity !== undefined
+        || v.strokeType !== undefined || v.textAlign !== undefined || v.verticalAlign !== undefined
+        || v.scale !== undefined) {
       filtered[k] = v;
     }
   }
@@ -569,8 +578,20 @@ function tryParseStylesLine(trimmed: string): StyleMap | null {
       if (typeof s.text        === 'string') entry.text        = s.text;
       if (typeof s.fontSize    === 'number') entry.fontSize    = s.fontSize;
       if (typeof s.bold        === 'boolean') entry.bold       = s.bold;
+      if (typeof s.italic      === 'boolean') entry.italic     = s.italic;
+      if (typeof s.underline   === 'boolean') entry.underline  = s.underline;
+      if (typeof s.strike      === 'boolean') entry.strike     = s.strike;
       if (typeof s.borderWidth === 'number') entry.borderWidth = s.borderWidth;
       if (typeof s.opacity     === 'number') entry.opacity     = s.opacity;
+      if (s.strokeType === 'solid' || s.strokeType === 'dashed' || s.strokeType === 'dotted') {
+        entry.strokeType = s.strokeType;
+      }
+      if (s.textAlign === 'left' || s.textAlign === 'center' || s.textAlign === 'right') {
+        entry.textAlign = s.textAlign;
+      }
+      if (s.verticalAlign === 'top' || s.verticalAlign === 'middle' || s.verticalAlign === 'bottom') {
+        entry.verticalAlign = s.verticalAlign;
+      }
       if (Array.isArray(s.scale) && s.scale.length === 2
           && typeof s.scale[0] === 'number' && typeof s.scale[1] === 'number') {
         entry.scale = [s.scale[0], s.scale[1]];

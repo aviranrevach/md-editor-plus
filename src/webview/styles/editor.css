@@ -3730,6 +3730,269 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 .ProseMirror .mb-vCtx-styleBtn svg { vertical-align: -1px; }
 
+/* ===========================================================================
+   Phase 11: Node context tip v2 (white design — three popover groups:
+   Fill, Stroke, Type style + Alignment)
+   =========================================================================== */
+
+/* Override the dark base for v2 contexts. */
+.ProseMirror .mb-vCtx.mb-vCtx2 {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 8px;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  font: 500 13px var(--font-body);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-btn {
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-btn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-sep {
+  background: var(--border);
+  height: 18px;
+  margin: 0 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-num {
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  width: 36px;
+  font: 500 13px var(--font-body);
+  -moz-appearance: textfield;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-multi { color: var(--text-primary); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-danger:hover { background: var(--callout-caution-bg); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-danger { color: var(--callout-caution-accent); }
+
+/* The popwrap is the anchor for popovers. */
+.ProseMirror .mb-vCtx-popwrap { position: relative; display: inline-flex; }
+
+/* Pill button used for Fill / Stroke / Text — boxed icon with a blue
+   selection ring when its popover is open. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-pillbtn {
+  position: relative;
+  padding: 4px 6px;
+  border: 1.5px solid transparent;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-bigpop:not(.mb-hidden)) > .mb-vCtx-pillbtn,
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-bigpop:not(.mb-hidden)) > .mb-vCtx-typetrigger,
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-bigpop:not(.mb-hidden)) > .mb-vCtx-aligntrigger {
+  border-color: var(--link);
+  border-radius: 8px;
+  background: transparent;
+}
+
+/* Color underline strip on Fill / Stroke / Text icons. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-colorstrip {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-textbtn .mb-vCtx-colorstrip { left: 6px; right: 6px; bottom: 4px; }
+
+/* Large popover used by Fill / Stroke / Text-color / Type-style /
+   Alignment. White card matching the edge tip design. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  z-index: 28;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop.mb-hidden { display: none; }
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-tight { min-width: 0; padding: 8px; }
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-align { min-width: 0; padding: 10px; }
+
+/* Line-type row (stroke popover). */
+.ProseMirror .mb-vCtx2 .mb-vCtx-types {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typebtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-typebtn.mb-vCtx-typebtn-on {
+  background: var(--bg);
+  border-color: var(--link);
+}
+
+/* Slider rows (light variant). */
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderwrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderwrap input[type="range"] {
+  width: 100%;
+  accent-color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderrow {
+  display: flex;
+  justify-content: space-between;
+  font: 500 13px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderval { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* No-color button. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-nocolor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font: 500 14px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-nocolor:hover { background: var(--block-hover); }
+
+/* Color grid (brand + all). Six columns, generous swatches. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-grouplabel {
+  font: 600 13px var(--font-body);
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop .mb-vCtx-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  padding: 0;
+  margin: 0 auto;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop .mb-vCtx-swatch:hover { transform: scale(1.06); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop .mb-vCtx-swatch.mb-vCtx-swatch-on {
+  border-color: var(--link);
+  border-width: 2px;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.18);
+}
+
+/* Type-style popover (B I U S) — small horizontal row. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-tight .mb-vCtx-types {
+  grid-template-columns: repeat(4, 1fr);
+  background: transparent;
+  padding: 0;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typeglyph {
+  font: 600 15px var(--font-body);
+  min-width: 40px;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typeglyph.mb-vCtx-typebtn-on {
+  background: var(--text-primary);
+  color: var(--bg);
+  border-color: transparent;
+}
+
+/* Alignment popover — two rows (horizontal then vertical), thin divider. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-align {
+  flex-direction: column;
+  gap: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignrow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignbtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignbtn.mb-vCtx-alignbtn-on {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-aligndivider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Light variant of the shape / more menus. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-popLight {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 28;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popLight .mb-vCtx-menu-item {
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popLight .mb-vCtx-menu-item:hover { background: var(--block-hover); }
+
+.ProseMirror .mb-vCtx2 .mb-vCtx-morepop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Resize handles around a single-selected, unlocked node. */
 .ProseMirror .mb-vResize {
   position: absolute;

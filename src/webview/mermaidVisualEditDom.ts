@@ -1620,7 +1620,7 @@ interface ContextTipHandlers {
 
 function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   const el = document.createElement('div');
-  el.className = 'mb-vCtx mb-hidden';
+  el.className = 'mb-vCtx mb-vCtx2 mb-hidden';
   el.contentEditable = 'false';
 
   // Multi-select summary chip (shown only when |selection| > 1).
@@ -1629,14 +1629,14 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   multiLabel.textContent = '';
   el.appendChild(multiLabel);
 
+  // ── Shape ────────────────────────────────────────────────────────────
   const shapeBtn = document.createElement('button');
   shapeBtn.type = 'button';
-  shapeBtn.className = 'mb-vCtx-btn';
+  shapeBtn.className = 'mb-vCtx-btn mb-vCtx-shapebtn';
   shapeBtn.title = 'Change shape';
   shapeBtn.textContent = 'Shape ▾';
-
   const shapeMenu = document.createElement('div');
-  shapeMenu.className = 'mb-vCtx-menu mb-hidden';
+  shapeMenu.className = 'mb-vCtx-menu mb-vCtx-popLight mb-hidden';
   const shapeOptions: Array<[NodeShape, string]> = [
     ['rect',    'Rectangle'],
     ['pill',    'Pill'],
@@ -1651,8 +1651,7 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
     opt.textContent = label;
     opt.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
     opt.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       shapeMenu.classList.add('mb-hidden');
       handlers.onShape(shape);
     });
@@ -1660,15 +1659,16 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   }
   shapeBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   shapeBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     shapeMenu.classList.toggle('mb-hidden');
   });
+  const shapeWrap = document.createElement('div');
+  shapeWrap.className = 'mb-vCtx-popwrap';
+  shapeWrap.append(shapeBtn, shapeMenu);
 
-  const sep = document.createElement('span');
-  sep.className = 'mb-vCtx-sep';
+  const sep1 = sepEl();
 
-  // ── Font size ─────────────────────────────────────────────────────────
+  // ── Font size ────────────────────────────────────────────────────────
   const fontInput = document.createElement('input');
   fontInput.type = 'number';
   fontInput.className = 'mb-vCtx-num';
@@ -1684,64 +1684,91 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
     if (Number.isFinite(v)) handlers.onStyle({ fontSize: v });
   });
 
-  // ── Bold ──────────────────────────────────────────────────────────────
-  const boldBtn = document.createElement('button');
-  boldBtn.type = 'button';
-  boldBtn.className = 'mb-vCtx-btn mb-vCtx-bold';
-  boldBtn.textContent = 'B';
-  boldBtn.setAttribute('aria-label', 'Bold');
-  boldBtn.title = 'Bold';
-  boldBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  boldBtn.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    const on = !boldBtn.classList.contains('mb-vCtx-bold-on');
-    handlers.onStyle({ bold: on });
+  const sep2 = sepEl();
+
+  // ── Type-style popover (B / I / U / S) ──────────────────────────────
+  const typeCtl = makeTypeStylePopover((partial) => handlers.onStyle(partial));
+  // ── Alignment popover (H + V text alignment) ────────────────────────
+  const alignCtl = makeAlignmentPopover((partial) => handlers.onStyle(partial));
+  // ── Text color (color + opacity) ────────────────────────────────────
+  const textCtl = makeColorPopover({
+    glyph: 'A',
+    ariaLabel: 'Text color',
+    tooltip:   'Text color',
+    iconClass: 'mb-vCtx-textbtn',
+    showThickness: false,
+    showLineType:  false,
+    onColor:   (c) => handlers.onStyle({ text: c }),
+    onOpacity: (o) => handlers.onStyle({ opacity: o }),
+  });
+  // ── Stroke (border) — line type + thickness + opacity + color ──────
+  const strokeCtl = makeColorPopover({
+    glyph: '',
+    ariaLabel: 'Stroke',
+    tooltip:   'Stroke style',
+    iconClass: 'mb-vCtx-strokebtn',
+    iconHTML: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>`,
+    showThickness: true,
+    showLineType:  true,
+    onColor:     (c) => handlers.onStyle({ border: c }),
+    onOpacity:   (o) => handlers.onStyle({ opacity: o }),
+    onThickness: (t) => handlers.onStyle({ borderWidth: t }),
+    onLineType:  (t) => handlers.onStyle({ strokeType: t }),
+  });
+  // ── Fill (color + opacity) ──────────────────────────────────────────
+  const fillCtl = makeColorPopover({
+    glyph: '',
+    ariaLabel: 'Fill',
+    tooltip:   'Fill',
+    iconClass: 'mb-vCtx-fillbtn',
+    iconHTML: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>`,
+    showThickness: false,
+    showLineType:  false,
+    onColor:   (c) => handlers.onStyle({ fill: c }),
+    onOpacity: (o) => handlers.onStyle({ opacity: o }),
   });
 
-  // ── Text color ────────────────────────────────────────────────────────
-  const textColorBtn = makeColorButton('A', 'Text color', (c) => handlers.onStyle({ text: c }));
-  // ── Border color ──────────────────────────────────────────────────────
-  const borderBtn    = makeColorButton('◯', 'Border color', (c) => handlers.onStyle({ border: c }));
-  // ── Fill color ────────────────────────────────────────────────────────
-  const fillBtn      = makeColorButton('●', 'Fill color',   (c) => handlers.onStyle({ fill: c }));
+  const sep3 = sepEl();
 
-  // ── Stroke style (thickness + opacity) ────────────────────────────────
-  // Matches the edge tip's line panel — sliders for border width and overall
-  // node opacity. Opens its own popover beside the color buttons.
-  const styleCtl = makeNodeStyleButton((partial) => handlers.onStyle(partial));
-
-  // ── Duplicate ─────────────────────────────────────────────────────────
+  // ── Duplicate ────────────────────────────────────────────────────────
   const dupBtn = document.createElement('button');
   dupBtn.type = 'button';
   dupBtn.className = 'mb-vCtx-btn mb-vCtx-dup';
   dupBtn.setAttribute('aria-label', 'Duplicate');
   dupBtn.title = 'Duplicate';
-  dupBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  dupBtn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
   dupBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   dupBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDuplicate(); });
 
-  const styleSep = document.createElement('span');
-  styleSep.className = 'mb-vCtx-sep';
+  // ── Lock ─────────────────────────────────────────────────────────────
+  const lockBtn = document.createElement('button');
+  lockBtn.type = 'button';
+  lockBtn.className = 'mb-vCtx-btn mb-vCtx-lock';
+  lockBtn.setAttribute('aria-label', 'Lock node');
+  lockBtn.title = 'Lock / unlock';
+  lockBtn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+  lockBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  lockBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onToggleLock(); });
 
-  // ── More menu (align / distribute) ─────────────────────────────────────
+  // ── More menu (canvas align / distribute) ───────────────────────────
   const moreWrap = document.createElement('div');
-  moreWrap.className = 'mb-vCtx-color'; // reuse positioning chrome
+  moreWrap.className = 'mb-vCtx-popwrap';
   const moreBtn = document.createElement('button');
   moreBtn.type = 'button';
   moreBtn.className = 'mb-vCtx-btn mb-vCtx-more';
   moreBtn.textContent = '⋯';
   moreBtn.setAttribute('aria-label', 'More actions');
-  moreBtn.title = 'More actions (align / distribute)';
+  moreBtn.title = 'Canvas align / distribute';
   moreBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   const morePop = document.createElement('div');
-  morePop.className = 'mb-vCtx-morepop mb-hidden';
+  morePop.className = 'mb-vCtx-morepop mb-vCtx-popLight mb-hidden';
   const moreItems: Array<[ContextTipHandlers['onAlign'] extends (a: infer A) => unknown ? A : never, string]> = [
-    ['left',         'Align left'],
-    ['center-h',     'Align center'],
-    ['right',        'Align right'],
-    ['top',          'Align top'],
-    ['middle-v',     'Align middle'],
-    ['bottom',       'Align bottom'],
+    ['left',         'Align nodes left'],
+    ['center-h',     'Align nodes center'],
+    ['right',        'Align nodes right'],
+    ['top',          'Align nodes top'],
+    ['middle-v',     'Align nodes middle'],
+    ['bottom',       'Align nodes bottom'],
     ['distribute-h', 'Distribute horizontally'],
     ['distribute-v', 'Distribute vertically'],
   ];
@@ -1765,64 +1792,38 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
   });
   moreWrap.append(moreBtn, morePop);
 
-  const lockBtn = document.createElement('button');
-  lockBtn.type = 'button';
-  lockBtn.className = 'mb-vCtx-btn mb-vCtx-lock';
-  lockBtn.setAttribute('aria-label', 'Lock node');
-  lockBtn.title = 'Lock / unlock';
-  lockBtn.innerHTML = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-  lockBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  lockBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    handlers.onToggleLock();
-  });
-
-  const sep2 = document.createElement('span');
-  sep2.className = 'mb-vCtx-sep';
-
+  // ── Delete ───────────────────────────────────────────────────────────
   const deleteBtn = document.createElement('button');
   deleteBtn.type = 'button';
   deleteBtn.className = 'mb-vCtx-btn mb-vCtx-danger';
-  deleteBtn.textContent = '×';
   deleteBtn.setAttribute('aria-label', 'Delete node');
   deleteBtn.title = 'Delete';
+  deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>`;
   deleteBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  deleteBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    handlers.onDelete();
-  });
+  deleteBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDelete(); });
 
   el.append(
-    shapeBtn, shapeMenu, sep,
-    fontInput, boldBtn,
-    textColorBtn.el, borderBtn.el, fillBtn.el, styleCtl.el,
-    dupBtn, moreWrap, styleSep,
-    lockBtn, sep2, deleteBtn,
+    multiLabel,
+    shapeWrap, sep1,
+    fontInput, sep2,
+    typeCtl.el,
+    alignCtl.el,
+    textCtl.el,
+    strokeCtl.el,
+    fillCtl.el,
+    sep3,
+    dupBtn, lockBtn, moreWrap, deleteBtn,
   );
 
-  // Single-popover policy: opening any popover (shape menu, color picker,
-  // or More menu) auto-closes the others. Capture-phase listener so we run
-  // BEFORE the opener button's own toggle handler — close everything, then
-  // let the button open its own.
+  // Single-popover policy: opening any popover auto-closes the others.
   el.addEventListener('click', (e) => {
     const t = e.target as Element;
     if (!t) return;
-    // Ignore clicks on items inside a popover (swatches, menu items).
-    if (t.closest('.mb-vCtx-menu-item, .mb-vCtx-swatch')) return;
-    const opener = t.closest('.mb-vCtx-btn, .mb-vCtx-colorbtn');
+    if (t.closest('.mb-vCtx-menu-item, .mb-vCtx-swatch, .mb-vCtx-segbtn, .mb-vCtx-typebtn, .mb-vCtx-sliderwrap, .mb-vCtx-popLight, .mb-vCtx-bigpop')) return;
+    const opener = t.closest('.mb-vCtx-btn');
     if (!opener) return;
-    // Identify the popover this opener owns (either a direct sibling or a
-    // child of the parent wrap).
-    let ownPop: Element | null = null;
-    const sib = opener.nextElementSibling;
-    if (sib && sib.matches('.mb-vCtx-menu, .mb-vCtx-colorpop, .mb-vCtx-morepop')) {
-      ownPop = sib;
-    } else {
-      ownPop = opener.parentElement?.querySelector('.mb-vCtx-menu, .mb-vCtx-colorpop, .mb-vCtx-morepop') ?? null;
-    }
-    const allPops = el.querySelectorAll<HTMLElement>('.mb-vCtx-menu, .mb-vCtx-colorpop, .mb-vCtx-morepop');
+    const allPops = el.querySelectorAll<HTMLElement>('.mb-vCtx-menu, .mb-vCtx-morepop, .mb-vCtx-bigpop');
+    const ownPop = opener.parentElement?.querySelector<HTMLElement>('.mb-vCtx-menu, .mb-vCtx-morepop, .mb-vCtx-bigpop');
     for (const p of Array.from(allPops)) {
       if (p !== ownPop) p.classList.add('mb-hidden');
     }
@@ -1834,9 +1835,8 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
     el.style.left = `${nodeRect.left - hostRect.left + nodeRect.width / 2}px`;
     el.style.top  = `${nodeRect.bottom - hostRect.top + 8}px`;
     el.classList.remove('mb-hidden');
-    // Single-select mode — show shape button, hide multi label.
-    shapeBtn.classList.remove('mb-hidden');
-    sep.classList.remove('mb-hidden');
+    shapeWrap.classList.remove('mb-hidden');
+    sep1.classList.remove('mb-hidden');
     multiLabel.classList.add('mb-hidden');
     shapeMenu.classList.add('mb-hidden');
   }
@@ -1847,10 +1847,8 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
     el.style.left = `${pivotRect.left - hostRect.left + pivotRect.width / 2}px`;
     el.style.top  = `${pivotRect.bottom - hostRect.top + 8}px`;
     el.classList.remove('mb-hidden');
-    // Multi-select mode — hide shape (per-shape changes don't apply to many),
-    // show count chip + lock + delete.
-    shapeBtn.classList.add('mb-hidden');
-    sep.classList.add('mb-hidden');
+    shapeWrap.classList.add('mb-hidden');
+    sep1.classList.add('mb-hidden');
     multiLabel.textContent = `${count} selected`;
     multiLabel.classList.remove('mb-hidden');
     shapeMenu.classList.add('mb-hidden');
@@ -1862,18 +1860,34 @@ function buildContextTip(handlers: ContextTipHandlers): ContextTipHandle {
 
   function setStyle(s: NodeStyle | null): void {
     fontInput.value = String(s?.fontSize ?? 14);
-    boldBtn.classList.toggle('mb-vCtx-bold-on', !!s?.bold);
-    styleCtl.setState(s?.borderWidth ?? 1, s?.opacity ?? 1);
+    typeCtl.setState({
+      bold:      !!s?.bold,
+      italic:    !!s?.italic,
+      underline: !!s?.underline,
+      strike:    !!s?.strike,
+    });
+    alignCtl.setState(s?.textAlign ?? 'center', s?.verticalAlign ?? 'middle');
+    const opacity = s?.opacity ?? 1;
+    textCtl.setState(  { color: s?.text   ?? null, opacity });
+    strokeCtl.setState({ color: s?.border ?? null, opacity, thickness: s?.borderWidth ?? 1, lineType: s?.strokeType ?? 'solid' });
+    fillCtl.setState(  { color: s?.fill   ?? null, opacity });
   }
 
   function hide(): void {
     el.classList.add('mb-hidden');
-    shapeMenu.classList.add('mb-hidden');
+    const allPops = el.querySelectorAll<HTMLElement>('.mb-vCtx-menu, .mb-vCtx-morepop, .mb-vCtx-bigpop');
+    for (const p of Array.from(allPops)) p.classList.add('mb-hidden');
   }
 
   function destroy(): void { el.remove(); }
 
   return { el, showBelow, showMulti, setLocked, setStyle, hide, destroy };
+}
+
+function sepEl(): HTMLSpanElement {
+  const s = document.createElement('span');
+  s.className = 'mb-vCtx-sep';
+  return s;
 }
 
 // ── Edge context tip (Phase 9, redesigned) ─────────────────────────────────
@@ -2721,75 +2735,112 @@ export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
 /** For each g.cluster, recompute the `<rect>` (or `<polygon>`) so it
     encloses its contained nodes after positions are applied. Padded so the
     box doesn't kiss the node edges. */
-/** Build a context-tip color button with a 6-swatch popover. */
-function makeColorButton(glyph: string, ariaLabel: string, onPick: (color: string) => void): { el: HTMLElement } {
-  const SWATCHES = ['#1f2937', '#6366f1', '#06b6d4', '#22c55e', '#b45309', '#ec4899', '#ffffff'];
-  const wrap = document.createElement('div');
-  wrap.className = 'mb-vCtx-color';
+// ── Unified color/style popover ─────────────────────────────────────────────
+// One popover with optional line-type row, optional thickness slider, opacity
+// slider, "No color" button, and brand + all color swatches. Used by Fill,
+// Stroke, and Text-color buttons so all three share the same chrome.
 
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'mb-vCtx-btn mb-vCtx-colorbtn';
-  btn.textContent = glyph;
-  btn.setAttribute('aria-label', ariaLabel);
-  btn.title = ariaLabel;
-
-  const pop = document.createElement('div');
-  pop.className = 'mb-vCtx-colorpop mb-hidden';
-  for (const c of SWATCHES) {
-    const s = document.createElement('button');
-    s.type = 'button';
-    s.className = 'mb-vCtx-swatch';
-    s.style.background = c;
-    s.dataset.color = c;
-    s.setAttribute('aria-label', `${ariaLabel} ${c}`);
-    s.title = c;
-    s.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-    s.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      onPick(c);
-      pop.classList.add('mb-hidden');
-    });
-    pop.appendChild(s);
-  }
-
-  btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  btn.addEventListener('click', (e) => {
-    e.preventDefault(); e.stopPropagation();
-    pop.classList.toggle('mb-hidden');
-  });
-
-  wrap.append(btn, pop);
-  return { el: wrap };
+interface ColorPopoverConfig {
+  glyph?:        string;
+  iconHTML?:     string;
+  iconClass?:    string;     // extra class on the trigger button
+  ariaLabel:     string;
+  tooltip:       string;
+  showThickness: boolean;
+  showLineType:  boolean;
+  onColor:       (c: string) => void;
+  onOpacity:     (o: number) => void;
+  onThickness?:  (t: number) => void;
+  onLineType?:   (t: 'solid' | 'dashed' | 'dotted') => void;
 }
 
-// Node "Style" button — opens a popover with sliders for border thickness and
-// node opacity. Mirrors the edge tip's line panel so users get the same
-// stroke/opacity controls for shapes that they have for edges.
-function makeNodeStyleButton(
-  onChange: (partial: { borderWidth?: number; opacity?: number }) => void,
-): {
+interface ColorPopoverState {
+  color:     string | null;
+  opacity:   number;
+  thickness?: number;
+  lineType?:  'solid' | 'dashed' | 'dotted';
+}
+
+function makeColorPopover(cfg: ColorPopoverConfig): {
   el: HTMLElement;
-  setState: (borderWidth: number, opacity: number) => void;
+  setState: (s: ColorPopoverState) => void;
 } {
   const wrap = document.createElement('div');
-  wrap.className = 'mb-vCtx-color mb-vCtx-styleWrap';
+  wrap.className = 'mb-vCtx-popwrap';
 
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'mb-vCtx-btn mb-vCtx-styleBtn';
-  btn.setAttribute('aria-label', 'Stroke and opacity');
-  btn.title = 'Stroke thickness + opacity';
-  // Two stacked sliders glyph (matches "options/levels" idiom).
-  btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2" fill="currentColor"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2" fill="currentColor"/></svg>`;
+  btn.className = `mb-vCtx-btn mb-vCtx-pillbtn ${cfg.iconClass ?? ''}`;
+  btn.setAttribute('aria-label', cfg.ariaLabel);
+  btn.title = cfg.tooltip;
+  if (cfg.iconHTML) btn.innerHTML = cfg.iconHTML;
+  else              btn.textContent = cfg.glyph ?? '';
+  // Tiny underline strip showing the current color (Figma-style).
+  const strip = document.createElement('span');
+  strip.className = 'mb-vCtx-colorstrip';
+  btn.appendChild(strip);
 
   const pop = document.createElement('div');
-  pop.className = 'mb-vCtx-colorpop mb-vCtx-stylepop mb-hidden';
+  pop.className = 'mb-vCtx-bigpop mb-hidden';
 
-  const thicknessSlider = makeNodeSlider('Border thickness', 0, 8, 0.5, 1, 'px', (v) => onChange({ borderWidth: v }));
-  const opacitySlider   = makeNodeSlider('Opacity', 10, 100, 5, 100, '%', (v) => onChange({ opacity: v / 100 }));
+  // Line-type row (stroke popover only).
+  let lineTypeRow: { row: HTMLElement; setValue: (t: 'solid' | 'dashed' | 'dotted') => void } | null = null;
+  if (cfg.showLineType && cfg.onLineType) {
+    const row = document.createElement('div');
+    row.className = 'mb-vCtx-types';
+    const buttons = new Map<string, HTMLButtonElement>();
+    for (const t of ['solid', 'dashed', 'dotted'] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mb-vCtx-typebtn';
+      b.dataset.type = t;
+      b.title = `Line: ${t}`;
+      b.setAttribute('aria-label', `Line: ${t}`);
+      b.innerHTML = lineGlyph(t, 26);
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        cfg.onLineType!(t);
+      });
+      buttons.set(t, b);
+      row.appendChild(b);
+    }
+    pop.appendChild(row);
+    lineTypeRow = {
+      row,
+      setValue(t) {
+        for (const [k, b] of buttons) b.classList.toggle('mb-vCtx-typebtn-on', k === t);
+      },
+    };
+  }
 
-  pop.append(thicknessSlider.el, opacitySlider.el);
+  let thicknessSlider: { el: HTMLElement; setValue: (v: number) => void } | null = null;
+  if (cfg.showThickness && cfg.onThickness) {
+    thicknessSlider = makeLightSlider('Thickness', 0, 8, 0.5, 1, 'px', cfg.onThickness);
+    pop.appendChild(thicknessSlider.el);
+  }
+  const opacitySlider = makeLightSlider('Opacity', 10, 100, 5, 100, '%', (v) => cfg.onOpacity(v / 100));
+  pop.appendChild(opacitySlider.el);
+
+  // "No color" button.
+  const noColorBtn = document.createElement('button');
+  noColorBtn.type = 'button';
+  noColorBtn.className = 'mb-vCtx-nocolor';
+  noColorBtn.title = 'No color';
+  noColorBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5" y1="5" x2="19" y2="19"/></svg><span>No color</span>`;
+  noColorBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  noColorBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    cfg.onColor('transparent');
+  });
+  pop.appendChild(noColorBtn);
+
+  // Brand + all color grids.
+  const brandLabel = groupLabel('Brand colors');
+  const brandGrid  = colorGrid(BRAND_COLORS, cfg.onColor);
+  const allLabel   = groupLabel('All colors');
+  const allGrid    = colorGrid(ALL_COLORS,   cfg.onColor);
+  pop.append(brandLabel, brandGrid.el, allLabel, allGrid.el);
 
   btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   btn.addEventListener('click', (e) => {
@@ -2798,50 +2849,253 @@ function makeNodeStyleButton(
   });
 
   wrap.append(btn, pop);
+
   return {
     el: wrap,
-    setState(bw, op) {
-      thicknessSlider.setValue(bw);
-      opacitySlider.setValue(Math.round(op * 100));
+    setState(s) {
+      strip.style.background = s.color && s.color !== 'transparent' ? s.color : 'transparent';
+      strip.classList.toggle('mb-vCtx-colorstrip-empty', !s.color || s.color === 'transparent');
+      opacitySlider.setValue(Math.round(s.opacity * 100));
+      if (thicknessSlider && s.thickness !== undefined) thicknessSlider.setValue(s.thickness);
+      if (lineTypeRow    && s.lineType  !== undefined) lineTypeRow.setValue(s.lineType);
+      brandGrid.setActive(s.color ?? null);
+      allGrid.setActive(s.color ?? null);
     },
   };
 }
 
-// Slider with a tiny label, sized for the dark node context tip. Same shape
-// as makeLabelledSlider but uses the dark-bar styling.
-function makeNodeSlider(
+function groupLabel(text: string): HTMLDivElement {
+  const d = document.createElement('div');
+  d.className = 'mb-vCtx-grouplabel';
+  d.textContent = text;
+  return d;
+}
+
+function colorGrid(colors: string[], onPick: (c: string) => void): { el: HTMLElement; setActive: (c: string | null) => void } {
+  const grid = document.createElement('div');
+  grid.className = 'mb-vCtx-swatches';
+  const map = new Map<string, HTMLButtonElement>();
+  for (const c of colors) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vCtx-swatch';
+    b.style.background = c;
+    b.dataset.color = c;
+    b.title = c;
+    b.setAttribute('aria-label', `Color ${c}`);
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onPick(c); });
+    map.set(c.toLowerCase(), b);
+    grid.appendChild(b);
+  }
+  return {
+    el: grid,
+    setActive(c) {
+      const lc = c?.toLowerCase() ?? '';
+      for (const [k, b] of map) b.classList.toggle('mb-vCtx-swatch-on', k === lc);
+    },
+  };
+}
+
+function makeLightSlider(
   label: string, min: number, max: number, step: number,
   initial: number, suffix: string, onChange: (v: number) => void,
 ): { el: HTMLElement; setValue: (v: number) => void } {
   const wrap = document.createElement('div');
-  wrap.className = 'mb-vCtx-slider';
-  const lab = document.createElement('div');
-  lab.className = 'mb-vCtx-sliderlabel';
-  const labText = document.createElement('span');
-  labText.textContent = label;
-  const valText = document.createElement('span');
-  valText.className = 'mb-vCtx-sliderval';
-  valText.textContent = `${initial}${suffix}`;
-  lab.append(labText, valText);
+  wrap.className = 'mb-vCtx-sliderwrap';
   const input = document.createElement('input');
   input.type = 'range';
-  input.min = String(min);
-  input.max = String(max);
+  input.min  = String(min);
+  input.max  = String(max);
   input.step = String(step);
   input.value = String(initial);
   input.title = label;
+  const row = document.createElement('div');
+  row.className = 'mb-vCtx-sliderrow';
+  const lab = document.createElement('span');
+  lab.textContent = label;
+  const val = document.createElement('span');
+  val.className = 'mb-vCtx-sliderval';
+  val.textContent = `${initial}${suffix}`;
+  row.append(lab, val);
   input.addEventListener('mousedown', (e) => { e.stopPropagation(); });
   input.addEventListener('input', () => {
     const v = parseFloat(input.value);
     if (Number.isFinite(v)) {
-      valText.textContent = `${v}${suffix}`;
+      val.textContent = `${v}${suffix}`;
       onChange(v);
     }
   });
-  wrap.append(lab, input);
+  wrap.append(input, row);
   return {
     el: wrap,
-    setValue(v) { input.value = String(v); valText.textContent = `${v}${suffix}`; },
+    setValue(v) { input.value = String(v); val.textContent = `${v}${suffix}`; },
+  };
+}
+
+// Type-style popover: Bold / Italic / Underline / Strike row.
+interface TypeStyleState {
+  bold:      boolean;
+  italic:    boolean;
+  underline: boolean;
+  strike:    boolean;
+}
+function makeTypeStylePopover(
+  onChange: (partial: Partial<TypeStyleState>) => void,
+): { el: HTMLElement; setState: (s: TypeStyleState) => void } {
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-vCtx-popwrap';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mb-vCtx-btn mb-vCtx-typetrigger';
+  btn.setAttribute('aria-label', 'Text style');
+  btn.title = 'Bold / italic / underline / strike';
+  btn.innerHTML = `<span style="font-weight:700;text-decoration:underline">B</span>`;
+
+  const pop = document.createElement('div');
+  pop.className = 'mb-vCtx-bigpop mb-vCtx-bigpop-tight mb-hidden';
+
+  const row = document.createElement('div');
+  row.className = 'mb-vCtx-types';
+
+  const state: TypeStyleState = { bold: false, italic: false, underline: false, strike: false };
+  const buttons = new Map<keyof TypeStyleState, HTMLButtonElement>();
+  const items: Array<[keyof TypeStyleState, string, string, string]> = [
+    ['bold',      'B', 'Bold',          'font-weight:700'],
+    ['italic',    'I', 'Italic',        'font-style:italic'],
+    ['underline', 'U', 'Underline',     'text-decoration:underline'],
+    ['strike',    'S', 'Strikethrough', 'text-decoration:line-through'],
+  ];
+  for (const [key, glyph, label, style] of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vCtx-typebtn mb-vCtx-typeglyph';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = `<span style="${style}">${glyph}</span>`;
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      state[key] = !state[key];
+      b.classList.toggle('mb-vCtx-typebtn-on', state[key]);
+      onChange({ [key]: state[key] } as Partial<TypeStyleState>);
+    });
+    buttons.set(key, b);
+    row.appendChild(b);
+  }
+  pop.appendChild(row);
+
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    pop.classList.toggle('mb-hidden');
+  });
+
+  wrap.append(btn, pop);
+
+  return {
+    el: wrap,
+    setState(s) {
+      Object.assign(state, s);
+      for (const [k, b] of buttons) b.classList.toggle('mb-vCtx-typebtn-on', !!state[k]);
+      // Trigger button reflects whether any text style is on.
+      const anyOn = state.bold || state.italic || state.underline || state.strike;
+      btn.classList.toggle('mb-vCtx-typetrigger-on', anyOn);
+    },
+  };
+}
+
+// Alignment popover: 3 horizontal + 3 vertical buttons.
+function makeAlignmentPopover(
+  onChange: (partial: { textAlign?: 'left' | 'center' | 'right'; verticalAlign?: 'top' | 'middle' | 'bottom' }) => void,
+): {
+  el: HTMLElement;
+  setState: (textAlign: 'left' | 'center' | 'right', verticalAlign: 'top' | 'middle' | 'bottom') => void;
+} {
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-vCtx-popwrap';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mb-vCtx-btn mb-vCtx-aligntrigger';
+  btn.setAttribute('aria-label', 'Alignment');
+  btn.title = 'Alignment';
+  // Three horizontal lines glyph.
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="7"  x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`;
+
+  const pop = document.createElement('div');
+  pop.className = 'mb-vCtx-bigpop mb-vCtx-bigpop-align mb-hidden';
+
+  const hRow = document.createElement('div');
+  hRow.className = 'mb-vCtx-alignrow';
+  const vRow = document.createElement('div');
+  vRow.className = 'mb-vCtx-alignrow';
+
+  const hButtons = new Map<string, HTMLButtonElement>();
+  const vButtons = new Map<string, HTMLButtonElement>();
+
+  // Horizontal alignment icons — three short lines biased to the side.
+  const hItems: Array<['left' | 'center' | 'right', string, string]> = [
+    ['left',   'Align text left',
+      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>`],
+    ['center', 'Align text center',
+      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>`],
+    ['right',  'Align text right',
+      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></svg>`],
+  ];
+  for (const [val, label, glyph] of hItems) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vCtx-alignbtn';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = glyph;
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onChange({ textAlign: val }); });
+    hButtons.set(val, b);
+    hRow.appendChild(b);
+  }
+
+  // Vertical alignment icons — arrow + line.
+  const vItems: Array<['top' | 'middle' | 'bottom', string, string]> = [
+    ['top',    'Align text top',
+      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="5" x2="20" y2="5"/><line x1="12" y1="10" x2="12" y2="20"/><path d="M8 14l4-4 4 4"/></svg>`],
+    ['middle', 'Align text middle',
+      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="12" x2="20" y2="12"/><line x1="12" y1="4" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="20"/></svg>`],
+    ['bottom', 'Align text bottom',
+      `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="20"/><line x1="12" y1="4" x2="12" y2="14"/><path d="M8 10l4 4 4-4"/></svg>`],
+  ];
+  for (const [val, label, glyph] of vItems) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vCtx-alignbtn';
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = glyph;
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); onChange({ verticalAlign: val }); });
+    vButtons.set(val, b);
+    vRow.appendChild(b);
+  }
+
+  const div = document.createElement('div');
+  div.className = 'mb-vCtx-aligndivider';
+  pop.append(hRow, div, vRow);
+
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    pop.classList.toggle('mb-hidden');
+  });
+
+  wrap.append(btn, pop);
+  return {
+    el: wrap,
+    setState(h, v) {
+      for (const [k, b] of hButtons) b.classList.toggle('mb-vCtx-alignbtn-on', k === h);
+      for (const [k, b] of vButtons) b.classList.toggle('mb-vCtx-alignbtn-on', k === v);
+    },
   };
 }
 
@@ -3092,6 +3346,12 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
       el.setAttribute('stroke-width', String(s.borderWidth));
       el.style.setProperty('stroke-width', `${s.borderWidth}px`, 'important');
     }
+    if (s.strokeType !== undefined) {
+      const dash = s.strokeType === 'dashed' ? '6 4'
+                 : s.strokeType === 'dotted' ? '2 4'
+                 : '0';
+      el.style.setProperty('stroke-dasharray', dash, 'important');
+    }
   }
   // Opacity on the whole node group so background, border, and label fade
   // together. Don't combine with the resize CSS transform — they're separate
@@ -3115,9 +3375,34 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
   // set these via class rules with higher specificity.
   const labelDivs = g.querySelectorAll<HTMLElement>('foreignObject .nodeLabel, foreignObject div, .label, span.nodeLabel');
   for (const labelDiv of Array.from(labelDivs)) {
-    if (s.text     !== undefined) labelDiv.style.setProperty('color',       s.text,           'important');
-    if (s.fontSize !== undefined) labelDiv.style.setProperty('font-size',   `${s.fontSize}px`, 'important');
-    if (s.bold     !== undefined) labelDiv.style.setProperty('font-weight', s.bold ? '700' : '', 'important');
+    if (s.text       !== undefined) labelDiv.style.setProperty('color',       s.text,           'important');
+    if (s.fontSize   !== undefined) labelDiv.style.setProperty('font-size',   `${s.fontSize}px`, 'important');
+    if (s.bold       !== undefined) labelDiv.style.setProperty('font-weight', s.bold ? '700' : '', 'important');
+    if (s.italic     !== undefined) labelDiv.style.setProperty('font-style',  s.italic ? 'italic' : '', 'important');
+    if (s.textAlign  !== undefined) labelDiv.style.setProperty('text-align',  s.textAlign,      'important');
+    // Underline + strike combine into one text-decoration-line value so they
+    // can co-exist on the same label.
+    if (s.underline !== undefined || s.strike !== undefined) {
+      const parts: string[] = [];
+      if (s.underline) parts.push('underline');
+      if (s.strike)    parts.push('line-through');
+      labelDiv.style.setProperty('text-decoration', parts.length ? parts.join(' ') : 'none', 'important');
+    }
+  }
+  // The foreignObject hosts the label. We can shift it vertically inside the
+  // shape to approximate top/middle/bottom alignment — mermaid leaves the
+  // foreignObject centered by default, so positive Y nudges it down.
+  if (s.verticalAlign !== undefined) {
+    const foreignObj = g.querySelector<SVGForeignObjectElement>('foreignObject');
+    if (foreignObj) {
+      // Reset any prior nudge by removing our marker dataset first.
+      const half = nodeHalfExtent(g);
+      const labelH = parseFloat(foreignObj.getAttribute('height') ?? '0') || 0;
+      let dy = 0;
+      if (s.verticalAlign === 'top')    dy = -(half.h - labelH / 2 - 4);
+      if (s.verticalAlign === 'bottom') dy =  (half.h - labelH / 2 - 4);
+      foreignObj.style.setProperty('transform', `translateY(${dy}px)`, 'important');
+    }
   }
   // Some mermaid versions render labels as <text> directly.
   const textEl = g.querySelector<SVGTextElement>('text.nodeLabel, text');
@@ -3132,6 +3417,19 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
     }
     if (s.bold !== undefined) {
       textEl.setAttribute('font-weight', s.bold ? '700' : '400');
+    }
+    if (s.italic !== undefined) {
+      textEl.setAttribute('font-style', s.italic ? 'italic' : 'normal');
+    }
+    if (s.underline !== undefined || s.strike !== undefined) {
+      const parts: string[] = [];
+      if (s.underline) parts.push('underline');
+      if (s.strike)    parts.push('line-through');
+      textEl.setAttribute('text-decoration', parts.length ? parts.join(' ') : 'none');
+    }
+    if (s.textAlign !== undefined) {
+      textEl.setAttribute('text-anchor',
+        s.textAlign === 'left' ? 'start' : s.textAlign === 'right' ? 'end' : 'middle');
     }
   }
 }
