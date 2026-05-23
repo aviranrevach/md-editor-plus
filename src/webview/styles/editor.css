@@ -2676,6 +2676,46 @@ html.source-word-wrap #source-view .cb-content {
   user-select: none;
 }
 
+/* Visual-edit canvas: the header fades into the background until the user
+   hovers it. Edit toggle stays visible (entry point); Expand + Copy
+   appear only on hover. Matches the floaty Miro/Figma vibe. */
+.ProseMirror .mb.mb-visual .mb-header,
+.ProseMirror .mb.mb-visual-active .mb-header,
+.ProseMirror .mb-visual-active .mb-header {
+  background: transparent;
+  border-bottom-color: transparent;
+  opacity: 0.55;
+  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.ProseMirror .mb.mb-visual .mb-header:hover,
+.ProseMirror .mb.mb-visual-active .mb-header:hover,
+.ProseMirror .mb-visual-active .mb-header:hover {
+  opacity: 1;
+  background: var(--bg-secondary);
+  border-bottom-color: var(--border);
+}
+/* Expand + Copy buttons hide until the header is hovered. The Edit toggle
+   stays so users have a way back to the source view. */
+.ProseMirror .mb.mb-visual .mb-header .mb-expand,
+.ProseMirror .mb.mb-visual .mb-header .mb-copy,
+.ProseMirror .mb.mb-visual-active .mb-header .mb-expand,
+.ProseMirror .mb.mb-visual-active .mb-header .mb-copy,
+.ProseMirror .mb-visual-active .mb-header .mb-expand,
+.ProseMirror .mb-visual-active .mb-header .mb-copy {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+.ProseMirror .mb.mb-visual .mb-header:hover .mb-expand,
+.ProseMirror .mb.mb-visual .mb-header:hover .mb-copy,
+.ProseMirror .mb.mb-visual-active .mb-header:hover .mb-expand,
+.ProseMirror .mb.mb-visual-active .mb-header:hover .mb-copy,
+.ProseMirror .mb-visual-active .mb-header:hover .mb-expand,
+.ProseMirror .mb-visual-active .mb-header:hover .mb-copy {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .ProseMirror .mb-lang {
   font: 500 11px var(--font-mono);
   color: var(--text-secondary);
@@ -3045,7 +3085,8 @@ html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
 /* Visual-edit canvas: give the preview pane a fixed, generous height so the
    SVG can stretch to fill it and users have empty space around the diagram
    for dropping new nodes / drawing edges. Match either selector — the block
-   extension sets .mb-visual; createVisualEditor sets .mb-visual-active. */
+   extension sets .mb-visual; createVisualEditor sets .mb-visual-active.
+   Light grey + dotted background mimics Miro's infinite-canvas feel. */
 .ProseMirror .mb.mb-visual .mb-preview,
 .ProseMirror .mb.mb-visual-active .mb-preview,
 .ProseMirror .mb-visual-active .mb-preview {
@@ -3053,6 +3094,16 @@ html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
   align-items: stretch;
   justify-content: stretch;
   padding: 0;
+  background-color: #f6f7f9;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.16) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
+}
+html.theme-dark .ProseMirror .mb.mb-visual .mb-preview,
+html.theme-dark .ProseMirror .mb.mb-visual-active .mb-preview,
+html.theme-dark .ProseMirror .mb-visual-active .mb-preview {
+  background-color: #1a1b1e;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.10) 1px, transparent 1px);
 }
 .ProseMirror .mb.mb-visual .mb-svg-host,
 .ProseMirror .mb.mb-visual-active .mb-svg-host,
@@ -4130,7 +4181,8 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 
 /* Shapes popover above the toolbar — same white card as the context tip
-   popovers, in a 4-icon row to keep the bottom toolbar compact. */
+   popovers. With 10 shapes we use a 5-column grid so the popover stays
+   readable without becoming too wide. */
 .ProseMirror .mb-vTb2 .mb-vTb-shapespop {
   bottom: calc(100% + 8px);
   left: 50%;
@@ -4138,9 +4190,10 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 6px;
+  padding: 8px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   z-index: 31;
 }

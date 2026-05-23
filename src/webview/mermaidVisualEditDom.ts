@@ -20,7 +20,10 @@ import {
   getLines, setLines, addLine, updateLineById, deleteLineById, LineDecl, LineEndpoint,
 } from './mermaidVisualEdit';
 
-export type Tool = 'select' | 'pan' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'line' | 'text' | 'sticky';
+export type Tool =
+  | 'select' | 'pan'
+  | 'rect' | 'round' | 'pill' | 'circle' | 'diamond' | 'hexagon' | 'cylinder' | 'subroutine' | 'trapezoid' | 'parallelogram'
+  | 'arrow' | 'line' | 'text' | 'sticky';
 
 export interface VisualEditorOptions {
   /** The block's outer DOM element (we own absolute overlays inside it). */
@@ -42,12 +45,18 @@ export interface VisualEditorHandle {
   destroy: () => void;
 }
 
-const SHAPE_FOR_TOOL: Record<Exclude<Tool, 'select' | 'arrow' | 'sticky' | 'pan'>, NodeShape> = {
-  rect:    'rect',
-  pill:    'pill',
-  circle:  'circle',
-  diamond: 'diamond',
-  text:    'text',
+const SHAPE_FOR_TOOL: Record<Exclude<Tool, 'select' | 'arrow' | 'sticky' | 'pan' | 'line'>, NodeShape> = {
+  rect:           'rect',
+  round:          'round',
+  pill:           'pill',
+  circle:         'circle',
+  diamond:        'diamond',
+  hexagon:        'hexagon',
+  cylinder:       'cylinder',
+  subroutine:     'subroutine',
+  trapezoid:      'trapezoid',
+  parallelogram:  'parallelogram',
+  text:           'text',
 };
 
 // SVG icons used by the toolbar. Stroke-based, currentColor — tint via CSS.
@@ -58,10 +67,16 @@ const TOOL_STROKE = `fill="none" stroke="currentColor" stroke-width="2.2" stroke
 const ICONS: Record<string, string> = {
   select:  `<svg viewBox="0 0 24 24" ${TOOL_STROKE} fill="currentColor"><path d="M5.5 3.5 5.5 19.7 9.4 16 14.8 22 17.3 20.5 13.2 14.5 18.5 14.5z" fill="currentColor" stroke="currentColor"/></svg>`,
   pan:     `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-5.99-3.5l-3.4-5.9a2 2 0 1 1 3.4-2l1.99 3.4"/></svg>`,
-  rect:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="4" y="6" width="16" height="12" rx="2"/></svg>`,
-  pill:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="3" y="8" width="18" height="8" rx="4"/></svg>`,
-  circle:  `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><circle cx="12" cy="12" r="7"/></svg>`,
-  diamond: `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>`,
+  rect:           `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="4" y="6" width="16" height="12"/></svg>`,
+  round:          `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="4" y="6" width="16" height="12" rx="4"/></svg>`,
+  pill:           `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="3" y="8" width="18" height="8" rx="4"/></svg>`,
+  circle:         `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><circle cx="12" cy="12" r="7"/></svg>`,
+  diamond:        `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>`,
+  hexagon:        `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M7 5h10l5 7-5 7H7l-5-7 5-7z"/></svg>`,
+  cylinder:       `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><ellipse cx="12" cy="7" rx="6" ry="2"/><path d="M6 7v10c0 1.1 2.7 2 6 2s6-.9 6-2V7"/></svg>`,
+  subroutine:     `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="4" y="6" width="16" height="12"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/></svg>`,
+  trapezoid:      `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M3 18 L7 6 L17 6 L21 18 Z"/></svg>`,
+  parallelogram:  `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M7 6 L21 6 L17 18 L3 18 Z"/></svg>`,
   arrow:   `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M4 12h14"/><path d="M14 7l5 5-5 5"/></svg>`,
   line:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M5 19L19 5"/></svg>`,
   text:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M5 6h14"/><path d="M12 6v14"/></svg>`,
@@ -70,6 +85,8 @@ const ICONS: Record<string, string> = {
   shapes:  `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="3" y="13" width="8" height="8" rx="1"/><circle cx="17" cy="17" r="4"/><path d="M9 3l5 8h-10z"/></svg>`,
   reset:   `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>`,
   grid:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/></svg>`,
+  lock:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
+  unlock:  `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.8"/></svg>`,
 };
 
 const TOOL_HOTKEYS: Record<string, Tool> = {
@@ -173,6 +190,12 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     applyViewport();
   }
 
+  // Viewport lock: when true (the default), `fitSvgViewBoxToNodes` is
+  // suppressed so style/resize/structural mutations don't slide the canvas
+  // around. Users can unlock via the toolbar if they want the viewport to
+  // recenter automatically.
+  let viewportLocked = true;
+
   const toolbar = buildToolbar({
     onPick: (tool) => setTool(tool),
     onReset: () => {
@@ -182,6 +205,14 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     onToggleGrid: () => {
       gridSnapEnabled = !gridSnapEnabled;
       toolbar.setGridSnapOn(gridSnapEnabled);
+    },
+    onToggleViewportLock: () => {
+      viewportLocked = !viewportLocked;
+      toolbar.setViewportLocked(viewportLocked);
+      opts.block.dataset.mbViewportLocked = viewportLocked ? 'true' : 'false';
+      // When the user unlocks, do an immediate fit so the diagram recenters
+      // right away. When they lock, leave the current view as-is.
+      if (!viewportLocked) fitSvgViewBoxToNodes(opts.previewPane);
     },
   });
   const selectionRing = document.createElement('div');
@@ -1852,17 +1883,22 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
 
   // ── Cleanup + rebind ────────────────────────────────────────────────────
   // Initial layout: expand the SVG to fill the preview pane so users have
-  // free canvas around the diagram for dropping new nodes.
+  // free canvas around the diagram for dropping new nodes. This runs BEFORE
+  // the viewport gets locked, so the SVG has time to size itself once.
   fitSvgViewBoxToNodes(opts.previewPane);
+  // Now lock the viewport — every subsequent fit call (from re-renders) will
+  // be a no-op until the user explicitly unlocks via the toolbar.
+  opts.block.dataset.mbViewportLocked = 'true';
+  toolbar.setViewportLocked(true);
 
   return {
     onMermaidRerender(): void {
       // mermaidBlock already called applyPositionsOverlay for us before
       // this. We just refresh toolbar state and re-bind ring/tip to the
       // (possibly newly-positioned) selected nodes.
-      // Always re-fit the viewBox so the SVG keeps filling the preview pane
-      // (matters for first render + when there are no pinned positions yet).
-      fitSvgViewBoxToNodes(opts.previewPane);
+      // Re-fit the viewBox only if the viewport is unlocked — otherwise
+      // small edits would pan/zoom the canvas around and annoy users.
+      if (!viewportLocked) fitSvgViewBoxToNodes(opts.previewPane);
       const ast = parseMermaid(opts.getSource());
       toolbar.setResetEnabled(getPositions(ast) !== null);
       // Drop any selectedIds that no longer have a node in the SVG.
@@ -1947,6 +1983,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     },
     destroy(): void {
       opts.block.classList.remove('mb-visual-active');
+      delete opts.block.dataset.mbViewportLocked;
       opts.previewPane.removeEventListener('click', onPreviewClick);
       opts.previewPane.removeEventListener('mousedown', onDragMouseDown, true);
       opts.previewPane.removeEventListener('wheel',     onWheel);
@@ -1988,22 +2025,28 @@ interface ToolbarHandle {
   setActive:          (tool: Tool) => void;
   setResetEnabled:    (enabled: boolean) => void;
   setGridSnapOn:      (on: boolean) => void;
+  setViewportLocked:  (on: boolean) => void;
 }
 
 interface ToolbarHandlers {
   onPick:    (tool: Tool) => void;
   onReset:   () => void;
   onToggleGrid: () => void;
+  onToggleViewportLock: () => void;
 }
 
-function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): ToolbarHandle {
+function buildToolbar({ onPick, onReset, onToggleGrid, onToggleViewportLock }: ToolbarHandlers): ToolbarHandle {
   const el = document.createElement('div');
   el.className = 'mb-vTb mb-vTb2';
   el.contentEditable = 'false';
 
-  // The four shape tools collapse into a single "Shapes" button with a
-  // popover. Other tools remain individual buttons.
-  const SHAPE_TOOLS: Tool[] = ['rect', 'pill', 'circle', 'diamond'];
+  // Shape tools collapse into a single "Shapes" button with a popover —
+  // matches the 10 shapes the contextual shape picker exposes.
+  const SHAPE_TOOLS: Tool[] = [
+    'rect', 'round', 'pill', 'circle',
+    'diamond', 'hexagon', 'cylinder', 'subroutine',
+    'trapezoid', 'parallelogram',
+  ];
   const groups: Array<{ tools: Tool[] }> = [
     { tools: ['select', 'pan'] },
     { tools: ['arrow', 'line'] },
@@ -2011,16 +2054,22 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
   ];
 
   const tipMap: Record<Tool, string> = {
-    select:  'Select (V)',
-    pan:     'Pan (H)',
-    rect:    'Rectangle (R)',
-    pill:    'Pill (P)',
-    circle:  'Circle (C)',
-    diamond: 'Diamond (D)',
-    arrow:   'Arrow (A)',
-    line:    'Line (L)',
-    text:    'Text (T)',
-    sticky:  'Sticky note (N)',
+    select:         'Select (V)',
+    pan:            'Pan (H)',
+    rect:           'Rectangle (R)',
+    round:          'Rounded rectangle',
+    pill:           'Pill (P)',
+    circle:         'Circle (C)',
+    diamond:        'Diamond (D)',
+    hexagon:        'Hexagon',
+    cylinder:       'Cylinder',
+    subroutine:     'Subroutine',
+    trapezoid:      'Trapezoid',
+    parallelogram:  'Parallelogram',
+    arrow:          'Arrow (A)',
+    line:           'Line (L)',
+    text:           'Text (T)',
+    sticky:         'Sticky note (N)',
   };
 
   const buttonsByTool = new Map<Tool, HTMLButtonElement>();
@@ -2121,6 +2170,24 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
   });
   el.appendChild(gridBtn);
 
+  // Lock viewport — when on (default), the canvas no longer auto-pans /
+  // auto-zooms in response to node edits. Users can toggle this off if they
+  // want the diagram to recenter as they work.
+  const lockBtn = document.createElement('button');
+  lockBtn.type = 'button';
+  lockBtn.className = 'mb-vTb-btn mb-vTb-viewlock mb-vTb-active';
+  lockBtn.dataset.tip = 'Viewport locked — click to unlock';
+  lockBtn.setAttribute('aria-label', 'Viewport lock');
+  lockBtn.setAttribute('aria-pressed', 'true');
+  lockBtn.innerHTML = ICONS.lock;
+  lockBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  lockBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggleViewportLock();
+  });
+  el.appendChild(lockBtn);
+
   const resetBtn = document.createElement('button');
   resetBtn.type = 'button';
   resetBtn.className = 'mb-vTb-btn mb-vTb-reset mb-vTb-disabled';
@@ -2158,8 +2225,15 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
     gridBtn.setAttribute('aria-pressed', String(on));
   }
 
+  function setViewportLocked(on: boolean): void {
+    lockBtn.classList.toggle('mb-vTb-active', on);
+    lockBtn.setAttribute('aria-pressed', String(on));
+    lockBtn.innerHTML = on ? ICONS.lock : ICONS.unlock;
+    lockBtn.dataset.tip = on ? 'Viewport locked — click to unlock' : 'Viewport unlocked — click to lock';
+  }
+
   setActive('select');
-  return { el, setActive, setResetEnabled, setGridSnapOn };
+  return { el, setActive, setResetEnabled, setGridSnapOn, setViewportLocked };
 }
 
 // ── Context tip ─────────────────────────────────────────────────────────────
@@ -2610,10 +2684,14 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
   colorPanel.append(noColorBtn, brandLabel, brandGrid, allLabel, allGrid);
 
   // Toggle panels on their buttons. Opening one closes the other to keep
-  // only one expanded at a time.
+  // only one expanded at a time — also covers the cap + animate popovers
+  // hanging off the top mini-bar so they can't stack with the line panel.
   function closeAllPanels(): void {
     linePanel.classList.add('mb-hidden');
     colorPanel.classList.add('mb-hidden');
+    for (const sub of Array.from(wrap.querySelectorAll<HTMLElement>('.mb-vEdgeCtx2-cappop'))) {
+      sub.classList.add('mb-hidden');
+    }
   }
   lineBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
   lineBtn.addEventListener('click', (e) => {
@@ -2629,6 +2707,23 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     closeAllPanels();
     if (!wasOpen) colorPanel.classList.remove('mb-hidden');
   });
+  // Capture-phase: when any small popover (cap dropdown / animate menu) is
+  // about to open, close the larger panels first so they don't stack.
+  wrap.addEventListener('click', (e) => {
+    const t = e.target as Element;
+    if (!t) return;
+    if (t.closest('.mb-vEdgeCtx2-capitem, .mb-vEdgeCtx2-animseg-btn, .mb-vEdgeCtx2-panel')) return;
+    const trigger = t.closest('.mb-vEdgeCtx2-cap > .mb-vEdgeCtx2-icon, .mb-vEdgeCtx2-anim-btn');
+    if (!trigger) return;
+    // Close the line / color panels and sibling cap popovers, but leave this
+    // trigger's own popover untouched so its click handler can toggle it.
+    linePanel.classList.add('mb-hidden');
+    colorPanel.classList.add('mb-hidden');
+    const ownPop = trigger.parentElement?.querySelector<HTMLElement>('.mb-vEdgeCtx2-cappop');
+    for (const sub of Array.from(wrap.querySelectorAll<HTMLElement>('.mb-vEdgeCtx2-cappop'))) {
+      if (sub !== ownPop) sub.classList.add('mb-hidden');
+    }
+  }, true);
 
   wrap.append(topBar, linePanel, colorPanel);
 
@@ -3475,8 +3570,10 @@ export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
 
   // 3) Expand SVG viewBox to enclose every (possibly-moved) node. Mermaid's
   // auto-layout sets a tight viewBox; if a user drags a node outside it,
-  // the node renders off-screen unless we widen.
-  fitSvgViewBoxToNodes(host);
+  // the node renders off-screen unless we widen. Skipped when the visual
+  // editor has the viewport locked — small edits shouldn't pan/zoom.
+  const lockedBlock = host.closest<HTMLElement>('[data-mb-viewport-locked="true"]');
+  if (!lockedBlock) fitSvgViewBoxToNodes(host);
 
   // 4) Recompute edges. We do this for ALL edges, not just ones touching a
   // pinned node — keeps the pipeline simple and avoids partial weirdness.
@@ -4236,18 +4333,24 @@ function applyEdgeStyle(p: SVGPathElement, s: EdgeStyle, key: string): void {
   if (s.opacity !== undefined) {
     p.style.setProperty('opacity', String(s.opacity), 'important');
   }
-  if (s.type === 'dashed' || s.type === 'dotted') {
-    p.style.setProperty('stroke-dasharray', s.type === 'dashed' ? '6 4' : '2 4', 'important');
+  // Marching-ants animation needs a dashed stroke to move. If the edge has
+  // animation set but no explicit type, force dashed so the animation has
+  // dashes to march. This also protects against mermaid's `edge-pattern-solid`
+  // class resetting the dasharray after a selection re-render.
+  const animOn = s.animation && s.animation !== 'none';
+  const effectiveType = s.type ?? (animOn ? 'dashed' : undefined);
+  if (effectiveType === 'dashed' || effectiveType === 'dotted') {
+    p.style.setProperty('stroke-dasharray', effectiveType === 'dashed' ? '6 4' : '2 4', 'important');
     // Round line caps make dashes look like pills (much nicer than square ends).
     p.style.setProperty('stroke-linecap', 'round', 'important');
-  } else if (s.type === 'solid') {
+  } else if (effectiveType === 'solid') {
     p.style.setProperty('stroke-dasharray', '0', 'important');
     p.style.setProperty('stroke-linecap', 'butt', 'important');
   }
 
   // Animation: slow/fast classes drive the keyframes duration; the reverse
   // class flips `animation-direction` so dashes travel away from the arrow.
-  const wantsAnim = s.animation && s.animation !== 'none' && s.type !== 'solid';
+  const wantsAnim = animOn && effectiveType !== 'solid';
   p.classList.toggle('mb-vEdge-anim-slow',    wantsAnim && s.animation === 'slow');
   p.classList.toggle('mb-vEdge-anim-fast',    wantsAnim && s.animation === 'fast');
   p.classList.toggle('mb-vEdge-anim-reverse', !!wantsAnim && s.animationDirection === 'reverse');
@@ -4494,17 +4597,23 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
   }
   // The foreignObject hosts the label. We can shift it vertically inside the
   // shape to approximate top/middle/bottom alignment — mermaid leaves the
-  // foreignObject centered by default, so positive Y nudges it down.
+  // foreignObject centered by default, so positive Y nudges it down. For
+  // 'middle' (the natural state), clear any prior transform so the label
+  // returns to mermaid's default centering rather than carrying a stale
+  // translate computed against a previous shape's half-extent.
   if (s.verticalAlign !== undefined) {
     const foreignObj = g.querySelector<SVGForeignObjectElement>('foreignObject');
     if (foreignObj) {
-      // Reset any prior nudge by removing our marker dataset first.
-      const half = nodeHalfExtent(g);
-      const labelH = parseFloat(foreignObj.getAttribute('height') ?? '0') || 0;
-      let dy = 0;
-      if (s.verticalAlign === 'top')    dy = -(half.h - labelH / 2 - 4);
-      if (s.verticalAlign === 'bottom') dy =  (half.h - labelH / 2 - 4);
-      foreignObj.style.setProperty('transform', `translateY(${dy}px)`, 'important');
+      if (s.verticalAlign === 'middle') {
+        foreignObj.style.removeProperty('transform');
+      } else {
+        const half = nodeHalfExtent(g);
+        const labelH = parseFloat(foreignObj.getAttribute('height') ?? '0') || 0;
+        const dy = s.verticalAlign === 'top'
+          ? -(half.h - labelH / 2 - 4)
+          :  (half.h - labelH / 2 - 4);
+        foreignObj.style.setProperty('transform', `translateY(${dy}px)`, 'important');
+      }
     }
   }
   // Some mermaid versions render labels as <text> directly.
