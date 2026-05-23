@@ -296,27 +296,24 @@ export function openFieldActionMenu(
 
 // ===== Properties popover (the chrome ⚙ icon target) =====
 
-export function openPropertiesMenu(
-  anchor: HTMLElement,
+/**
+ * Render the Properties header, field-row list, and "Add a property" button
+ * into an arbitrary host element. The caller is responsible for outside-click
+ * handling, positioning, and cleanup — this function only manages the content.
+ */
+export function renderPropertiesContent(
+  host: HTMLElement,
   board: Board,
   onChange: (next: Board) => void,
 ): void {
-  document.querySelectorAll('.board-properties-menu').forEach((n) => n.remove());
-
-  const menu = document.createElement('div');
-  menu.className = 'board-properties-menu';
-  document.body.appendChild(menu);
-  positionAnchored(menu, anchor);
-
   const header = document.createElement('div');
   header.className = 'board-properties-section';
   header.textContent = 'Properties';
-  menu.appendChild(header);
+  host.appendChild(header);
 
   // Keep a local mirror of the board so we can rebuild the list after each
-  // mutate(). The popover lives at document.body — it's NOT inside the board's
-  // root, so the board's re-render does NOT refresh it. Without this, "Add a
-  // property" appears to do nothing because the user keeps seeing the old list.
+  // mutate(). Without this, "Add a property" appears to do nothing because
+  // the user keeps seeing the old list.
   let currentBoard = board;
   const wrappedOnChange = (next: Board) => {
     currentBoard = next;
@@ -326,7 +323,7 @@ export function openPropertiesMenu(
 
   const list = document.createElement('div');
   list.className = 'board-properties-list';
-  menu.appendChild(list);
+  host.appendChild(list);
 
   function rebuildList() {
     list.innerHTML = '';
@@ -344,7 +341,22 @@ export function openPropertiesMenu(
     <span>Add a property</span>
   `;
   add.addEventListener('click', () => promptNewField(add, currentBoard, wrappedOnChange));
-  menu.appendChild(add);
+  host.appendChild(add);
+}
+
+export function openPropertiesMenu(
+  anchor: HTMLElement,
+  board: Board,
+  onChange: (next: Board) => void,
+): void {
+  document.querySelectorAll('.board-properties-menu').forEach((n) => n.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'board-properties-menu';
+  document.body.appendChild(menu);
+  positionAnchored(menu, anchor);
+
+  renderPropertiesContent(menu, board, onChange);
 
   function onOutside(e: MouseEvent) {
     const t = e.target as HTMLElement | null;

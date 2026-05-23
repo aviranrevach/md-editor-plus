@@ -6,6 +6,7 @@
 
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { renderPropertiesContent } from './boardProperties';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
@@ -74,24 +75,118 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
   chrome.appendChild(name);
 
   if (!readOnly) {
-    // Right-side: Properties button only. (Column-add moved to a tall + at the
-    // end of the columns row.)
-    const props = document.createElement('button');
-    props.type = 'button';
-    props.className = 'board-properties-btn';
-    props.title = 'Properties';
-    // Phosphor Icons — sliders-horizontal, 2-handle variant (256x256 viewBox).
-    props.innerHTML = `
-      <svg viewBox="0 0 256 256" fill="currentColor">
-        <path d="M40,80H79.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24H140.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24Zm70-20a8,8,0,1,1-8,8A8,8,0,0,1,110,60Z"/>
-        <path d="M216,160H176.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24h75.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24Zm-70,20a8,8,0,1,1,8-8A8,8,0,0,1,146,180Z"/>
-      </svg>
-    `;
-    props.addEventListener('click', () => ctx.openProperties(props));
-    chrome.appendChild(props);
+    chrome.appendChild(buildHeaderMore(ctx));
   }
 
   return chrome;
+}
+
+// ---------------------------------------------------------------------------
+// ⋯ menu: view segmented control + embedded Properties content
+// ---------------------------------------------------------------------------
+
+function buildHeaderMore(ctx: BoardRendererCtx): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'bd-more';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'bd-more-btn';
+  btn.setAttribute('aria-label', 'More');
+  btn.setAttribute('aria-haspopup', 'menu');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`;
+
+  const menu = document.createElement('div');
+  menu.className = 'bd-more-menu bd-hidden';
+  menu.setAttribute('role', 'menu');
+
+  // View segmented control (top of menu)
+  const viewRow = document.createElement('div');
+  viewRow.className = 'bd-more-view';
+  const seg = document.createElement('div');
+  seg.className = 'bd-view-seg';
+  const mkSeg = (name: 'kanban' | 'table', label: string) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bd-view-seg-btn';
+    b.dataset.view = name;
+    b.textContent = label;
+    return b;
+  };
+  const kanbanBtn = mkSeg('kanban', 'Kanban');
+  const tableBtn  = mkSeg('table',  'Table');
+  seg.append(kanbanBtn, tableBtn);
+  viewRow.appendChild(seg);
+  menu.appendChild(viewRow);
+
+  // Separator
+  const sep = document.createElement('div');
+  sep.className = 'bd-more-sep';
+  menu.appendChild(sep);
+
+  // Properties host — renderPropertiesContent mounts here on open
+  const propsHost = document.createElement('div');
+  propsHost.className = 'bd-more-props';
+  menu.appendChild(propsHost);
+
+  wrap.append(btn, menu);
+
+  // Reflect active view in segmented control
+  function refreshViewSeg(): void {
+    const cur = ctx.getBoard().activeView;
+    kanbanBtn.classList.toggle('bd-view-seg-active', !cur || cur === 'kanban');
+    tableBtn.classList.toggle('bd-view-seg-active', cur === 'table');
+  }
+
+  // Outside-click handler — closed lazily so it doesn't fire on the open click
+  let removeOutside: (() => void) | null = null;
+
+  function openMenu(): void {
+    menu.classList.remove('bd-hidden');
+    btn.setAttribute('aria-expanded', 'true');
+    refreshViewSeg();
+    propsHost.innerHTML = '';
+    renderPropertiesContent(propsHost, ctx.getBoard(), ctx.mutate);
+
+    function onOutside(e: MouseEvent): void {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      // Clicks inside the menu or any sub-popover it spawned stay "inside"
+      if (t.closest('.bd-more-menu, .board-field-action-menu, .board-add-field-picker, .board-confirm-overlay')) return;
+      closeMenu();
+    }
+    removeOutside = () => document.removeEventListener('mousedown', onOutside, true);
+    setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+  }
+
+  function closeMenu(): void {
+    menu.classList.add('bd-hidden');
+    btn.setAttribute('aria-expanded', 'false');
+    propsHost.innerHTML = '';
+    removeOutside?.();
+    removeOutside = null;
+  }
+
+  btn.addEventListener('click', () => {
+    if (menu.classList.contains('bd-hidden')) {
+      openMenu();
+    } else {
+      closeMenu();
+    }
+  });
+
+  kanbanBtn.addEventListener('click', () => {
+    ctx.mutate({ ...ctx.getBoard(), activeView: 'kanban' });
+    closeMenu();
+  });
+
+  tableBtn.addEventListener('click', () => {
+    ctx.mutate({ ...ctx.getBoard(), activeView: 'table' });
+    closeMenu();
+  });
+
+  return wrap;
 }
 
 // ---------------------------------------------------------------------------

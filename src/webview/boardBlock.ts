@@ -83,9 +83,14 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   let board = parseBoardSource(initialSource);
 
   function mutate(next: Board): void {
+    const prevActiveView = board.activeView;
     board = next;
     opts.onMutate(serializeBoard(board));
-    renderer!.update(board);
+    if (board.activeView !== prevActiveView) {
+      mountForActiveView();
+    } else {
+      renderer!.update(board);
+    }
   }
 
   const ctx: BoardRendererCtx = {
@@ -129,9 +134,14 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   return {
     dom,
     update(source: string): void {
+      const prevActiveView = board.activeView;
       board = parseBoardSource(source);
       ctx.readonly = opts.isReadOnly();
-      renderer!.update(board);
+      if (board.activeView !== prevActiveView) {
+        mountForActiveView();
+      } else {
+        renderer!.update(board);
+      }
     },
   };
 }

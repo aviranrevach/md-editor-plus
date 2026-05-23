@@ -1244,3 +1244,54 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   z-index: 30;
 }
 .bd-drop-line-visible { opacity: 1; }
+
+/* ===== ⋯ More menu: view segmented control + embedded Properties ===== */
+.bd-more { position: relative; display: inline-flex; }
+.bd-more-btn {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.bd-more-btn:hover { background: var(--block-hover); color: var(--text-primary); }
+.bd-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  z-index: 6;
+}
+.bd-more-menu.bd-hidden { display: none; }
+.bd-more-sep { height: 1px; background: var(--border); margin: 8px 0; }
+.bd-more-view { padding: 4px 6px 8px 6px; }
+.bd-view-seg {
+  display: inline-flex; gap: 1px; padding: 3px;
+  background: var(--seg-bg, rgba(0, 0, 0, 0.06));
+  border-radius: 7px;
+  width: 100%;
+}
+.bd-view-seg-btn {
+  flex: 1;
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  font: 500 12px ui-sans-serif, sans-serif;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.bd-view-seg-btn.bd-view-seg-active {
+  background: var(--seg-active-bg, #ffffff);
+  color: var(--text-primary);
+  box-shadow: var(--seg-active-shadow, 0 1px 3px rgba(0, 0, 0, 0.15));
+  font-weight: 600;
+}
+.bd-hidden { display: none !important; }
