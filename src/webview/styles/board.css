@@ -1316,3 +1316,4 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-cell-editing { background: var(--bg); outline: 2px solid var(--link); outline-offset: -2px; }
 .bd-table-cell { cursor: text; }
 .bd-cell-status, .bd-cell-date, .bd-cell-tags { cursor: pointer; }
+.bd-cell-empty { color: var(--text-secondary, #888); font-size: 12px; }

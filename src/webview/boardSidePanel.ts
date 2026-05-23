@@ -396,7 +396,7 @@ function renderStatusChipTrigger(board: Board, card: Card): HTMLElement {
   return trigger;
 }
 
-function buildChip(name: string, color: string): HTMLElement {
+export function buildChip(name: string, color: string): HTMLElement {
   const chip = document.createElement('span');
   chip.className = `board-column-chip color-${color}`;
   const dot = document.createElement('span');

@@ -4,6 +4,7 @@
 
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { buildChip } from './boardSidePanel';
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   const root = ctx.root;
@@ -111,9 +112,68 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Bo
         td.addEventListener('click', () => beginInlineText(td, card, field, ctx));
       }
       return;
+    case 'status': {
+      const colDef = b.columns.find(c => c.name === value);
+      if (value) {
+        td.appendChild(buildChip(value, colDef?.color ?? 'gray'));
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'bd-cell-empty';
+        placeholder.textContent = '—';
+        td.appendChild(placeholder);
+      }
+      if (!ctx.readonly) {
+        td.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openStatusDropdown(td, card, ctx);
+        });
+      }
+      return;
+    }
     default:
       td.textContent = value;
   }
+}
+
+function openStatusDropdown(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): void {
+  document.querySelectorAll('.board-status-dropdown').forEach((n) => n.remove());
+  const pop = document.createElement('div');
+  pop.className = 'board-status-dropdown';
+
+  function closeOnOutside(e: MouseEvent): void {
+    if (!pop.contains(e.target as Node)) {
+      pop.remove();
+      document.removeEventListener('mousedown', closeOnOutside, true);
+    }
+  }
+
+  for (const col of ctx.getBoard().columns) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'board-status-option';
+    item.appendChild(buildChip(col.name, col.color));
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cur = ctx.getBoard();
+      ctx.mutate({
+        ...cur,
+        cards: cur.cards.map(c =>
+          c.id === card.id
+            ? { ...c, values: { ...c.values, Status: col.name } }
+            : c,
+        ),
+      });
+      pop.remove();
+      document.removeEventListener('mousedown', closeOnOutside, true);
+    });
+    pop.appendChild(item);
+  }
+  const r = anchor.getBoundingClientRect();
+  pop.style.position = 'fixed';
+  pop.style.left = `${r.left}px`;
+  pop.style.top = `${r.bottom + 4}px`;
+  document.body.appendChild(pop);
+  document.addEventListener('mousedown', closeOnOutside, true);
 }
 
 function beginInlineText(
