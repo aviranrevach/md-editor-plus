@@ -17,9 +17,10 @@ import {
   getStyles, getNodeStyle, setNodeStyle, NodeStyle, StyleMap,
   getEdgeStyles, getEdgeStyle, setEdgeStyle, deleteEdgeByKey, edgeKey,
   EdgeStyle, EdgeCap, EdgeAnimation, EdgeAnimationDirection,
+  getLines, addLine, updateLineById, deleteLineById, LineDecl,
 } from './mermaidVisualEdit';
 
-export type Tool = 'select' | 'pan' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'text' | 'sticky';
+export type Tool = 'select' | 'pan' | 'rect' | 'pill' | 'circle' | 'diamond' | 'arrow' | 'line' | 'text' | 'sticky';
 
 export interface VisualEditorOptions {
   /** The block's outer DOM element (we own absolute overlays inside it). */
@@ -62,6 +63,7 @@ const ICONS: Record<string, string> = {
   circle:  `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><circle cx="12" cy="12" r="7"/></svg>`,
   diamond: `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M12 3l9 9-9 9-9-9 9-9z"/></svg>`,
   arrow:   `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M4 12h14"/><path d="M14 7l5 5-5 5"/></svg>`,
+  line:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M5 19L19 5"/></svg>`,
   text:    `<svg viewBox="0 0 24 24" ${TOOL_STROKE}><path d="M5 6h14"/><path d="M12 6v14"/></svg>`,
   sticky:  `<svg viewBox="0 0 24 24" fill="#fef6a9" stroke="#b89d1f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5" fill="#f0e07a"/></svg>`,
   // "Shapes" composite button — a square + circle + triangle in one glyph.
@@ -78,6 +80,7 @@ const TOOL_HOTKEYS: Record<string, Tool> = {
   c: 'circle',
   d: 'diamond',
   a: 'arrow',
+  l: 'line',
   t: 'text',
   n: 'sticky',
 };
@@ -96,6 +99,9 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // exclusive with node selection — selecting an edge clears node selection
   // and vice versa.
   let selectedEdgeKey: string | null = null;
+  // Phase 10 (standalone lines): selected free-line id. Mutually exclusive
+  // with node + edge selection.
+  let selectedLineId: string | null = null;
   // For Arrow tool — first click captures the source node, second click connects.
   let pendingFromId: string | null = null;
 
@@ -104,6 +110,8 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   const MAX_UNDO = 50;
   // After a duplicate, re-select the new copies on the next rerender.
   let pendingDuplicateIds: string[] | null = null;
+  // After committing a fresh line, auto-select it once the SVG re-renders.
+  let pendingNewLineId: string | null = null;
 
   // ── Overlays (mounted under the block, absolute-positioned) ─────────────
   opts.block.classList.add('mb-visual-active');
@@ -250,6 +258,22 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   pendingPin.className = 'mb-vPin mb-hidden';
   pendingPin.textContent = 'Click another node to connect';
 
+  // ── Phase 10: standalone-line context tip ──────────────────────────────
+  const lineTip = buildLineContextTip({
+    onStyleChange: (partial) => {
+      if (!selectedLineId) return;
+      const id = selectedLineId;
+      mutate((ast) => { updateLineById(ast, id, partial); });
+    },
+    onDelete: () => {
+      if (!selectedLineId) return;
+      const id = selectedLineId;
+      mutate((ast) => { deleteLineById(ast, id); });
+      selectedLineId = null;
+      refreshSelectionUI();
+    },
+  });
+
   // ── Phase 9: edge context tip ──────────────────────────────────────────
   const edgeTip = buildEdgeContextTip({
     onStyleChange: (partial) => {
@@ -348,6 +372,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   opts.previewPane.appendChild(marqueeEl);
   opts.previewPane.appendChild(contextTip.el);
   opts.previewPane.appendChild(edgeTip.el);
+  opts.previewPane.appendChild(lineTip.el);
   opts.previewPane.appendChild(renameOverlay.el);
   opts.previewPane.appendChild(pendingPin);
   opts.previewPane.appendChild(zoomCtrl);
@@ -365,16 +390,39 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
 
     // Clicks on our own overlay chrome (resize handles, edge tip, context
     // tip, etc.) shouldn't fall through to selection/edge hit-testing.
-    if ((e.target as Element).closest?.('.mb-vResize, .mb-vCtx, .mb-vEdgeCtx2, .mb-vTb, .mb-vConn, .mb-vZoom')) {
+    if ((e.target as Element).closest?.('.mb-vResize, .mb-vCtx, .mb-vEdgeCtx2, .mb-vTb, .mb-vConn, .mb-vZoom, .mb-vLineTip')) {
       return;
     }
 
     const targetNode = findMermaidNode(e.target as Element, opts.previewPane);
 
     if (activeTool === 'select') {
+      // Standalone-line hit test runs before node/edge — lines are decorative
+      // overlays that sit on top of everything, so they shouldn't be shadowed
+      // by node hit-testing. If e.target is one of our line elements, it
+      // wins outright (pointer-events:stroke ensures only the line catches).
+      const lineEl = (e.target as Element).closest?.('line.mb-vLine') as SVGLineElement | null;
+      if (lineEl && lineEl.dataset.lineId) {
+        const lid = lineEl.dataset.lineId;
+        // Clear any other selection state.
+        setSelected(null);
+        if (selectedEdgeKey) {
+          selectedEdgeKey = null;
+          edgeTip.hide();
+          clearAllEdgeSelections(opts.previewPane);
+        }
+        selectedLineId = lid;
+        refreshLineSelectionDom();
+        const ast = parseMermaid(opts.getSource());
+        const found = getLines(ast).find(l => l.id === lid) ?? null;
+        lineTip.setStyle(found);
+        lineTip.showAt(e.clientX, e.clientY);
+        return;
+      }
       if (targetNode) {
         // Clicking a node clears any edge selection.
         if (selectedEdgeKey) { selectedEdgeKey = null; edgeTip.hide(); }
+        if (selectedLineId) { selectedLineId = null; lineTip.hide(); refreshLineSelectionDom(); }
         const shift = e.shiftKey;
         // Shift-click toggles in the selection (add/remove). Plain click on
         // the already-selected single node opens rename (unless locked).
@@ -424,6 +472,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
             selectedEdgeKey = null;
             edgeTip.hide();
             clearAllEdgeSelections(opts.previewPane);
+          }
+          if (selectedLineId) {
+            selectedLineId = null;
+            lineTip.hide();
+            refreshLineSelectionDom();
           }
         }
       }
@@ -524,6 +577,16 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Lines have their own selection store; handle before node-delete.
+      if (selectedLineId) {
+        e.preventDefault();
+        const id = selectedLineId;
+        mutate((ast) => { deleteLineById(ast, id); });
+        selectedLineId = null;
+        lineTip.hide();
+        refreshLineSelectionDom();
+        return;
+      }
       if (selectedIds.size === 0) return;
       e.preventDefault();
       const targetIds = Array.from(selectedIds);
@@ -830,10 +893,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     scale:     number;
     moved:     boolean;
   }
-  // Three mutually-exclusive gestures share the mouse:
-  //  - drag    : node reposition (single or multi)
-  //  - marquee : drag on empty canvas → multi-select
-  //  - edge    : drag from a connection-point dot → new edge
+  // Four mutually-exclusive gestures share the mouse:
+  //  - drag       : node reposition (single or multi)
+  //  - marquee    : drag on empty canvas → multi-select
+  //  - edge       : drag from a connection-point dot → new edge
+  //  - lineDraft  : Line tool — drag on canvas → free-form straight line
   let drag: DragCandidate | null = null;
   let marquee: { x1: number; y1: number; x2: number; y2: number; additive: boolean } | null = null;
   let edgeDraft: {
@@ -842,6 +906,16 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     fromY:         number;
     pathEl:        SVGPathElement | null;
     currentTarget: string | null;  // id of node currently hovered
+  } | null = null;
+  // Phase 10: while drawing a free line, this holds the live draft.
+  // `el` is a transient SVG <line> we append to the host SVG and update on
+  // mousemove. On mouseup we either commit (>4 px) or discard.
+  let lineDraft: {
+    startX: number; // SVG coords
+    startY: number;
+    endX:   number;
+    endY:   number;
+    el:     SVGLineElement | null;
   } | null = null;
   let pan: { startX: number; startY: number; originTx: number; originTy: number } | null = null;
   let spaceHeld = false;
@@ -854,7 +928,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     // Pan tool, space-drag, or middle-click → pan the viewport.
     if (activeTool === 'pan' || spaceHeld) {
       // Don't pan if click landed on our own UI overlays (toolbar, etc.).
-      const inOverlay = (e.target as Element).closest('.mb-vTb, .mb-vCtx, .mb-vZoom, .mb-snackbar, .mb-vRename, .mb-vPin, .mb-vResize');
+      const inOverlay = (e.target as Element).closest('.mb-vTb, .mb-vCtx, .mb-vZoom, .mb-snackbar, .mb-vRename, .mb-vPin, .mb-vResize, .mb-vLineTip');
       if (inOverlay) return;
       pan = {
         startX:   e.clientX,
@@ -863,6 +937,20 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
         originTy: viewport.ty,
       };
       opts.previewPane.classList.add('mb-panning');
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    // Line tool — drag anywhere on the canvas to draw a free-form straight
+    // line. Ignores nodes/edges entirely (the line is decorative — Miro/Figma
+    // line tool behavior).
+    if (activeTool === 'line') {
+      const inOverlay = (e.target as Element).closest('.mb-vTb, .mb-vCtx, .mb-vZoom, .mb-snackbar, .mb-vRename, .mb-vPin, .mb-vResize, .mb-vLineTip');
+      if (inOverlay) return;
+      const svgPt = clientToSvgPoint(e.clientX, e.clientY, opts.previewPane);
+      if (!svgPt) return;
+      lineDraft = { startX: svgPt.x, startY: svgPt.y, endX: svgPt.x, endY: svgPt.y, el: null };
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -893,7 +981,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       // Empty canvas mousedown with Select tool → start marquee.
       // (Don't start marquee for clicks inside our own UI overlays — those have
       //  their own pointer handlers and shouldn't trigger selection drag.)
-      const inOverlay = (e.target as Element).closest('.mb-vTb, .mb-vCtx, .mb-vConn, .mb-vResize, .mb-snackbar, .mb-vRename, .mb-vPin, .mb-svg-host svg');
+      const inOverlay = (e.target as Element).closest('.mb-vTb, .mb-vCtx, .mb-vConn, .mb-vResize, .mb-snackbar, .mb-vRename, .mb-vPin, .mb-vLineTip, .mb-vEdgeCtx2, .mb-svg-host svg');
       if (!inOverlay) {
         marquee = { x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY, additive: e.shiftKey };
       }
@@ -939,6 +1027,32 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       viewport.tx = pan.originTx + (e.clientX - pan.startX);
       viewport.ty = pan.originTy + (e.clientY - pan.startY);
       applyViewport();
+      return;
+    }
+    // Line draft: extend a transient <line> from the click origin to the
+    // current cursor position. We materialize the element lazily so a click
+    // that never moves stays purely click-vs-drag in mouseup.
+    if (lineDraft) {
+      const svgPt = clientToSvgPoint(e.clientX, e.clientY, opts.previewPane);
+      if (!svgPt) return;
+      lineDraft.endX = svgPt.x;
+      lineDraft.endY = svgPt.y;
+      if (!lineDraft.el) {
+        const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+        if (!svg) return;
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        el.setAttribute('class', 'mb-vLineDraft');
+        el.setAttribute('stroke', '#6366f1');
+        el.setAttribute('stroke-width', '1.5');
+        el.setAttribute('stroke-dasharray', '4 3');
+        el.setAttribute('pointer-events', 'none');
+        svg.appendChild(el);
+        lineDraft.el = el;
+      }
+      lineDraft.el.setAttribute('x1', String(lineDraft.startX));
+      lineDraft.el.setAttribute('y1', String(lineDraft.startY));
+      lineDraft.el.setAttribute('x2', String(lineDraft.endX));
+      lineDraft.el.setAttribute('y2', String(lineDraft.endY));
       return;
     }
     // Edge draft path: while dragging, hover-detect a target node, highlight it,
@@ -1069,6 +1183,47 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       opts.previewPane.classList.remove('mb-panning');
       return;
     }
+    // Line draft → if the cursor moved enough to constitute a deliberate
+    // drag (>4 px in screen units), commit. Otherwise it was a stray click,
+    // so we drop it without mutating the source.
+    if (lineDraft) {
+      const draft = lineDraft;
+      lineDraft = null;
+      if (draft.el) draft.el.remove();
+      // Measure the screen-space drag length. Going via SVG coords is fragile
+      // when the diagram is zoomed; we re-derive in screen px from the start
+      // SVG point's CTM mapping using the live SVG.
+      const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+      if (!svg) return;
+      const dxSvg = draft.endX - draft.startX;
+      const dySvg = draft.endY - draft.startY;
+      // Convert SVG-space delta to screen-space using one SVG unit's screen size.
+      const ctm = svg.getScreenCTM();
+      const unit = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
+      const screenLen = Math.hypot(dxSvg, dySvg) * unit;
+      if (screenLen < DRAG_THRESHOLD) {
+        e.stopPropagation();
+        return;
+      }
+      suppressNextClick = true;
+      mutate((ast) => {
+        const created = addLine(ast, {
+          x1: draft.startX, y1: draft.startY,
+          x2: draft.endX,   y2: draft.endY,
+          color:     '#1f2937',
+          thickness: 1.5,
+          type:      'solid',
+        });
+        // Select the new line so the style tip pops up immediately.
+        pendingNewLineId = created.id;
+      });
+      // After mutate → re-render fires; we'll auto-select pendingNewLineId there.
+      // Snap back to select tool so users don't accidentally redraw.
+      toolbar.setActive('select');
+      activeTool = 'select';
+      e.stopPropagation();
+      return;
+    }
     // Edge draft → commit if landed on a node. Prefer the tracked target
     // (set during mousemove via elementFromPoint) since e.target during
     // mouseup can be our draft path or another overlay.
@@ -1197,13 +1352,25 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   function setTool(tool: Tool): void {
     activeTool = tool;
     toolbar.setActive(tool);
+    // Drive cursor styling off a class on the previewPane. The Line tool
+    // gets a crosshair so users know they can draw anywhere.
+    opts.previewPane.classList.toggle('mb-tool-line', tool === 'line');
     if (tool !== 'arrow') {
       pendingFromId = null;
       pendingPin.classList.add('mb-hidden');
     }
     // Switching to a non-Select tool clears selection so users don't think
     // they're operating on the selected node.
-    if (tool !== 'select') setSelected(null);
+    if (tool !== 'select') {
+      setSelected(null);
+      // Same idea for line selection — it'd be confusing if the line stayed
+      // selected while a different tool is active.
+      if (selectedLineId) {
+        selectedLineId = null;
+        lineTip.hide();
+        refreshLineSelectionDom();
+      }
+    }
   }
 
   type SelectMode = 'replace' | 'add' | 'toggle';
@@ -1294,6 +1461,14 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
 
     // Padlock badges over locked selected nodes.
     refreshLockBadges();
+  }
+
+  function refreshLineSelectionDom(): void {
+    const all = opts.previewPane.querySelectorAll<SVGLineElement>('g.mb-vLines > line.mb-vLine');
+    for (const el of Array.from(all)) {
+      const isSel = !!selectedLineId && el.dataset.lineId === selectedLineId;
+      el.classList.toggle('mb-vLine-selected', isSel);
+    }
   }
 
   function showConnectionPoints(nodeEl: Element): void {
@@ -1409,6 +1584,39 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
           }
         }
       }
+
+      // Phase 10: promote a freshly-drawn line to the active selection and
+      // open its style tip. Also re-sync the selected-line DOM class +
+      // tip-style on every re-render (so style edits made via the tip stay
+      // reflected in both the line element and the tip's controls).
+      if (pendingNewLineId) {
+        selectedLineId = pendingNewLineId;
+        pendingNewLineId = null;
+      }
+      if (selectedLineId) {
+        const lines = getLines(ast);
+        const found = lines.find(l => l.id === selectedLineId) ?? null;
+        if (!found) {
+          // The line we had selected was deleted (e.g., undo).
+          selectedLineId = null;
+          lineTip.hide();
+        } else {
+          lineTip.setStyle(found);
+          // Park the tip near the midpoint of the line for natural placement.
+          const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+          if (svg) {
+            const ctm = svg.getScreenCTM();
+            if (ctm) {
+              const pt = svg.createSVGPoint();
+              pt.x = (found.x1 + found.x2) / 2;
+              pt.y = (found.y1 + found.y2) / 2;
+              const scr = pt.matrixTransform(ctm);
+              lineTip.showAt(scr.x, scr.y);
+            }
+          }
+        }
+        refreshLineSelectionDom();
+      }
     },
     destroy(): void {
       opts.block.classList.remove('mb-visual-active');
@@ -1423,11 +1631,13 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       // Reset host transform so a future visual session starts clean.
       const host = getSvgHost();
       if (host) host.style.transform = '';
+      opts.previewPane.classList.remove('mb-tool-line');
       toolbar.el.remove();
       selectionRing.remove();
       for (const r of extraRings) r.remove();
       contextTip.destroy();
       edgeTip.destroy();
+      lineTip.destroy();
       renameOverlay.destroy();
       pendingPin.remove();
       connectionLayer.remove();
@@ -1469,7 +1679,7 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
   const SHAPE_TOOLS: Tool[] = ['rect', 'pill', 'circle', 'diamond'];
   const groups: Array<{ tools: Tool[] }> = [
     { tools: ['select', 'pan'] },
-    { tools: ['arrow'] },
+    { tools: ['arrow', 'line'] },
     { tools: ['text', 'sticky'] },
   ];
 
@@ -1481,6 +1691,7 @@ function buildToolbar({ onPick, onReset, onToggleGrid }: ToolbarHandlers): Toolb
     circle:  'Circle (C)',
     diamond: 'Diamond (D)',
     arrow:   'Arrow (A)',
+    line:    'Line (L)',
     text:    'Text (T)',
     sticky:  'Sticky note (N)',
   };
@@ -2124,6 +2335,159 @@ function buildEdgeContextTip(handlers: EdgeTipHandlers): EdgeTipHandle {
     animCtl.setState(s?.animation ?? 'none', s?.animationDirection ?? 'forward', s?.type ?? 'solid');
   }
 
+  function destroy(): void { wrap.remove(); }
+
+  return { el: wrap, showAt, hide, setStyle, destroy };
+}
+
+// ── Standalone-line context tip ─────────────────────────────────────────────
+// A leaner cousin of the edge tip — no caps, no animation, no flip (lines have
+// no direction). Just: line-type swatches, thickness, color, delete.
+
+export type LinePartial = Partial<Pick<LineDecl, 'color' | 'thickness' | 'type'>>;
+
+interface LineTipHandle {
+  el:       HTMLElement;
+  showAt:   (clientX: number, clientY: number) => void;
+  hide:     () => void;
+  setStyle: (l: LineDecl | null) => void;
+  destroy:  () => void;
+}
+
+interface LineTipHandlers {
+  onStyleChange: (partial: LinePartial) => void;
+  onDelete:      () => void;
+}
+
+function buildLineContextTip(handlers: LineTipHandlers): LineTipHandle {
+  // Reuse the edge tip's chrome classes — same theme-aware container, same
+  // panel + swatch styles. Adding `mb-vLineTip` to the wrapper lets the
+  // click-suppression elsewhere know "this is our overlay, don't deselect".
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-vEdgeCtx2 mb-vLineTip mb-hidden';
+  wrap.contentEditable = 'false';
+
+  const topBar = document.createElement('div');
+  topBar.className = 'mb-vEdgeCtx2-top';
+
+  // Line style preview button — opens the line panel (type + thickness).
+  const lineBtn = document.createElement('button');
+  lineBtn.type = 'button';
+  lineBtn.className = 'mb-vEdgeCtx2-line';
+  lineBtn.setAttribute('aria-label', 'Line style and thickness');
+  lineBtn.title = 'Line style, thickness';
+  lineBtn.innerHTML = lineGlyph('solid');
+
+  // Color button.
+  const colorBtn = document.createElement('button');
+  colorBtn.type = 'button';
+  colorBtn.className = 'mb-vEdgeCtx2-color';
+  colorBtn.setAttribute('aria-label', 'Line color');
+  colorBtn.title = 'Line color';
+  colorBtn.innerHTML = `<span class="mb-vEdgeCtx2-colorswatch" style="background:#1f2937"></span>`;
+  const colorSwatch = colorBtn.querySelector<HTMLElement>('.mb-vEdgeCtx2-colorswatch');
+
+  const sep = document.createElement('span');
+  sep.className = 'mb-vEdgeCtx2-sep';
+
+  // Delete
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'mb-vEdgeCtx2-icon mb-vEdgeCtx2-danger';
+  deleteBtn.setAttribute('aria-label', 'Delete line');
+  deleteBtn.title = 'Delete line';
+  deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>`;
+  deleteBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  deleteBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); handlers.onDelete(); });
+
+  topBar.append(lineBtn, colorBtn, sep, deleteBtn);
+
+  // ── Line panel (type + thickness) ────────────────────────────────────
+  const linePanel = document.createElement('div');
+  linePanel.className = 'mb-vEdgeCtx2-panel mb-hidden';
+
+  const typeRow = document.createElement('div');
+  typeRow.className = 'mb-vEdgeCtx2-types';
+  const typeBtns: Record<string, HTMLButtonElement> = {};
+  for (const t of ['solid', 'dashed', 'dotted'] as const) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mb-vEdgeCtx2-type';
+    b.dataset.type = t;
+    b.setAttribute('aria-label', `Line: ${t}`);
+    b.title = `Line: ${t}`;
+    b.innerHTML = lineGlyph(t, 26);
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      handlers.onStyleChange({ type: t });
+    });
+    typeBtns[t] = b;
+    typeRow.appendChild(b);
+  }
+
+  const thicknessSlider = makeLabelledSlider('Thickness', 0.5, 6, 0.5, 1.5, 'px', (v) => handlers.onStyleChange({ thickness: v }));
+  linePanel.append(typeRow, thicknessSlider.el);
+
+  // ── Color panel ───────────────────────────────────────────────────────
+  const colorPanel = document.createElement('div');
+  colorPanel.className = 'mb-vEdgeCtx2-panel mb-vEdgeCtx2-colorpanel mb-hidden';
+
+  const brandLabel = document.createElement('div');
+  brandLabel.className = 'mb-vEdgeCtx2-grouplabel';
+  brandLabel.textContent = 'Brand colors';
+  const brandGrid = makeSwatchGrid(BRAND_COLORS, (c) => handlers.onStyleChange({ color: c }));
+
+  const allLabel = document.createElement('div');
+  allLabel.className = 'mb-vEdgeCtx2-grouplabel';
+  allLabel.textContent = 'All colors';
+  const allGrid = makeSwatchGrid(ALL_COLORS, (c) => handlers.onStyleChange({ color: c }));
+
+  colorPanel.append(brandLabel, brandGrid, allLabel, allGrid);
+
+  function closeAllPanels(): void {
+    linePanel.classList.add('mb-hidden');
+    colorPanel.classList.add('mb-hidden');
+  }
+  lineBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  lineBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const wasOpen = !linePanel.classList.contains('mb-hidden');
+    closeAllPanels();
+    if (!wasOpen) linePanel.classList.remove('mb-hidden');
+  });
+  colorBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  colorBtn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const wasOpen = !colorPanel.classList.contains('mb-hidden');
+    closeAllPanels();
+    if (!wasOpen) colorPanel.classList.remove('mb-hidden');
+  });
+
+  wrap.append(topBar, linePanel, colorPanel);
+
+  function showAt(clientX: number, clientY: number): void {
+    const host = wrap.parentElement;
+    if (host) {
+      const hostRect = host.getBoundingClientRect();
+      wrap.style.left = `${clientX - hostRect.left}px`;
+      wrap.style.top  = `${clientY - hostRect.top + 16}px`;
+    }
+    wrap.classList.remove('mb-hidden');
+  }
+  function hide(): void {
+    wrap.classList.add('mb-hidden');
+    closeAllPanels();
+  }
+  function setStyle(l: LineDecl | null): void {
+    const t = l?.type ?? 'solid';
+    lineBtn.innerHTML = lineGlyph(t);
+    for (const k of Object.keys(typeBtns)) {
+      typeBtns[k].classList.toggle('mb-vEdgeCtx2-type-on', k === t);
+    }
+    thicknessSlider.setValue(l?.thickness ?? 1.5);
+    if (colorSwatch) colorSwatch.style.background = l?.color ?? '#1f2937';
+  }
   function destroy(): void { wrap.remove(); }
 
   return { el: wrap, showAt, hide, setStyle, destroy };
@@ -3352,6 +3716,48 @@ function makeSegRow<T extends string>(
       }
     },
   };
+}
+
+/** Render persisted standalone lines (Phase 10) into a dedicated SVG group.
+    Lines aren't part of mermaid's output — we keep them in our own
+    `<g class="mb-vLines">` group inside the rendered SVG so they live in the
+    same coordinate space and zoom/pan with everything else. We clear and
+    rebuild the group on every call to keep state simple (no per-element
+    diffing). The cost is trivial since line counts are realistically <50. */
+export function applyStandaloneLinesOverlay(ast: Ast, host: HTMLElement): void {
+  const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (!svg) return;
+  // Find or create our group. Append last so it paints over mermaid's edges
+  // and nodes — these are decorative annotations on top of the diagram.
+  let group = svg.querySelector<SVGGElement>('g.mb-vLines');
+  if (!group) {
+    group = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGElement;
+    group.setAttribute('class', 'mb-vLines');
+    svg.appendChild(group);
+  } else {
+    // Move to the end on every apply so re-renders that prepend new mermaid
+    // content don't bury our lines.
+    svg.appendChild(group);
+    while (group.firstChild) group.removeChild(group.firstChild);
+  }
+
+  const lines = getLines(ast);
+  for (const l of lines) {
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    el.setAttribute('class', 'mb-vLine');
+    el.dataset.lineId = l.id;
+    el.setAttribute('x1', String(l.x1));
+    el.setAttribute('y1', String(l.y1));
+    el.setAttribute('x2', String(l.x2));
+    el.setAttribute('y2', String(l.y2));
+    el.setAttribute('stroke', l.color ?? '#1f2937');
+    el.setAttribute('stroke-width', String(l.thickness ?? 1.5));
+    el.setAttribute('stroke-linecap', 'round');
+    if (l.type === 'dashed')      el.setAttribute('stroke-dasharray', '6 4');
+    else if (l.type === 'dotted') el.setAttribute('stroke-dasharray', '2 4');
+    else                          el.setAttribute('stroke-dasharray', '0');
+    group.appendChild(el);
+  }
 }
 
 /** Apply per-node + per-edge style overrides (Phases 5 + 9) to the rendered SVG. */

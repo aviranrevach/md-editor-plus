@@ -4238,3 +4238,43 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 
 /* When Pan tool is active in toolbar, .mb-svg-host area shows grab cursor. */
 .ProseMirror .mb-visual .mb-vTb-btn[data-tool="pan"].mb-vTb-active ~ * { /* no-op selector */ }
+
+/* ===========================================================================
+   Phase 10: Standalone "free" lines
+   ===========================================================================
+   Lines live in their own <g class="mb-vLines"> group inside the rendered
+   mermaid SVG. We only style hit-test behavior + hover/selected feedback —
+   the actual stroke/dash/width is set as SVG attributes by the overlay
+   render so dynamic styles "just work" without per-line CSS classes. */
+.ProseMirror .mb-vLines line.mb-vLine {
+  /* Only the stroke catches clicks. Without this the giant invisible
+     bounding box of a long line would shadow nearby nodes. */
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.ProseMirror .mb-vLines line.mb-vLine:hover {
+  stroke-opacity: 0.85;
+}
+.ProseMirror .mb-vLines line.mb-vLine.mb-vLine-selected {
+  /* Force a 3px blue stroke override regardless of the saved color, so the
+     selected line is visually unambiguous. The line's own color shows on
+     deselect. !important is necessary because the stroke attr is set
+     directly on the element. */
+  stroke: #6366f1 !important;
+  stroke-width: 3 !important;
+}
+/* Transient draft line while the user is dragging out a new one. */
+.ProseMirror line.mb-vLineDraft {
+  pointer-events: none;
+}
+/* Show a crosshair cursor over the canvas when the Line tool is active. */
+.ProseMirror .mb-tool-line,
+.ProseMirror .mb-tool-line .mb-svg-host,
+.ProseMirror .mb-tool-line .mb-svg-host * { cursor: crosshair !important; }
+/* Don't override cursor on toolbar buttons — they should still look clickable. */
+.ProseMirror .mb-tool-line .mb-vTb,
+.ProseMirror .mb-tool-line .mb-vTb *,
+.ProseMirror .mb-tool-line .mb-vLineTip,
+.ProseMirror .mb-tool-line .mb-vLineTip *,
+.ProseMirror .mb-tool-line .mb-vZoom,
+.ProseMirror .mb-tool-line .mb-vZoom * { cursor: pointer !important; }

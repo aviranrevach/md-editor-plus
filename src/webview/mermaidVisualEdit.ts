@@ -91,6 +91,20 @@ export interface EdgeStyle {
 }
 export type EdgeStyleMap = Record<string, EdgeStyle>;
 
+/** Standalone "free" line — not connected to any node. Used as a separator,
+    pointer, or annotation. Coordinates are in the rendered mermaid SVG's
+    viewBox space (same coordinate system as `PositionMap`). */
+export interface LineDecl {
+  id:         string;
+  x1:         number;
+  y1:         number;
+  x2:         number;
+  y2:         number;
+  color?:     string;
+  thickness?: number;
+  type?:      'solid' | 'dashed' | 'dotted';
+}
+
 type AnyLine =
   | { kind: 'node';        node: NodeDecl }
   | { kind: 'edge';        edge: EdgeDecl }
@@ -99,6 +113,7 @@ type AnyLine =
   | { kind: 'locks';       raw:  string; ids: string[] }
   | { kind: 'styles';      raw:  string; map: StyleMap }
   | { kind: 'edge-styles'; raw:  string; map: EdgeStyleMap }
+  | { kind: 'lines';       raw:  string; lines: LineDecl[] }
   | { kind: 'pass';        raw:  string };
 
 export interface Ast {
@@ -166,6 +181,12 @@ export function parseMermaid(source: string): Ast {
     const edgeStyles = tryParseEdgeStylesLine(trimmed);
     if (edgeStyles) {
       lines.push({ kind: 'edge-styles', raw: trimmed, map: edgeStyles });
+      continue;
+    }
+
+    const standaloneLines = tryParseLinesLine(trimmed);
+    if (standaloneLines) {
+      lines.push({ kind: 'lines', raw: trimmed, lines: standaloneLines });
       continue;
     }
 
@@ -516,6 +537,96 @@ export function deleteEdgeByKey(ast: Ast, key: string): void {
   writeEdgeStylesLine(ast, styles);
 }
 
+// ── Standalone lines sidecar ───────────────────────────────────────────────
+// `%% mb-lines: [{ id: "L1", x1: 100, y1: 50, x2: 300, y2: 80, color: "#1f2937", thickness: 1.5, type: "solid" }]`
+//
+// Stored as an array (not a keyed map like the others) because lines have no
+// natural "key" — they aren't tied to a node id and there's no equivalent of
+// edge from/to. We use `id` so style edits and deletions can target a specific
+// line without ambiguity.
+
+export function getLines(ast: Ast): LineDecl[] {
+  for (const line of ast.lines) {
+    if (line.kind === 'lines') return line.lines;
+  }
+  return [];
+}
+
+function writeLinesLine(ast: Ast, lines: LineDecl[]): void {
+  // Drop the sidecar entirely when empty so the source stays tidy.
+  if (lines.length === 0) {
+    ast.lines = ast.lines.filter(l => l.kind !== 'lines');
+    return;
+  }
+  const filtered: LineDecl[] = lines.map(l => {
+    const out: LineDecl = {
+      id: l.id,
+      x1: Math.round(l.x1),
+      y1: Math.round(l.y1),
+      x2: Math.round(l.x2),
+      y2: Math.round(l.y2),
+    };
+    if (l.color     !== undefined) out.color     = l.color;
+    if (l.thickness !== undefined) out.thickness = l.thickness;
+    if (l.type      !== undefined) out.type      = l.type;
+    return out;
+  });
+  const raw = `%% mb-lines: ${JSON.stringify(filtered)}`;
+  const idx = ast.lines.findIndex(l => l.kind === 'lines');
+  if (idx >= 0) {
+    ast.lines[idx] = { kind: 'lines', raw, lines: filtered };
+    return;
+  }
+  // Insert after edge-styles → styles → locks → positions → header — matches
+  // the chain used by every other sidecar so files stay sorted.
+  const edgeStyleIdx = ast.lines.findIndex(l => l.kind === 'edge-styles');
+  const styleIdx    = ast.lines.findIndex(l => l.kind === 'styles');
+  const lockIdx     = ast.lines.findIndex(l => l.kind === 'locks');
+  const posIdx      = ast.lines.findIndex(l => l.kind === 'positions');
+  const headerIdx   = ast.lines.findIndex(l => l.kind === 'header');
+  const at = edgeStyleIdx >= 0 ? edgeStyleIdx + 1
+           : styleIdx     >= 0 ? styleIdx     + 1
+           : lockIdx      >= 0 ? lockIdx      + 1
+           : posIdx       >= 0 ? posIdx       + 1
+           : headerIdx + 1;
+  ast.lines.splice(at, 0, { kind: 'lines', raw, lines: filtered });
+}
+
+export function setLines(ast: Ast, lines: LineDecl[]): void {
+  writeLinesLine(ast, lines);
+}
+
+export function addLine(ast: Ast, line: Omit<LineDecl, 'id'>): LineDecl {
+  const lines = getLines(ast).slice();
+  const id = nextLineId(lines);
+  const created: LineDecl = { id, ...line };
+  lines.push(created);
+  writeLinesLine(ast, lines);
+  return created;
+}
+
+export function updateLineById(ast: Ast, id: string, partial: Partial<Omit<LineDecl, 'id'>>): void {
+  const lines = getLines(ast).slice();
+  const idx = lines.findIndex(l => l.id === id);
+  if (idx < 0) return;
+  lines[idx] = { ...lines[idx], ...partial, id };
+  writeLinesLine(ast, lines);
+}
+
+export function deleteLineById(ast: Ast, id: string): void {
+  const lines = getLines(ast).filter(l => l.id !== id);
+  writeLinesLine(ast, lines);
+}
+
+function nextLineId(existing: LineDecl[]): string {
+  const used = new Set(existing.map(l => l.id));
+  for (let i = 1; i < 100000; i++) {
+    const candidate = `L${i}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `L${Date.now()}`;
+}
+
 // ── Parsers (internal) ──────────────────────────────────────────────────────
 
 // Order matters — more specific (longer) bracket pairs must come first so a
@@ -563,6 +674,34 @@ function tryParseEdgeStylesLine(trimmed: string): EdgeStyleMap | null {
       if (s.startCap === 'none' || s.startCap === 'arrow' || s.startCap === 'circle') entry.startCap = s.startCap;
       if (s.endCap   === 'none' || s.endCap   === 'arrow' || s.endCap   === 'circle') entry.endCap   = s.endCap;
       out[k] = entry;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+// `%% mb-lines: [{ "id": "L1", "x1": 0, "y1": 0, "x2": 10, "y2": 10, ... }]`
+function tryParseLinesLine(trimmed: string): LineDecl[] | null {
+  const m = trimmed.match(/^%%\s*mb-lines:\s*(.+)$/);
+  if (!m) return null;
+  try {
+    const arr = JSON.parse(m[1]) as unknown;
+    if (!Array.isArray(arr)) return null;
+    const out: LineDecl[] = [];
+    for (const v of arr) {
+      if (!v || typeof v !== 'object') continue;
+      const s = v as Record<string, unknown>;
+      if (typeof s.id !== 'string') continue;
+      if (typeof s.x1 !== 'number' || typeof s.y1 !== 'number'
+       || typeof s.x2 !== 'number' || typeof s.y2 !== 'number') continue;
+      const entry: LineDecl = {
+        id: s.id, x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2,
+      };
+      if (typeof s.color     === 'string') entry.color     = s.color;
+      if (typeof s.thickness === 'number') entry.thickness = s.thickness;
+      if (s.type === 'solid' || s.type === 'dashed' || s.type === 'dotted') entry.type = s.type;
+      out.push(entry);
     }
     return out;
   } catch {
@@ -724,6 +863,7 @@ function emitLine(line: AnyLine): string {
   if (line.kind === 'locks')     return '    ' + line.raw;
   if (line.kind === 'styles')    return '    ' + line.raw;
   if (line.kind === 'edge-styles') return '    ' + line.raw;
+  if (line.kind === 'lines')     return '    ' + line.raw;
   // For node/edge lines: if the parsed `raw` is still attached, emit it
   // verbatim (preserves the user's quoting and inline shape syntax).
   // Mutations clear `raw` to force a canonical re-emit.
