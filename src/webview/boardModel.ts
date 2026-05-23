@@ -44,6 +44,7 @@ export interface Board {
 }
 
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
+const VIEW_RE = /<!--\s*board:view([\s\S]*?)-->/gi;
 const BODY_RE = /<!--\s*board:body\s+id="([^"]+)"\s*-->/gi;
 
 function parseAttrs(raw: string): Record<string, string> {
@@ -110,6 +111,57 @@ function findTableSlice(body: string): { header: string[]; rows: string[][] } | 
   return null;
 }
 
+function parseViewDef(raw: string): ViewDef {
+  const attrs = parseAttrs(raw);
+  const known = new Set(['name', 'columns', 'hidden', 'sort', 'group', 'widths']);
+
+  const view: ViewDef = { name: attrs.name?.trim() || 'kanban' };
+
+  if (attrs.columns) {
+    view.columns = attrs.columns.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  if (attrs.hidden) {
+    view.hidden = attrs.hidden.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  if (attrs.sort) {
+    const parts = attrs.sort.split(',');
+    const field = parts[0]?.trim();
+    const dir = parts[1]?.trim();
+    if (field && (dir === 'asc' || dir === 'desc')) {
+      view.sort = { field, dir };
+    }
+  }
+  if (attrs.group) {
+    view.groupBy = attrs.group.trim();
+  }
+  if (attrs.widths) {
+    const widths: Record<string, number> = {};
+    for (const pair of attrs.widths.split(',')) {
+      const [k, v] = pair.split('=');
+      const name = k?.trim();
+      const num = parseInt(v?.trim() ?? '', 10);
+      if (name && isFinite(num)) {
+        widths[name] = num;
+      }
+    }
+    if (Object.keys(widths).length > 0) {
+      view.widths = widths;
+    }
+  }
+
+  const extras: Record<string, string> = {};
+  for (const [k, v] of Object.entries(attrs)) {
+    if (!known.has(k)) {
+      extras[k] = v;
+    }
+  }
+  if (Object.keys(extras).length > 0) {
+    view.extras = extras;
+  }
+
+  return view;
+}
+
 function parseFieldTypes(raw: string): Map<string, FieldType> {
   const out = new Map<string, FieldType>();
   for (const pair of raw.split(',')) {
@@ -163,10 +215,18 @@ export function parseBoardSource(source: string): Board {
 
   const innerStart = source.indexOf('-->', startMatch?.index ?? 0);
   const endIdx = source.search(/<!--\s*board:end\s*-->/i);
-  const body = source.slice(
+  const rawBody = source.slice(
     innerStart >= 0 ? innerStart + 3 : 0,
     endIdx >= 0 ? endIdx : source.length,
   );
+
+  // Extract board:view markers before handing the body to the table parser.
+  const views: ViewDef[] = [];
+  VIEW_RE.lastIndex = 0;
+  const body = rawBody.replace(VIEW_RE, (_match, attrRaw: string) => {
+    views.push(parseViewDef(attrRaw));
+    return '';
+  });
 
   const table = findTableSlice(body);
 
@@ -213,8 +273,8 @@ export function parseBoardSource(source: string): Board {
     fields,
     cards,
     orphanBodies,
-    views: [],
-    activeView: 'kanban',
+    views,
+    activeView: attrs['active-view']?.trim() || 'kanban',
   };
 }
 

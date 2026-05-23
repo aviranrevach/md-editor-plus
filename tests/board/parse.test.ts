@@ -185,3 +185,63 @@ describe('parseBoardSource — bodies', () => {
     expect(board.cards[0].body).toBe('');
   });
 });
+
+describe('parseBoardSource — board:view markers', () => {
+  it('parses a board:view section into the views array', () => {
+    const md = [
+      '<!-- board:start id="b1" name="X"',
+      '     columns="Todo|Doing"',
+      '     field-types="Title=text,Status=status,Owner=person"',
+      '     active-view="table" -->',
+      '<!-- board:view name="table"',
+      '     columns="Title,Status,Owner"',
+      '     hidden="id"',
+      '     sort="Owner,desc"',
+      '     group="Status"',
+      '     widths="Title=240,Status=120" -->',
+      '',
+      '| id | Title | Status | Owner |',
+      '|----|-------|--------|-------|',
+      '| c1 | A     | Todo   |       |',
+      '',
+      '<!-- board:end -->',
+    ].join('\n');
+
+    const b = parseBoardSource(md);
+    expect(b.activeView).toBe('table');
+    expect(b.views).toHaveLength(1);
+    const v = b.views[0];
+    expect(v.name).toBe('table');
+    expect(v.columns).toEqual(['Title', 'Status', 'Owner']);
+    expect(v.hidden).toEqual(['id']);
+    expect(v.sort).toEqual({ field: 'Owner', dir: 'desc' });
+    expect(v.groupBy).toBe('Status');
+    expect(v.widths).toEqual({ Title: 240, Status: 120 });
+  });
+
+  it('returns empty views array when no board:view sections present', () => {
+    const md = [
+      '<!-- board:start id="b1" name="X" columns="Todo" field-types="Title=text,Status=status" -->',
+      '| id | Title | Status |',
+      '|----|-------|--------|',
+      '| c1 | A     | Todo   |',
+      '<!-- board:end -->',
+    ].join('\n');
+    const b = parseBoardSource(md);
+    expect(b.views).toEqual([]);
+    expect(b.activeView).toBe('kanban');
+  });
+
+  it('preserves unknown board:view attributes in extras', () => {
+    const md = [
+      '<!-- board:start id="b1" name="X" columns="Todo" field-types="Title=text,Status=status" -->',
+      '<!-- board:view name="table" mystery="future-attr" -->',
+      '| id | Title | Status |',
+      '|----|-------|--------|',
+      '| c1 | A     | Todo   |',
+      '<!-- board:end -->',
+    ].join('\n');
+    const b = parseBoardSource(md);
+    expect(b.views[0].extras).toEqual({ mystery: 'future-attr' });
+  });
+});
