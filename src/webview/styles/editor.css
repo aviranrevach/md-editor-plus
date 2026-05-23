@@ -2676,16 +2676,23 @@ html.source-word-wrap #source-view .cb-content {
   user-select: none;
 }
 
-/* Visual-edit canvas: the header fades into the background until the user
-   hovers it. Edit toggle stays visible (entry point); Expand + Copy
-   appear only on hover. Matches the floaty Miro/Figma vibe. */
+/* Visual-edit canvas: the header keeps a translucent white background so the
+   text stays legible against the dotted canvas, fades to full on hover.
+   Expand + Copy appear only on hover. Edit toggle stays visible. */
 .ProseMirror .mb.mb-visual .mb-header,
 .ProseMirror .mb.mb-visual-active .mb-header,
 .ProseMirror .mb-visual-active .mb-header {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border-bottom-color: transparent;
-  opacity: 0.55;
+  opacity: 0.85;
   transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+html.theme-dark .ProseMirror .mb.mb-visual .mb-header,
+html.theme-dark .ProseMirror .mb.mb-visual-active .mb-header,
+html.theme-dark .ProseMirror .mb-visual-active .mb-header {
+  background: rgba(30, 31, 35, 0.7);
 }
 .ProseMirror .mb.mb-visual .mb-header:hover,
 .ProseMirror .mb.mb-visual-active .mb-header:hover,
@@ -3095,16 +3102,15 @@ html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
   justify-content: stretch;
   padding: 0;
   background-color: #f6f7f9;
-  background-image: radial-gradient(rgba(0, 0, 0, 0.16) 1px, transparent 1px);
-  background-size: 20px 20px;
-  background-position: 0 0;
 }
 html.theme-dark .ProseMirror .mb.mb-visual .mb-preview,
 html.theme-dark .ProseMirror .mb.mb-visual-active .mb-preview,
 html.theme-dark .ProseMirror .mb-visual-active .mb-preview {
   background-color: #1a1b1e;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.10) 1px, transparent 1px);
 }
+/* Dot pattern lives inside the SVG (see mermaidVisualEditDom.ts) so it pans
+   and zooms with the viewport. The base preview just gives it a tinted
+   backdrop. */
 .ProseMirror .mb.mb-visual .mb-svg-host,
 .ProseMirror .mb.mb-visual-active .mb-svg-host,
 .ProseMirror .mb-visual-active .mb-svg-host {

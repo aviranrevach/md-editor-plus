@@ -210,9 +210,17 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       viewportLocked = !viewportLocked;
       toolbar.setViewportLocked(viewportLocked);
       opts.block.dataset.mbViewportLocked = viewportLocked ? 'true' : 'false';
-      // When the user unlocks, do an immediate fit so the diagram recenters
-      // right away. When they lock, leave the current view as-is.
-      if (!viewportLocked) fitSvgViewBoxToNodes(opts.previewPane);
+      if (!viewportLocked) {
+        // Unlocking: immediate fit so the diagram recenters now and
+        // subsequent rerenders re-fit too.
+        fitSvgViewBoxToNodes(opts.previewPane);
+      } else {
+        // Re-locking: snapshot the current viewBox so future rerenders
+        // restore THIS view (the user may have panned/zoomed since the
+        // initial lock).
+        const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+        if (svg) lockedViewBox = svg.getAttribute('viewBox');
+      }
     },
   });
   const selectionRing = document.createElement('div');
@@ -604,6 +612,42 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     if (e.key === 'Escape') {
       if (renameOverlay.isOpen()) { renameOverlay.hide(); return; }
       if (pendingFromId) { pendingFromId = null; pendingPin.classList.add('mb-hidden'); return; }
+      // Panic reset: any in-progress drag/draft state that could leave the
+      // canvas feeling stuck. Escape rescues without exiting the editor.
+      let didReset = false;
+      if (edgeDraft) {
+        if (edgeDraft.pathEl) edgeDraft.pathEl.remove();
+        if (edgeDraft.currentTarget) {
+          const prev = findNodeElementById(edgeDraft.currentTarget, opts.previewPane);
+          prev?.classList.remove('mb-vEdgeTarget');
+        }
+        targetHooksLayer.classList.add('mb-hidden');
+        edgeDraft = null;
+        didReset = true;
+      }
+      if (lineDraft) {
+        if (lineDraft.el) lineDraft.el.remove();
+        lineDraft = null;
+        didReset = true;
+      }
+      if (drag)             { drag = null;             didReset = true; }
+      if (lineHandleDrag)   { lineHandleDrag = null;   didReset = true; }
+      if (lineBodyDrag)     { lineBodyDrag = null;     didReset = true; }
+      if (pan)              {
+        pan = null;
+        opts.previewPane.classList.remove('mb-panning');
+        didReset = true;
+      }
+      if (marquee)          {
+        marquee = null;
+        marqueeEl.classList.add('mb-hidden');
+        didReset = true;
+      }
+      if (didReset) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       opts.onExit();
       return;
     }
@@ -1886,19 +1930,40 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // free canvas around the diagram for dropping new nodes. This runs BEFORE
   // the viewport gets locked, so the SVG has time to size itself once.
   fitSvgViewBoxToNodes(opts.previewPane);
-  // Now lock the viewport — every subsequent fit call (from re-renders) will
-  // be a no-op until the user explicitly unlocks via the toolbar.
+  installDotGrid(opts.previewPane);
+  // Capture the viewBox we just settled on — this is what "locked" means.
+  // Every subsequent mermaid re-render will get its viewBox stamped back to
+  // this value, so structural mutations (adding nodes/edges/stickies) don't
+  // cause mermaid's auto-layout to zoom or pan the canvas.
+  let lockedViewBox: string | null = null;
+  const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (initialSvg) lockedViewBox = initialSvg.getAttribute('viewBox');
   opts.block.dataset.mbViewportLocked = 'true';
   toolbar.setViewportLocked(true);
+
+  function restoreLockedViewBox(): void {
+    if (!viewportLocked || !lockedViewBox) return;
+    const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+    if (!svg) return;
+    if (svg.getAttribute('viewBox') !== lockedViewBox) {
+      svg.setAttribute('viewBox', lockedViewBox);
+    }
+    svg.style.width  = '100%';
+    svg.style.height = '100%';
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  }
 
   return {
     onMermaidRerender(): void {
       // mermaidBlock already called applyPositionsOverlay for us before
       // this. We just refresh toolbar state and re-bind ring/tip to the
       // (possibly newly-positioned) selected nodes.
-      // Re-fit the viewBox only if the viewport is unlocked — otherwise
-      // small edits would pan/zoom the canvas around and annoy users.
-      if (!viewportLocked) fitSvgViewBoxToNodes(opts.previewPane);
+      // When locked: stamp back the original viewBox so mermaid's
+      // auto-layout doesn't drift the canvas. When unlocked: re-fit.
+      if (viewportLocked) restoreLockedViewBox();
+      else                fitSvgViewBoxToNodes(opts.previewPane);
+      // Re-inject the dot grid; mermaid wiped the SVG and rebuilt it.
+      installDotGrid(opts.previewPane);
       const ast = parseMermaid(opts.getSource());
       toolbar.setResetEnabled(getPositions(ast) !== null);
       // Drop any selectedIds that no longer have a node in the SVG.
@@ -3258,6 +3323,61 @@ function closestHook(g: SVGGElement, p: { x: number; y: number }): { x: number; 
 /** document.elementFromPoint, but climb out of any of our drag-related
     overlays (.mb-vEdgeDraft path, the connection dot) so we see the
     SVG nodes underneath. */
+// Install a Miro-style dot grid as a background layer inside the SVG. We
+// use an SVG <pattern> so the dots pan + zoom with the viewport
+// automatically (no JS sync needed) and a <rect> sized to the viewBox that
+// the pattern fills. Idempotent: replaces an existing grid on each call.
+function installDotGrid(host: HTMLElement): void {
+  const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (!svg) return;
+  const dark = document.documentElement.classList.contains('theme-dark');
+  const dotColor = dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.18)';
+  const vb = svg.viewBox?.baseVal;
+  // Need a viewBox to know how big the background rect should be.
+  if (!vb || !isFinite(vb.width) || vb.width <= 0) return;
+
+  // Remove the old grid (if any) before reinstalling — keeps it lean and
+  // lets us update the color when the theme flips.
+  for (const old of Array.from(svg.querySelectorAll('.mb-vDotGrid, #mb-vDotGrid-pattern'))) {
+    old.remove();
+  }
+
+  const ns = 'http://www.w3.org/2000/svg';
+  let defs = svg.querySelector<SVGDefsElement>('defs');
+  if (!defs) {
+    defs = document.createElementNS(ns, 'defs') as SVGDefsElement;
+    svg.insertBefore(defs, svg.firstChild);
+  }
+  const pattern = document.createElementNS(ns, 'pattern');
+  pattern.setAttribute('id', 'mb-vDotGrid-pattern');
+  pattern.setAttribute('width',  '12');
+  pattern.setAttribute('height', '12');
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('cx', '1');
+  dot.setAttribute('cy', '1');
+  dot.setAttribute('r',  '0.9');
+  dot.setAttribute('fill', dotColor);
+  pattern.appendChild(dot);
+  defs.appendChild(pattern);
+
+  // Cover the viewBox (padded so dots reach past the edge if the user
+  // zooms out a little). Placed as the FIRST renderable child so it sits
+  // behind everything.
+  const pad = Math.max(vb.width, vb.height);
+  const bg = document.createElementNS(ns, 'rect');
+  bg.setAttribute('class', 'mb-vDotGrid');
+  bg.setAttribute('x',      String(vb.x - pad));
+  bg.setAttribute('y',      String(vb.y - pad));
+  bg.setAttribute('width',  String(vb.width  + pad * 2));
+  bg.setAttribute('height', String(vb.height + pad * 2));
+  bg.setAttribute('fill', 'url(#mb-vDotGrid-pattern)');
+  bg.setAttribute('pointer-events', 'none');
+  // Insert as the first child AFTER defs so it sits behind everything.
+  if (defs.nextSibling) svg.insertBefore(bg, defs.nextSibling);
+  else                  svg.appendChild(bg);
+}
+
 function elementAtPoint(clientX: number, clientY: number, host: HTMLElement): Element | null {
   let el = document.elementFromPoint(clientX, clientY) as Element | null;
   while (el && host.contains(el)) {
@@ -4657,6 +4777,18 @@ function applyStyleToNode(g: SVGGElement, s: NodeStyle): void {
 // so we cache the original dimensions in dataset on first apply per render
 // and compute the scaled values from those.
 
+// Minimum width/height a shape must keep so its label doesn't overflow. We
+// read the foreignObject's natural box (mermaid sized it to fit the text)
+// plus a small breathing pad.
+function labelMinExtent(g: SVGGElement): { w: number; h: number } {
+  const fo = g.querySelector('foreignObject');
+  if (!fo) return { w: 0, h: 0 };
+  const w = parseFloat(fo.getAttribute('width')  ?? '0') || 0;
+  const h = parseFloat(fo.getAttribute('height') ?? '0') || 0;
+  const PAD = 8;
+  return { w: w + PAD * 2, h: h + PAD * 2 };
+}
+
 function findPrimaryShape(g: SVGGElement): SVGGraphicsElement | null {
   // Mermaid v11 wraps the background shape in g.basic (sometimes nested).
   // Prefer the first shape inside that wrapper; fall back to direct children
@@ -4680,6 +4812,11 @@ function applyNodeScale(g: SVGGElement, sx: number, sy: number): void {
   const tag = shape.tagName.toLowerCase();
   const ds = (shape as SVGGraphicsElement & { dataset: DOMStringMap }).dataset;
 
+  // Don't allow the shape to shrink smaller than its label, otherwise the
+  // text overflows visibly. We measure the label's foreignObject and use it
+  // as a floor on the new dimensions.
+  const labelFloor = labelMinExtent(g);
+
   if (tag === 'rect') {
     let oW = parseFloat(ds.mbOrigW ?? '');
     let oH = parseFloat(ds.mbOrigH ?? '');
@@ -4689,8 +4826,8 @@ function applyNodeScale(g: SVGGElement, sx: number, sy: number): void {
       ds.mbOrigW = String(oW);
       ds.mbOrigH = String(oH);
     }
-    const newW = oW * sx;
-    const newH = oH * sy;
+    const newW = Math.max(oW * sx, labelFloor.w);
+    const newH = Math.max(oH * sy, labelFloor.h);
     shape.setAttribute('width',  String(newW));
     shape.setAttribute('height', String(newH));
     // Recenter around (0,0) so mermaid's translate keeps the node in place.
