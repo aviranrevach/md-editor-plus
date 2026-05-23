@@ -1,4 +1,4 @@
-import { serializeBoard } from '../../src/webview/boardModel';
+import { serializeBoard, parseBoardSource } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 
 describe('serializeBoard', () => {
@@ -88,5 +88,87 @@ describe('serializeBoard', () => {
     expect(out).toMatch(/\|\s*A\s*\|\s*\|\s*c1\s*\|/);
     expect(out).toMatch(/\|\s*B\s*\|\s*\|\s*c1-2\s*\|/);
     expect(out).toMatch(/\|\s*C\s*\|\s*\|\s*c1-3\s*\|/);
+  });
+});
+
+describe('serializeBoard — views', () => {
+  it('emits no board:view section when views array is empty (kanban-only)', () => {
+    const b: Board = {
+      id: 'b1', name: 'X',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title',  type: 'text',   visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+      ],
+      cards: [{ id: 'c1', values: { id: 'c1', Title: 'A', Status: 'Todo' }, body: '' }],
+      orphanBodies: [],
+      views: [],
+      activeView: 'kanban',
+    };
+    const out = serializeBoard(b);
+    expect(out).not.toContain('board:view');
+    expect(out).not.toContain('active-view');
+  });
+
+  it('emits active-view on board:start when not the default', () => {
+    const b: Board = {
+      id: 'b1', name: 'X',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title',  type: 'text',   visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+      ],
+      cards: [],
+      orphanBodies: [],
+      views: [],
+      activeView: 'table',
+    };
+    const out = serializeBoard(b);
+    expect(out).toContain('active-view="table"');
+  });
+
+  it('emits a board:view section with all populated fields', () => {
+    const b: Board = {
+      id: 'b1', name: 'X',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title',  type: 'text',   visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+      ],
+      cards: [],
+      orphanBodies: [],
+      views: [{
+        name: 'table',
+        columns: ['Title', 'Status'],
+        hidden: ['id'],
+        sort: { field: 'Title', dir: 'asc' },
+        groupBy: 'Status',
+        widths: { Title: 200, Status: 100 },
+      }],
+      activeView: 'table',
+    };
+    const out = serializeBoard(b);
+    expect(out).toContain('<!-- board:view name="table"');
+    expect(out).toContain('columns="Title,Status"');
+    expect(out).toContain('hidden="id"');
+    expect(out).toContain('sort="Title,asc"');
+    expect(out).toContain('group="Status"');
+    expect(out).toContain('widths="Title=200,Status=100"');
+  });
+
+  it('preserves extras on round-trip', () => {
+    const md = [
+      '<!-- board:start id="b1" name="X" columns="Todo" field-types="Title=text,Status=status" -->',
+      '<!-- board:view name="table" mystery="future" -->',
+      '| id | Title | Status |',
+      '|----|-------|--------|',
+      '| c1 | A     | Todo   |',
+      '<!-- board:end -->',
+    ].join('\n');
+    const b1 = parseBoardSource(md);
+    const out = serializeBoard(b1);
+    expect(out).toContain('mystery="future"');
+    const b2 = parseBoardSource(out);
+    expect(b2.views[0].extras).toEqual({ mystery: 'future' });
   });
 });

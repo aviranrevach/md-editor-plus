@@ -296,8 +296,27 @@ function serializeStartMarker(board: Board): string {
   }
   if (fieldNames.length) attrs.push(`field-types="${fieldTypes}"`);
   if (hidden.length) attrs.push(`hidden-fields="${hidden.join(',')}"`);
+  if (board.activeView && board.activeView !== 'kanban') {
+    attrs.push(`active-view="${board.activeView}"`);
+  }
 
   return `<!-- board:start ${attrs.join(' ')} -->`;
+}
+
+function serializeView(v: ViewDef): string {
+  const parts: string[] = [`name="${v.name}"`];
+  if (v.columns && v.columns.length > 0) parts.push(`columns="${v.columns.join(',')}"`);
+  if (v.hidden  && v.hidden.length  > 0) parts.push(`hidden="${v.hidden.join(',')}"`);
+  if (v.sort)    parts.push(`sort="${v.sort.field},${v.sort.dir}"`);
+  if (v.groupBy) parts.push(`group="${v.groupBy}"`);
+  if (v.widths && Object.keys(v.widths).length > 0) {
+    const widthStr = Object.entries(v.widths).map(([k, n]) => `${k}=${n}`).join(',');
+    parts.push(`widths="${widthStr}"`);
+  }
+  if (v.extras) {
+    for (const [k, val] of Object.entries(v.extras)) parts.push(`${k}="${val}"`);
+  }
+  return `<!-- board:view ${parts.join(' ')} -->`;
 }
 
 function serializeTable(board: Board): string {
@@ -351,10 +370,13 @@ export function serializeBoard(board: Board): string {
 
   const sections: string[] = [
     serializeStartMarker(normalized),
-    '',
-    serializeTable(normalized),
-    '',
   ];
+  for (const view of normalized.views) {
+    sections.push(serializeView(view));
+  }
+  sections.push('');
+  sections.push(serializeTable(normalized));
+  sections.push('');
   const bodies = serializeBodies(normalized);
   if (bodies) {
     sections.push(bodies);
