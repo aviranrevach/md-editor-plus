@@ -1,6 +1,7 @@
 // src/webview/boardBlock.ts
 import { parseBoardSource, serializeBoard, type Board } from './boardModel';
 import { mountKanban } from './boardKanbanRender';
+// import { mountTable } from './boardTableRender';  // arrives in Task 9
 import { openBoardSidePanel } from './boardSidePanel';
 import { openPropertiesMenu } from './boardProperties';
 
@@ -84,7 +85,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   function mutate(next: Board): void {
     board = next;
     opts.onMutate(serializeBoard(board));
-    renderer.update(board);
+    renderer!.update(board);
   }
 
   const ctx: BoardRendererCtx = {
@@ -116,14 +117,21 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     },
     readonly: opts.isReadOnly(),
   };
-  const renderer = mountKanban(ctx);
+  let renderer: BoardRendererOps | null = null;
+  function mountForActiveView(): void {
+    renderer?.destroy();
+    // When mountTable lands (Task 9), branch here on board.activeView.
+    // For now, kanban is the only renderer available, so both views map to it.
+    renderer = mountKanban(ctx);
+  }
+  mountForActiveView();
 
   return {
     dom,
     update(source: string): void {
       board = parseBoardSource(source);
       ctx.readonly = opts.isReadOnly();
-      renderer.update(board);
+      renderer!.update(board);
     },
   };
 }
