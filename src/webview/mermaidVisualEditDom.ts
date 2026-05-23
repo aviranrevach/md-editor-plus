@@ -2781,14 +2781,16 @@ function makeShapePicker(
   menu.className = 'mb-vCtx-menu mb-vCtx-popLight mb-vCtx-shapegrid mb-hidden';
 
   const shapes: Array<[NodeShape, string]> = [
-    ['rect',       'Rectangle'],
-    ['round',      'Rounded rectangle'],
-    ['pill',       'Pill'],
-    ['circle',     'Circle'],
-    ['diamond',    'Diamond'],
-    ['hexagon',    'Hexagon'],
-    ['cylinder',   'Cylinder'],
-    ['subroutine', 'Subroutine'],
+    ['rect',          'Rectangle'],
+    ['round',         'Rounded rectangle'],
+    ['pill',          'Pill'],
+    ['circle',        'Circle'],
+    ['diamond',       'Diamond'],
+    ['hexagon',       'Hexagon'],
+    ['cylinder',      'Cylinder'],
+    ['subroutine',    'Subroutine'],
+    ['trapezoid',     'Trapezoid'],
+    ['parallelogram', 'Parallelogram'],
   ];
   const buttons = new Map<NodeShape, HTMLButtonElement>();
   for (const [shape, label] of shapes) {
@@ -2846,6 +2848,12 @@ function shapeIconSvg(shape: NodeShape): string {
       return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><ellipse cx="12" cy="7" rx="6" ry="2"/><path d="M6 7v10c0 1.1 2.7 2 6 2s6-.9 6-2V7"/></svg>`;
     case 'subroutine':
       return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><rect x="4" y="6" width="16" height="12"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/></svg>`;
+    case 'trapezoid':
+      // Wider at the bottom — classic "priority / manual op" shape.
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><path d="M7 6h10l4 12H3l4-12z"/></svg>`;
+    case 'parallelogram':
+      // Lean-right — classic "input / output" shape.
+      return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><path d="M8 6h13l-5 12H3l5-12z"/></svg>`;
     case 'text':
     default:
       return `<svg viewBox="0 0 24 24" width="18" height="18" ${stroke}><path d="M5 8h14M12 8v10"/></svg>`;

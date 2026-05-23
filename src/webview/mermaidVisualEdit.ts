@@ -10,15 +10,17 @@
 // their original positions.
 
 export type NodeShape =
-  | 'rect'        // A[Label]
-  | 'pill'        // A([Label])     stadium
-  | 'circle'      // A((Label))
-  | 'diamond'     // A{Label}
-  | 'round'       // A(Label)
-  | 'subroutine'  // A[[Label]]
-  | 'cylinder'    // A[(Label)]
-  | 'hexagon'     // A{{Label}}
-  | 'text'        // bare — emitted as A["Label"]
+  | 'rect'          // A[Label]
+  | 'pill'          // A([Label])     stadium
+  | 'circle'        // A((Label))
+  | 'diamond'       // A{Label}
+  | 'round'         // A(Label)
+  | 'subroutine'    // A[[Label]]
+  | 'cylinder'      // A[(Label)]
+  | 'hexagon'       // A{{Label}}
+  | 'trapezoid'     // A[\Label/]     base bottom — priority/manual op shape
+  | 'parallelogram' // A[/Label/]     lean-right — data input/output shape
+  | 'text'          // bare — emitted as A["Label"]
   ;
 
 // `raw` holds the original source text of the parsed line, indent stripped.
@@ -519,14 +521,18 @@ export function deleteEdgeByKey(ast: Ast, key: string): void {
 // Order matters — more specific (longer) bracket pairs must come first so a
 // "subroutine" line doesn't get caught by the "rect" regex.
 const NODE_SHAPES: Array<[NodeShape, RegExp]> = [
-  ['subroutine', /^([A-Za-z][\w-]*)\[\[\s*"?([^\]"]*?)"?\s*\]\]$/], // A[[Label]]
-  ['cylinder',   /^([A-Za-z][\w-]*)\[\(\s*"?([^)"]*?)"?\s*\)\]$/],  // A[(Label)]
-  ['pill',       /^([A-Za-z][\w-]*)\(\[\s*"?([^\]"]*?)"?\s*\]\)$/], // A([Label])
-  ['circle',     /^([A-Za-z][\w-]*)\(\(\s*"?([^)"]*?)"?\s*\)\)$/],  // A((Label))
-  ['hexagon',    /^([A-Za-z][\w-]*)\{\{\s*"?([^}"]*?)"?\s*\}\}$/],  // A{{Label}}
-  ['rect',       /^([A-Za-z][\w-]*)\[\s*"?([^\]"]*?)"?\s*\]$/],     // A[Label]
-  ['round',      /^([A-Za-z][\w-]*)\(\s*"?([^)"]*?)"?\s*\)$/],      // A(Label)
-  ['diamond',    /^([A-Za-z][\w-]*)\{\s*"?([^}"]*?)"?\s*\}$/],      // A{Label}
+  ['subroutine',    /^([A-Za-z][\w-]*)\[\[\s*"?([^\]"]*?)"?\s*\]\]$/],     // A[[Label]]
+  ['cylinder',      /^([A-Za-z][\w-]*)\[\(\s*"?([^)"]*?)"?\s*\)\]$/],      // A[(Label)]
+  ['pill',          /^([A-Za-z][\w-]*)\(\[\s*"?([^\]"]*?)"?\s*\]\)$/],     // A([Label])
+  ['circle',        /^([A-Za-z][\w-]*)\(\(\s*"?([^)"]*?)"?\s*\)\)$/],      // A((Label))
+  ['hexagon',       /^([A-Za-z][\w-]*)\{\{\s*"?([^}"]*?)"?\s*\}\}$/],      // A{{Label}}
+  // Trapezoid / parallelogram family — slash/backslash delimiters. These must
+  // come before `rect` (whose `[…]` would otherwise gobble the entire match).
+  ['trapezoid',     /^([A-Za-z][\w-]*)\[\\\s*"?([^"]*?)"?\s*\/\]$/],       // A[\Label/]
+  ['parallelogram', /^([A-Za-z][\w-]*)\[\/\s*"?([^"]*?)"?\s*\/\]$/],       // A[/Label/]
+  ['rect',          /^([A-Za-z][\w-]*)\[\s*"?([^\]"]*?)"?\s*\]$/],         // A[Label]
+  ['round',         /^([A-Za-z][\w-]*)\(\s*"?([^)"]*?)"?\s*\)$/],          // A(Label)
+  ['diamond',       /^([A-Za-z][\w-]*)\{\s*"?([^}"]*?)"?\s*\}$/],          // A{Label}
 ];
 
 // `%% mb-edge-styles: { "A->B->0": { type: "dashed", thickness: 2, color: "#...", opacity: 0.8, animated: true } }`
@@ -736,15 +742,17 @@ function emitNode(n: NodeDecl): string {
   // restore unquoted forms; visual edits never strip quotes.)
   const label = `"${n.label.replace(/"/g, '\\"')}"`;
   switch (n.shape) {
-    case 'rect':       return `${n.id}[${label}]`;
-    case 'pill':       return `${n.id}([${label}])`;
-    case 'circle':     return `${n.id}((${label}))`;
-    case 'diamond':    return `${n.id}{${label}}`;
-    case 'round':      return `${n.id}(${label})`;
-    case 'subroutine': return `${n.id}[[${label}]]`;
-    case 'cylinder':   return `${n.id}[(${label})]`;
-    case 'hexagon':    return `${n.id}{{${label}}}`;
-    case 'text':       return `${n.id}[${label}]`;
+    case 'rect':          return `${n.id}[${label}]`;
+    case 'pill':          return `${n.id}([${label}])`;
+    case 'circle':        return `${n.id}((${label}))`;
+    case 'diamond':       return `${n.id}{${label}}`;
+    case 'round':         return `${n.id}(${label})`;
+    case 'subroutine':    return `${n.id}[[${label}]]`;
+    case 'cylinder':      return `${n.id}[(${label})]`;
+    case 'hexagon':       return `${n.id}{{${label}}}`;
+    case 'trapezoid':     return `${n.id}[\\${label}/]`;
+    case 'parallelogram': return `${n.id}[/${label}/]`;
+    case 'text':          return `${n.id}[${label}]`;
   }
 }
 
