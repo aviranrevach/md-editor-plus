@@ -1295,3 +1295,21 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   font-weight: 600;
 }
 .bd-hidden { display: none !important; }
+
+/* ── Table view ─────────────────────────────────────────────────────────── */
+.bd-table-host { padding: 8px 10px 12px 10px; overflow-x: auto; }
+.bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
+.bd-table thead th {
+  text-align: left;
+  padding: 8px 10px;
+  font: 600 10.5px ui-sans-serif, sans-serif;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.bd-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
+.bd-table-row:hover { background: var(--block-hover); }
+.bd-table-gutter { width: 36px; }
+.bd-table-empty { padding: 60px 0; text-align: center; color: var(--text-secondary); font-size: 13px; }

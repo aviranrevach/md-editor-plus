@@ -1,7 +1,7 @@
 // src/webview/boardBlock.ts
 import { parseBoardSource, serializeBoard, type Board } from './boardModel';
 import { mountKanban } from './boardKanbanRender';
-// import { mountTable } from './boardTableRender';  // arrives in Task 9
+import { mountTable } from './boardTableRender';
 import { openBoardSidePanel } from './boardSidePanel';
 
 
@@ -120,9 +120,9 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   let renderer: BoardRendererOps | null = null;
   function mountForActiveView(): void {
     renderer?.destroy();
-    // When mountTable lands (Task 9), branch here on board.activeView.
-    // For now, kanban is the only renderer available, so both views map to it.
-    renderer = mountKanban(ctx);
+    renderer = board.activeView === 'table'
+      ? mountTable(ctx)
+      : mountKanban(ctx);
   }
   mountForActiveView();
 
