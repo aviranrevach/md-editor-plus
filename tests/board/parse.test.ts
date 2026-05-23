@@ -14,6 +14,8 @@ describe('parseBoardSource — minimal', () => {
       ],
       cards: [],
       orphanBodies: [],
+      views: [],
+      activeView: 'kanban',
     });
   });
 });

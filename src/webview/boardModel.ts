@@ -20,6 +20,18 @@ export interface Card {
   body: string;
 }
 
+export interface ViewDef {
+  name: string;
+  // table-only (kanban ignores):
+  columns?:  string[];
+  hidden?:   string[];
+  sort?:     { field: string; dir: 'asc' | 'desc' };
+  groupBy?:  string;
+  widths?:   Record<string, number>;
+  // Unknown attributes preserved verbatim on round-trip.
+  extras?:   Record<string, string>;
+}
+
 export interface Board {
   id: string;
   name: string;
@@ -27,6 +39,8 @@ export interface Board {
   fields: FieldDef[];
   cards: Card[];
   orphanBodies: { id: string; body: string }[];  // preserved verbatim on round-trip
+  views: ViewDef[];
+  activeView: string;
 }
 
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
@@ -199,6 +213,8 @@ export function parseBoardSource(source: string): Board {
     fields,
     cards,
     orphanBodies,
+    views: [],
+    activeView: 'kanban',
   };
 }
 
