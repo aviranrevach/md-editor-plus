@@ -3352,11 +3352,11 @@ function closestHook(g: SVGGElement, p: { x: number; y: number }): { x: number; 
 // as you zoom in past a threshold, the spacing halves; as you zoom out,
 // it doubles. Dots stay visually consistent at any zoom level.
 
-const DOT_GRID_BASE_UNIT = 8;          // SVG user units per "step"
-const DOT_GRID_TARGET_SCREEN_PX = 16;   // ideal on-screen distance between dots
+const DOT_GRID_BASE_UNIT = 4;          // SVG user units per "step" (small base → tighter dots)
+const DOT_GRID_TARGET_SCREEN_PX = 22;   // ideal on-screen distance between dots
+const DOT_GRID_RADIUS_RATIO = 0.10;     // dot radius = ratio * spacing (visible at any zoom)
 
 function gridSpacingForScale(scale: number): number {
-  // Want: spacing_screen_px = unitSpacing * scale ≈ DOT_GRID_TARGET_SCREEN_PX
   // Snap unitSpacing to base * 2^level so spacing changes only at thresholds.
   const safe = Math.max(0.001, scale);
   const desiredUnit = DOT_GRID_TARGET_SCREEN_PX / safe;
@@ -3368,7 +3368,7 @@ function installDotGrid(host: HTMLElement): void {
   const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
   if (!svg) return;
   const dark = document.documentElement.classList.contains('theme-dark');
-  const dotColor = dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.18)';
+  const dotColor = dark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.28)';
   const vb = svg.viewBox?.baseVal;
   if (!vb || !isFinite(vb.width) || vb.width <= 0) return;
 
@@ -3385,16 +3385,19 @@ function installDotGrid(host: HTMLElement): void {
   }
 
   // Start at the baseline spacing — `updateDotGrid` will rescale on zoom.
-  const spacing = DOT_GRID_BASE_UNIT * 2;
+  // Pick a sensible initial spacing for the current "natural" zoom rather
+  // than the absolute base; the level-snap math fires immediately anyway.
+  const spacing = gridSpacingForScale(1);
+  const radius  = Math.max(0.6, spacing * DOT_GRID_RADIUS_RATIO);
   const pattern = document.createElementNS(ns, 'pattern');
   pattern.setAttribute('id', 'mb-vDotGrid-pattern');
   pattern.setAttribute('width',  String(spacing));
   pattern.setAttribute('height', String(spacing));
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
   const dot = document.createElementNS(ns, 'circle');
-  dot.setAttribute('cx', '0');
-  dot.setAttribute('cy', '0');
-  dot.setAttribute('r',  '0.9');
+  dot.setAttribute('cx', String(spacing / 2));
+  dot.setAttribute('cy', String(spacing / 2));
+  dot.setAttribute('r',  String(radius));
   dot.setAttribute('fill', dotColor);
   pattern.appendChild(dot);
   defs.appendChild(pattern);
@@ -3415,14 +3418,22 @@ function installDotGrid(host: HTMLElement): void {
   else                  svg.appendChild(bg);
 }
 
-// Update the pattern spacing for the current zoom — call on every viewport
-// change. Cheap: just an attribute write.
+// Update the pattern spacing + dot radius for the current zoom — call on
+// every viewport change. Cheap: just attribute writes. The dot's circle
+// scales with the new spacing so it stays visible at any zoom level.
 function updateDotGrid(host: HTMLElement, scale: number): void {
   const pattern = host.querySelector<SVGPatternElement>('#mb-vDotGrid-pattern');
   if (!pattern) return;
   const spacing = gridSpacingForScale(scale);
+  const radius  = Math.max(0.6, spacing * DOT_GRID_RADIUS_RATIO);
   pattern.setAttribute('width',  String(spacing));
   pattern.setAttribute('height', String(spacing));
+  const dot = pattern.querySelector('circle');
+  if (dot) {
+    dot.setAttribute('cx', String(spacing / 2));
+    dot.setAttribute('cy', String(spacing / 2));
+    dot.setAttribute('r',  String(radius));
+  }
 }
 
 function elementAtPoint(clientX: number, clientY: number, host: HTMLElement): Element | null {

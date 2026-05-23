@@ -27,7 +27,7 @@ const ICON_EXPAND = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const ICON_COPY   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const ICON_PENCIL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`;
 const ICON_ALERT  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
-const ICON_CARET  = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>`;
+const ICON_MORE   = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5"  cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>`;
 
 const MermaidBlock = CodeBlock.extend({
   name: 'codeBlock', // keep the same node type as the base CodeBlock
@@ -64,25 +64,24 @@ function buildMermaidView(props: unknown) {
   dom.className = 'mb';
   dom.dataset.lang = 'mermaid';
 
-  // ── Header ─────────────────────────────────────────────────────────────
+  // ── Header (floating chrome, no bar) ─────────────────────────────────────
+  // Two icon buttons in the top-right: Expand + a "more" three-dots menu
+  // that contains the Edit toggle and all copy / download actions. The
+  // chrome is hidden in preview mode unless the user hovers the block;
+  // it stays visible while editing source or in visual-edit mode.
   const header = document.createElement('div');
   header.className = 'mb-header';
   header.contentEditable = 'false';
 
-  const langEl = document.createElement('span');
-  langEl.className = 'mb-lang';
-  langEl.textContent = 'mermaid';
-
-  const actions = document.createElement('div');
-  actions.className = 'mb-actions';
-
-  const toggle = buildToggle();
-  const expandBtn = buildIconButton(`${ICON_EXPAND}<span>Expand</span>`, 'Open fullscreen');
+  const expandBtn = buildIconButton(ICON_EXPAND, 'Open fullscreen');
   expandBtn.classList.add('mb-expand');
-  const copySplit = buildCopySplit();
+  const more = buildMoreMenu();
+  // Compatibility shim: the rest of the file talks to a `toggle` and
+  // `copySplit` object — we expose the same surface from inside `more`.
+  const toggle = more.toggle;
+  const copySplit = more.copy;
 
-  actions.append(toggle.el, expandBtn, copySplit.el);
-  header.append(langEl, actions);
+  header.append(expandBtn, more.el);
 
   // ── Preview pane ───────────────────────────────────────────────────────
   // preview = outer pane (also hosts visual-edit overlays as siblings)
@@ -421,6 +420,142 @@ function buildToggle(): ToggleHandle {
   };
 }
 
+// "More" dropdown menu — combines the Edit toggle, Copy actions, and
+// downloads behind a single 3-dots icon. Exposes the existing `toggle`
+// and `copySplit` handles so the rest of the file keeps working.
+interface MoreMenuHandle {
+  el:       HTMLElement;
+  toggle:   ToggleHandle;
+  copy:     CopySplitHandle;
+}
+function buildMoreMenu(): MoreMenuHandle {
+  const wrap = document.createElement('div');
+  wrap.className = 'mb-more';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'mb-iconbtn mb-more-btn';
+  btn.innerHTML = ICON_MORE;
+  btn.setAttribute('aria-label', 'More actions');
+  btn.setAttribute('aria-haspopup', 'menu');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.dataset.tip = 'More';
+
+  const menu = document.createElement('div');
+  menu.className = 'mb-more-menu mb-hidden';
+  menu.setAttribute('role', 'menu');
+
+  // Edit toggle row — switch lives inside the menu, with a left-side label.
+  const toggleRow = document.createElement('div');
+  toggleRow.className = 'mb-more-row mb-more-row-toggle';
+  toggleRow.setAttribute('role', 'menuitemcheckbox');
+  toggleRow.setAttribute('aria-label', 'Edit mermaid source');
+  toggleRow.tabIndex = 0;
+  const innerToggle = buildToggle();
+  // The row itself is clickable AND the switch reflects state.
+  const toggleLabel = document.createElement('span');
+  toggleLabel.className = 'mb-more-row-label';
+  toggleLabel.textContent = 'Edit';
+  // Hide the toggle's own internal label since the row supplies its own.
+  innerToggle.el.querySelector('.mb-toggle-label')?.classList.add('mb-hidden');
+  toggleRow.append(toggleLabel, innerToggle.el);
+
+  const sep1 = document.createElement('div');
+  sep1.className = 'mb-copy-sep';
+  sep1.setAttribute('role', 'separator');
+
+  // Copy / download items.
+  const items: Array<[string, string]> = [
+    ['copy-code',    'Copy mermaid code'],
+    ['copy-svg',     'Copy as SVG'],
+    ['download-svg', 'Download as SVG'],
+    ['download-png', 'Download as PNG'],
+  ];
+  for (const [action, label] of items) {
+    const it = document.createElement('button');
+    it.type = 'button';
+    it.className = 'mb-more-row';
+    it.setAttribute('role', 'menuitem');
+    it.dataset.action = action;
+    it.textContent = label;
+    menu.appendChild(it);
+  }
+
+  // Place toggle row + separator at the top.
+  menu.prepend(sep1);
+  menu.prepend(toggleRow);
+
+  wrap.append(btn, menu);
+
+  // Stop ProseMirror from stealing focus.
+  [btn, toggleRow, innerToggle.el].forEach(b => {
+    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  });
+
+  function openMenu(): void {
+    menu.classList.remove('mb-hidden');
+    btn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('mousedown', onOutside, true);
+  }
+  function closeMenu(): void {
+    menu.classList.add('mb-hidden');
+    btn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', onOutside, true);
+  }
+  function onOutside(e: MouseEvent): void {
+    if (!wrap.contains(e.target as Node)) closeMenu();
+  }
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (menu.classList.contains('mb-hidden')) openMenu();
+    else closeMenu();
+  });
+
+  // Toggle row: clicking anywhere on the row flips the switch via the
+  // outer wiring (we expose innerToggle.el so the existing handlers work).
+  // Re-dispatch a click on the inner toggle from a click on the row.
+  toggleRow.addEventListener('click', (e) => {
+    // Don't loop when the click was on the toggle button itself.
+    if ((e.target as Element).closest('.mb-toggle')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    innerToggle.el.click();
+  });
+
+  // Menu items: copy actions etc. We expose the same `onMain` / `onMenu`
+  // interface as the old CopySplit so the existing wiring stays intact.
+  const mainListeners: (() => void)[] = [];
+  const menuListeners = new Map<string, (() => void)>();
+  menu.addEventListener('click', (e) => {
+    const item = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+    if (!item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    menuListeners.get(item.dataset.action ?? '')?.();
+    closeMenu();
+  });
+
+  // The legacy copySplit had a `flash` method that updated a label. Without
+  // a visible inline label we use a transient snackbar-style text on the
+  // first menu item. Best-effort — copy actions still work either way.
+  function flash(text: string): void {
+    const target = menu.querySelector<HTMLElement>('[data-action="copy-code"]');
+    if (!target) return;
+    const previous = target.textContent;
+    target.textContent = text;
+    setTimeout(() => { target.textContent = previous; }, 1500);
+  }
+
+  const copy: CopySplitHandle = {
+    el: wrap,
+    onMain(cb)  { mainListeners.push(cb); }, // unused now; preserved for API.
+    onMenu(action, cb) { menuListeners.set(action, cb); },
+    flash,
+  };
+
+  return { el: wrap, toggle: innerToggle, copy };
+}
+
 function buildIconButton(html: string, tip: string): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
@@ -436,97 +571,6 @@ interface CopySplitHandle {
   onMain:  (cb: () => void) => void;
   onMenu:  (action: string, cb: () => void) => void;
   flash:   (text: string) => void;
-}
-
-function buildCopySplit(): CopySplitHandle {
-  const wrap = document.createElement('div');
-  wrap.className = 'mb-copy';
-
-  const main = document.createElement('button');
-  main.type = 'button';
-  main.className = 'mb-copy-main';
-  main.innerHTML = `${ICON_COPY}<span class="mb-copy-label">Copy</span>`;
-  main.setAttribute('aria-label', 'Copy mermaid code');
-
-  const caret = document.createElement('button');
-  caret.type = 'button';
-  caret.className = 'mb-copy-caret';
-  caret.innerHTML = ICON_CARET;
-  caret.setAttribute('aria-label', 'More copy and download options');
-  caret.setAttribute('aria-haspopup', 'menu');
-  caret.setAttribute('aria-expanded', 'false');
-
-  const menu = document.createElement('div');
-  menu.className = 'mb-copy-menu mb-hidden';
-  menu.setAttribute('role', 'menu');
-  menu.innerHTML = `
-    <button type="button" role="menuitem" data-action="copy-code">Copy mermaid code</button>
-    <button type="button" role="menuitem" data-action="copy-svg">Copy as SVG</button>
-    <div class="mb-copy-sep" role="separator"></div>
-    <button type="button" role="menuitem" data-action="download-svg">Download as SVG</button>
-    <button type="button" role="menuitem" data-action="download-png">Download as PNG</button>
-  `;
-
-  wrap.append(main, caret, menu);
-
-  // Stop ProseMirror from stealing focus.
-  [main, caret].forEach(b => {
-    b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
-  });
-
-  function openMenu(): void {
-    menu.classList.remove('mb-hidden');
-    caret.setAttribute('aria-expanded', 'true');
-    document.addEventListener('mousedown', onOutside, true);
-  }
-  function closeMenu(): void {
-    menu.classList.add('mb-hidden');
-    caret.setAttribute('aria-expanded', 'false');
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  function onOutside(e: MouseEvent): void {
-    if (!wrap.contains(e.target as Node)) closeMenu();
-  }
-  caret.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (menu.classList.contains('mb-hidden')) openMenu();
-    else closeMenu();
-  });
-
-  const mainListeners: (() => void)[] = [];
-  const menuListeners = new Map<string, (() => void)>();
-
-  main.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    mainListeners.forEach(fn => fn());
-  });
-
-  menu.addEventListener('click', (e) => {
-    const item = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
-    if (!item) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const action = item.dataset.action ?? '';
-    menuListeners.get(action)?.();
-    closeMenu();
-  });
-
-  function flash(text: string): void {
-    const original = main.querySelector('.mb-copy-label');
-    if (!original) return;
-    const previous = original.textContent;
-    original.textContent = text;
-    setTimeout(() => { original.textContent = previous; }, 1500);
-  }
-
-  return {
-    el: wrap,
-    onMain(cb) { mainListeners.push(cb); },
-    onMenu(action, cb) { menuListeners.set(action, cb); },
-    flash,
-  };
 }
 
 // ── HTML fragment helpers ───────────────────────────────────────────────────

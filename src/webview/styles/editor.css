@@ -2666,62 +2666,102 @@ html.source-word-wrap #source-view .cb-content {
 }
 
 .ProseMirror .mb-header {
+  position: absolute;
+  top: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
   font-family: var(--font-body);
   user-select: none;
-}
-
-/* Visual-edit canvas: the header is fully opaque (so the dotted canvas
-   below doesn't show through it) but with a soft bottom shadow instead of
-   a hard border, so it feels less rigid. Expand + Copy still hide until
-   hover. */
-.ProseMirror .mb.mb-visual .mb-header,
-.ProseMirror .mb.mb-visual-active .mb-header,
-.ProseMirror .mb-visual-active .mb-header {
-  background: var(--bg);
-  border-bottom-color: transparent;
-  box-shadow: 0 1px 0 var(--border);
-  position: relative;
-  z-index: 2;
-  transition: box-shadow 160ms ease;
-}
-.ProseMirror .mb.mb-visual .mb-header:hover,
-.ProseMirror .mb.mb-visual-active .mb-header:hover,
-.ProseMirror .mb-visual-active .mb-header:hover {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-}
-.ProseMirror .mb.mb-visual .mb-header:hover,
-.ProseMirror .mb.mb-visual-active .mb-header:hover,
-.ProseMirror .mb-visual-active .mb-header:hover {
-  opacity: 1;
-  background: var(--bg-secondary);
-  border-bottom-color: var(--border);
-}
-/* Expand + Copy buttons hide until the header is hovered. The Edit toggle
-   stays so users have a way back to the source view. */
-.ProseMirror .mb.mb-visual .mb-header .mb-expand,
-.ProseMirror .mb.mb-visual .mb-header .mb-copy,
-.ProseMirror .mb.mb-visual-active .mb-header .mb-expand,
-.ProseMirror .mb.mb-visual-active .mb-header .mb-copy,
-.ProseMirror .mb-visual-active .mb-header .mb-expand,
-.ProseMirror .mb-visual-active .mb-header .mb-copy {
+  z-index: 4;
   opacity: 0;
+  transition: opacity 140ms ease;
   pointer-events: none;
-  transition: opacity 160ms ease;
 }
-.ProseMirror .mb.mb-visual .mb-header:hover .mb-expand,
-.ProseMirror .mb.mb-visual .mb-header:hover .mb-copy,
-.ProseMirror .mb.mb-visual-active .mb-header:hover .mb-expand,
-.ProseMirror .mb.mb-visual-active .mb-header:hover .mb-copy,
-.ProseMirror .mb-visual-active .mb-header:hover .mb-expand,
-.ProseMirror .mb-visual-active .mb-header:hover .mb-copy {
+/* Hovering the block reveals the chrome in view mode. */
+.ProseMirror .mb:hover > .mb-header { opacity: 1; pointer-events: auto; }
+/* While editing source OR in visual-edit, the chrome is always shown. */
+.ProseMirror .mb.mb-editing > .mb-header,
+.ProseMirror .mb.mb-visual > .mb-header,
+.ProseMirror .mb.mb-visual-active > .mb-header {
   opacity: 1;
   pointer-events: auto;
+}
+/* The block needs to be a positioning context so the absolute header
+   anchors to its corner, and we need it to stretch over the preview. */
+.ProseMirror .mb { position: relative; }
+
+/* Floating header icon buttons — top-right of the block. */
+.ProseMirror .mb-header .mb-iconbtn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.ProseMirror .mb-header .mb-iconbtn:hover {
+  background: var(--block-hover);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.ProseMirror .mb-header .mb-iconbtn svg { width: 14px; height: 14px; }
+/* Buttons used to wrap "<svg/><span>Expand</span>" — keep only the icon. */
+.ProseMirror .mb-header .mb-iconbtn > span { display: none; }
+
+/* "More" dropdown menu — three-dots opens a popover with Edit toggle +
+   copy / download actions. Matches the rest of our white popover design. */
+.ProseMirror .mb-more { position: relative; display: inline-flex; }
+.ProseMirror .mb-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 1px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  z-index: 5;
+}
+.ProseMirror .mb-more-menu.mb-hidden { display: none; }
+.ProseMirror .mb-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+  text-align: left;
+  width: 100%;
+}
+.ProseMirror .mb-more-row:hover { background: var(--block-hover); }
+.ProseMirror .mb-more-row-toggle { justify-content: space-between; }
+.ProseMirror .mb-more-row-label { color: var(--text-primary); }
+.ProseMirror .mb-more-row-toggle .mb-toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .ProseMirror .mb-lang {
