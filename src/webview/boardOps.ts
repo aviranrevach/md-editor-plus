@@ -14,7 +14,10 @@ function pruneView(board: Board, viewName: string): void {
   const idx = board.views.findIndex(x => x.name === viewName);
   if (idx < 0) return;
   const v = board.views[idx];
-  const empty = !v.columns && !v.hidden && !v.sort && !v.groupBy && !v.widths && !v.extras;
+  const hasColumns = !!v.columns && v.columns.length > 0;
+  const hasHidden  = !!v.hidden  && v.hidden.length  > 0;
+  const hasWidths  = !!v.widths  && Object.keys(v.widths).length > 0;
+  const empty = !hasColumns && !hasHidden && !v.sort && !v.groupBy && !hasWidths && !v.extras;
   if (empty) board.views.splice(idx, 1);
 }
 
@@ -69,14 +72,27 @@ export function deleteField(board: Board, field: string): void {
   for (const card of board.cards) delete card.values[field];
   // Clean every view that referenced this field.
   for (const v of board.views) {
-    if (v.columns) v.columns = v.columns.filter(n => n !== field);
-    if (v.hidden)  v.hidden  = v.hidden.filter(n => n !== field);
+    if (v.columns) {
+      v.columns = v.columns.filter(n => n !== field);
+      if (v.columns.length === 0) delete v.columns;
+    }
+    if (v.hidden) {
+      v.hidden = v.hidden.filter(n => n !== field);
+      if (v.hidden.length === 0) delete v.hidden;
+    }
     if (v.sort?.field    === field) delete v.sort;
     if (v.groupBy        === field) delete v.groupBy;
-    if (v.widths?.[field] !== undefined) delete v.widths[field];
+    if (v.widths?.[field] !== undefined) {
+      delete v.widths[field];
+      if (Object.keys(v.widths).length === 0) delete v.widths;
+    }
   }
-  // After cleanup, prune empty views.
+  // After cleanup, prune views that have nothing meaningful left.
   board.views = board.views.filter(v =>
-    v.columns || v.hidden || v.sort || v.groupBy || v.widths || v.extras,
+    (!!v.columns && v.columns.length > 0) ||
+    (!!v.hidden  && v.hidden.length  > 0) ||
+    v.sort || v.groupBy ||
+    (!!v.widths  && Object.keys(v.widths).length > 0) ||
+    v.extras,
   );
 }

@@ -32,9 +32,10 @@ describe('boardOps.setViewSort', () => {
     expect(b.views[0]).toEqual({ name: 'table', sort: { field: 'Title', dir: 'asc' } });
   });
   it('clears sort when passed null', () => {
-    const b = makeBoard({ views: [{ name: 'table', sort: { field: 'X', dir: 'asc' } }] });
+    const b = makeBoard({ views: [{ name: 'table', sort: { field: 'X', dir: 'asc' }, groupBy: 'Status' }] });
     ops.setViewSort(b, 'table', null);
-    expect(b.views[0]?.sort).toBeUndefined();
+    expect(b.views[0].sort).toBeUndefined();
+    expect(b.views[0].groupBy).toBe('Status');   // view survived because groupBy is still set
   });
 });
 
@@ -45,9 +46,10 @@ describe('boardOps.setViewGroup', () => {
     expect(b.views[0].groupBy).toBe('Status');
   });
   it('clears groupBy when passed null', () => {
-    const b = makeBoard({ views: [{ name: 'table', groupBy: 'Status' }] });
+    const b = makeBoard({ views: [{ name: 'table', groupBy: 'Status', sort: { field: 'X', dir: 'asc' } }] });
     ops.setViewGroup(b, 'table', null);
-    expect(b.views[0]?.groupBy).toBeUndefined();
+    expect(b.views[0].groupBy).toBeUndefined();
+    expect(b.views[0].sort).toEqual({ field: 'X', dir: 'asc' });
   });
 });
 
@@ -91,5 +93,22 @@ describe('boardOps.deleteField', () => {
     expect(tableView?.sort).toBeUndefined();
     expect(tableView?.groupBy).toBeUndefined();
     expect(tableView?.widths?.Owner).toBeUndefined();
+  });
+});
+
+describe('boardOps.deleteField — empty-container cleanup', () => {
+  it('removes view that ends up with only an empty columns array', () => {
+    const b = makeBoard({
+      views: [{ name: 'table', columns: ['Owner'] }],
+    });
+    ops.deleteField(b, 'Owner');
+    expect(b.views).toHaveLength(0);
+  });
+  it('removes view that ends up with only an empty widths object', () => {
+    const b = makeBoard({
+      views: [{ name: 'table', widths: { Owner: 200 } }],
+    });
+    ops.deleteField(b, 'Owner');
+    expect(b.views).toHaveLength(0);
   });
 });
