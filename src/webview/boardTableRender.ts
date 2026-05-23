@@ -2,7 +2,7 @@
 // Table renderer: builds an empty-state OR a <table> with one header per
 // visible field and one row per card.  Real cell editors arrive in Tasks 10-12.
 
-import type { Board, ViewDef, FieldDef } from './boardModel';
+import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
@@ -66,9 +66,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       tr.appendChild(gutter);
       for (const f of visibleFields) {
         const td = document.createElement('td');
-        td.className = 'bd-table-cell';
-        td.dataset.field = f.name;
-        td.textContent = (card.values as Record<string, string>)[f.name] ?? '';
+        renderCell(td, card, f, b, ctx);
         tr.appendChild(td);
       }
       tbody.appendChild(tr);
@@ -99,4 +97,72 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.classList.remove('bd-table-host');
     },
   };
+}
+
+function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Board, ctx: BoardRendererCtx): void {
+  td.dataset.field = field.name;
+  td.className = `bd-table-cell bd-cell-${field.type}`;
+  const value = card.values[field.name] ?? '';
+  switch (field.type) {
+    case 'text':
+    case 'person':
+      td.textContent = value;
+      if (!ctx.readonly) {
+        td.addEventListener('click', () => beginInlineText(td, card, field, ctx));
+      }
+      return;
+    default:
+      td.textContent = value;
+  }
+}
+
+function beginInlineText(
+  td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx,
+): void {
+  if (td.getAttribute('contenteditable') === 'true') return;
+  td.setAttribute('contenteditable', 'true');
+  td.classList.add('bd-cell-editing');
+  td.focus();
+  const range = document.createRange();
+  range.selectNodeContents(td);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+
+  const commit = () => {
+    const next = (td.textContent ?? '').trim();
+    td.removeAttribute('contenteditable');
+    td.classList.remove('bd-cell-editing');
+    cleanup();
+    if (next !== (card.values[field.name] ?? '')) {
+      const b = ctx.getBoard();
+      ctx.mutate({
+        ...b,
+        cards: b.cards.map(c =>
+          c.id === card.id
+            ? { ...c, values: { ...c.values, [field.name]: next } }
+            : c,
+        ),
+      });
+    }
+  };
+  const cancel = () => {
+    td.textContent = card.values[field.name] ?? '';
+    td.removeAttribute('contenteditable');
+    td.classList.remove('bd-cell-editing');
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    else if (e.key === 'Tab') { e.preventDefault(); commit(); }
+  };
+  const onBlur = () => commit();
+  function cleanup() {
+    td.removeEventListener('keydown', onKey);
+    td.removeEventListener('blur', onBlur);
+  }
+  td.addEventListener('keydown', onKey);
+  td.addEventListener('blur', onBlur);
 }
