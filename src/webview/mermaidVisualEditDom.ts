@@ -1351,11 +1351,18 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   }
 
   // ── Cleanup + rebind ────────────────────────────────────────────────────
+  // Initial layout: expand the SVG to fill the preview pane so users have
+  // free canvas around the diagram for dropping new nodes.
+  fitSvgViewBoxToNodes(opts.previewPane);
+
   return {
     onMermaidRerender(): void {
       // mermaidBlock already called applyPositionsOverlay for us before
       // this. We just refresh toolbar state and re-bind ring/tip to the
       // (possibly newly-positioned) selected nodes.
+      // Always re-fit the viewBox so the SVG keeps filling the preview pane
+      // (matters for first render + when there are no pinned positions yet).
+      fitSvgViewBoxToNodes(opts.previewPane);
       const ast = parseMermaid(opts.getSource());
       toolbar.setResetEnabled(getPositions(ast) !== null);
       // Drop any selectedIds that no longer have a node in the SVG.
@@ -3816,12 +3823,51 @@ function fitSvgViewBoxToNodes(host: HTMLElement): void {
     w = Math.max(cx2, x + w) - x;
     h = Math.max(cy2, y + h) - y;
   }
+
+  // Free-canvas mode (when the block is in visual-edit). Expand the viewBox
+  // to fill the preview pane's aspect ratio so the SVG can stretch to the
+  // edges — that gives users empty space around the diagram to drop new
+  // nodes into instead of pushing them off the top/side. We key off
+  // `mb-visual-active` because it's added inside createVisualEditor (more
+  // reliable than `mb-visual`, which the block extension manages).
+  const visualBlock = host.closest('.mb-visual, .mb-visual-active') as HTMLElement | null;
+  if (visualBlock) {
+    const preview = host.closest<HTMLElement>('.mb-preview') ?? host;
+    const pr = preview.getBoundingClientRect();
+    if (pr.width > 0 && pr.height > 0) {
+      const previewAspect = pr.width / pr.height;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      const viewAspect = w / h;
+      if (viewAspect > previewAspect) {
+        // Diagram is wider than preview — grow height to match.
+        const newH = w / previewAspect;
+        y = cy - newH / 2;
+        h = newH;
+      } else {
+        // Diagram is taller — grow width to match.
+        const newW = h * previewAspect;
+        x = cx - newW / 2;
+        w = newW;
+      }
+    }
+  }
+
   svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
-  // Also remove fixed width/height so the SVG scales to its container.
-  svg.removeAttribute('width');
-  svg.removeAttribute('height');
-  svg.style.maxWidth = '100%';
-  svg.style.height = 'auto';
+  if (visualBlock) {
+    // Fill the preview pane both width and height — the viewBox above
+    // matches the aspect ratio so nothing letterboxes.
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.style.width  = '100%';
+    svg.style.height = '100%';
+    svg.style.maxWidth = '100%';
+  } else {
+    // Static preview keeps its natural sizing.
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.style.maxWidth = '100%';
+    svg.style.height = 'auto';
+  }
 }
 
 /** Walks every edge element in the SVG and yields { element, from, to }. */

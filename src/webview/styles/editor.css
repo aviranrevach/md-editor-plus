@@ -3042,6 +3042,35 @@ html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
 .ProseMirror .mb-preview { position: relative; }
 .ProseMirror .mb.mb-visual { outline: 2px solid var(--link); outline-offset: -2px; }
 
+/* Visual-edit canvas: give the preview pane a fixed, generous height so the
+   SVG can stretch to fill it and users have empty space around the diagram
+   for dropping new nodes / drawing edges. Match either selector — the block
+   extension sets .mb-visual; createVisualEditor sets .mb-visual-active. */
+.ProseMirror .mb.mb-visual .mb-preview,
+.ProseMirror .mb.mb-visual-active .mb-preview,
+.ProseMirror .mb-visual-active .mb-preview {
+  min-height: 560px;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+}
+.ProseMirror .mb.mb-visual .mb-svg-host,
+.ProseMirror .mb.mb-visual-active .mb-svg-host,
+.ProseMirror .mb-visual-active .mb-svg-host {
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: stretch;
+}
+.ProseMirror .mb.mb-visual .mb-svg-host > svg,
+.ProseMirror .mb.mb-visual-active .mb-svg-host > svg,
+.ProseMirror .mb-visual-active .mb-svg-host > svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  display: block;
+}
+
 /* Hide helper, reused across overlays. */
 .ProseMirror .mb-hidden { display: none !important; }
 
