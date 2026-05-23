@@ -5,12 +5,15 @@
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
-import { setViewSort } from './boardOps';
+import { setViewSort, setViewGroup, setViewWidth, hideFieldInView } from './boardOps';
+
+interface Group { key: string; cards: Card[]; }
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   const root = ctx.root;
   root.classList.add('bd-table-host');
   let detached = false;
+  const collapsedGroups = new Set<string>();
 
   function render(): void {
     if (detached) return;
@@ -64,6 +67,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       if (!ctx.readonly) {
         th.addEventListener('click', (e) => {
           if ((e.target as HTMLElement).classList.contains('bd-col-resizer')) return;
+          if ((e.target as HTMLElement).closest('.bd-col-menu-btn')) return;
           const cur = ctx.getBoard();
           const curView = cur.views.find(x => x.name === 'table');
           const curSort = curView?.sort;
@@ -75,27 +79,75 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           setViewSort(b2, 'table', nextDir ? { field: f.name, dir: nextDir } : null);
           ctx.mutate(b2);
         });
+        const headerMenuBtn = document.createElement('button');
+        headerMenuBtn.type = 'button';
+        headerMenuBtn.className = 'bd-col-menu-btn';
+        headerMenuBtn.textContent = '⋯';
+        headerMenuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openColumnMenu(headerMenuBtn, f, ctx, collapsedGroups);
+        });
+        th.appendChild(headerMenuBtn);
       }
       headRow.appendChild(th);
     }
     thead.appendChild(headRow);
     table.appendChild(thead);
 
-    // tbody — empty rows in this task (real cells in Task 10/11)
+    // tbody — grouped rendering
     const tbody = document.createElement('tbody');
-    for (const card of applySort(b.cards, v, b)) {
-      const tr = document.createElement('tr');
-      tr.className = 'bd-table-row';
-      tr.dataset.cardId = card.id;
-      const gutter = document.createElement('td');
-      gutter.className = 'bd-table-gutter';
-      tr.appendChild(gutter);
-      for (const f of visibleFields) {
+    const sortedCards = applySort(b.cards, v, b);
+    const groups = applyGroup(sortedCards, v, b);
+    for (const g of groups) {
+      if (v.groupBy) {
+        const head = document.createElement('tr');
+        head.className = 'bd-table-group';
         const td = document.createElement('td');
-        renderCell(td, card, f, b, ctx);
-        tr.appendChild(td);
+        td.colSpan = visibleFields.length + 1;
+        const row = document.createElement('div');
+        row.className = 'bd-group-row';
+        const left = document.createElement('span');
+        left.className = 'bd-group-left';
+        const caret = document.createElement('span');
+        caret.className = 'bd-group-caret';
+        caret.textContent = collapsedGroups.has(g.key) ? '▸' : '▾';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'bd-group-name';
+        nameSpan.textContent = g.key;
+        const countSpan = document.createElement('span');
+        countSpan.className = 'bd-group-count';
+        countSpan.textContent = String(g.cards.length);
+        left.append(caret, nameSpan, countSpan);
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'bd-group-add';
+        addBtn.textContent = '+ Add card';
+        row.append(left, addBtn);
+        td.appendChild(row);
+        head.appendChild(td);
+        head.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).closest('.bd-group-add')) return;
+          if (collapsedGroups.has(g.key)) collapsedGroups.delete(g.key);
+          else                            collapsedGroups.add(g.key);
+          render();
+        });
+        tbody.appendChild(head);
       }
-      tbody.appendChild(tr);
+      if (collapsedGroups.has(g.key)) continue;
+      for (const card of g.cards) {
+        const tr = document.createElement('tr');
+        tr.className = 'bd-table-row';
+        tr.dataset.cardId = card.id;
+        const gutter = document.createElement('td');
+        gutter.className = 'bd-table-gutter';
+        tr.appendChild(gutter);
+        for (const f of visibleFields) {
+          const td = document.createElement('td');
+          renderCell(td, card, f, b, ctx);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
     }
     table.appendChild(tbody);
 
@@ -123,6 +175,105 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.classList.remove('bd-table-host');
     },
   };
+}
+
+function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
+  if (!v.groupBy) return [{ key: '', cards }];
+  const field = v.groupBy;
+  const fdef = b.fields.find(x => x.name === field);
+  if (!fdef) return [{ key: '', cards }];
+
+  const bucket = new Map<string, Card[]>();
+  for (const c of cards) {
+    let key = c.values[field] ?? '';
+    if (field === 'Status' && !b.columns.some(col => col.name === key)) key = 'Uncategorized';
+    if (fdef.type === 'tags') key = (key.split(',')[0] ?? '').trim();
+    key = key || '—';
+    const arr = bucket.get(key) ?? [];
+    arr.push(c);
+    bucket.set(key, arr);
+  }
+
+  let keys: string[];
+  if (field === 'Status') {
+    // Build keys in board.columns order, including empty groups, then Uncategorized last.
+    for (const col of b.columns) {
+      if (!bucket.has(col.name)) bucket.set(col.name, []);
+    }
+    keys = b.columns.map(col => col.name);
+    if (bucket.has('Uncategorized')) keys.push('Uncategorized');
+  } else {
+    keys = Array.from(bucket.keys());
+    keys.sort((a, c) => {
+      if (a === '—') return 1;
+      if (c === '—') return -1;
+      return a.localeCompare(c, undefined, { sensitivity: 'base' });
+    });
+  }
+
+  return keys.map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
+}
+
+function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx, collapsedGroups: Set<string>): void {
+  const existing = document.querySelector('.bd-col-menu');
+  existing?.remove();
+  const menu = document.createElement('div');
+  menu.className = 'bd-col-menu';
+  const mkItem = (label: string, fn: () => void) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'bd-col-menu-item';
+    btn.textContent = label;
+    btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
+    btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); });
+    menu.appendChild(btn);
+  };
+  mkItem('Sort ascending', () => {
+    const cur = ctx.getBoard();
+    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+    setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
+    ctx.mutate(b2);
+  });
+  mkItem('Sort descending', () => {
+    const cur = ctx.getBoard();
+    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+    setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
+    ctx.mutate(b2);
+  });
+  mkItem('Clear sort', () => {
+    const cur = ctx.getBoard();
+    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+    setViewSort(b2, 'table', null);
+    ctx.mutate(b2);
+  });
+  mkItem('Group by this', () => {
+    collapsedGroups.clear();
+    const cur = ctx.getBoard();
+    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+    setViewGroup(b2, 'table', f.name);
+    ctx.mutate(b2);
+  });
+  mkItem('Reset column width', () => {
+    const cur = ctx.getBoard();
+    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+    setViewWidth(b2, 'table', f.name, null);
+    ctx.mutate(b2);
+  });
+  mkItem('Hide column', () => {
+    const cur = ctx.getBoard();
+    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+    hideFieldInView(b2, 'table', f.name);
+    ctx.mutate(b2);
+  });
+  const r = anchor.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.left = `${r.left}px`;
+  menu.style.top  = `${r.bottom + 4}px`;
+  document.body.appendChild(menu);
+  const close = (e: MouseEvent) => {
+    if (!menu.contains(e.target as Node)) { menu.remove(); document.removeEventListener('mousedown', close, true); }
+  };
+  document.addEventListener('mousedown', close, true);
 }
 
 function applySort(cards: Card[], v: ViewDef, b: Board): Card[] {

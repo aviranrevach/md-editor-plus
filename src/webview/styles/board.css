@@ -1322,3 +1322,19 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-tag { display: inline-block; padding: 1px 7px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); border-radius: 4px; font-size: 11px; margin-right: 4px; }
 .bd-date-input { font: 13px ui-sans-serif, sans-serif; padding: 4px 6px; border: 1px solid var(--link, #2563eb); border-radius: 5px; background: var(--bg); }
 .bd-sort-caret { color: var(--link, #2563eb); font-size: 9px; margin-left: 4px; }
+
+/* ── Table group-by headers ─────────────────────────────────────────────── */
+.bd-table-group td { background: var(--bg-secondary, rgba(0,0,0,0.03)); padding: 6px 10px; font: 500 12px ui-sans-serif, sans-serif; }
+.bd-group-row { display: flex; align-items: center; justify-content: space-between; }
+.bd-group-left { display: inline-flex; align-items: center; gap: 6px; }
+.bd-group-caret { color: var(--text-secondary, #888); font-size: 10px; cursor: pointer; }
+.bd-group-name  { font-weight: 500; color: var(--text-primary, #222); }
+.bd-group-count { color: var(--text-secondary, #888); font-size: 11px; }
+.bd-group-add   { color: var(--link, #2563eb); background: transparent; border: none; cursor: pointer; font: 500 12px ui-sans-serif, sans-serif; }
+
+/* ── Table column ⋯ menu button ─────────────────────────────────────────── */
+.bd-col-menu-btn { background: transparent; border: none; color: var(--text-secondary, #888); font-size: 14px; padding: 0 4px; cursor: pointer; opacity: 0; }
+.bd-table thead th:hover .bd-col-menu-btn { opacity: 1; }
+.bd-col-menu { display: flex; flex-direction: column; gap: 1px; padding: 6px; background: var(--bg, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.12); z-index: 7; min-width: 180px; }
+.bd-col-menu-item { text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: 5px; cursor: pointer; font: 500 12.5px ui-sans-serif, sans-serif; color: var(--text-primary, #222); }
+.bd-col-menu-item:hover { background: var(--block-hover, rgba(0,0,0,0.05)); }
