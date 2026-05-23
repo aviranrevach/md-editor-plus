@@ -24,6 +24,7 @@ export function fieldHasAnyValue(board: Board, fieldName: string): boolean {
 function startManualFieldDrag(
   downEvent: MouseEvent,
   fromName: string,
+  listEl: HTMLElement,
   board: Board,
   onChange: (next: Board) => void,
 ): void {
@@ -32,10 +33,6 @@ function startManualFieldDrag(
   const THRESHOLD = 4;
   let active = false;
   let lastDropTarget: HTMLElement | null = null;
-
-  function rowsContainer(): HTMLElement | null {
-    return document.querySelector('.board-properties-menu .board-properties-list') as HTMLElement | null;
-  }
 
   function clearIndicator(): void {
     document.querySelectorAll('.board-properties-drop-indicator').forEach((n) => n.remove());
@@ -52,9 +49,7 @@ function startManualFieldDrag(
   }
 
   function findRowAt(x: number, y: number): { row: HTMLElement; before: boolean } | null {
-    const list = rowsContainer();
-    if (!list) return null;
-    const rows = list.querySelectorAll('.board-properties-row');
+    const rows = listEl.querySelectorAll('.board-properties-row');
     for (const r of Array.from(rows) as HTMLElement[]) {
       const rect = r.getBoundingClientRect();
       if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
@@ -328,7 +323,7 @@ export function renderPropertiesContent(
   function rebuildList() {
     list.innerHTML = '';
     for (const field of currentBoard.fields) {
-      list.appendChild(renderFieldRow(currentBoard, field, wrappedOnChange));
+      list.appendChild(renderFieldRow(currentBoard, field, list, wrappedOnChange));
     }
   }
   rebuildList();
@@ -391,7 +386,7 @@ export function openPropertiesMenu(
   });
 }
 
-function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) => void): HTMLElement {
+function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onChange: (next: Board) => void): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-properties-row';
   row.dataset.fieldName = field.name;
@@ -409,7 +404,7 @@ function renderFieldRow(board: Board, field: FieldDef, onChange: (next: Board) =
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      startManualFieldDrag(e, field.name, board, onChange);
+      startManualFieldDrag(e, field.name, listEl, board, onChange);
     });
   }
   row.appendChild(handle);

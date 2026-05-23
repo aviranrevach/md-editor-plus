@@ -9,10 +9,23 @@ import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { renderPropertiesContent } from './boardProperties';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
+  // Tracks the cleanup callback registered by the currently-open ⋯ menu so
+  // paint() and destroy() can close the menu (and remove its document listener)
+  // before tearing down the DOM.
+  let closeOpenMenu: (() => void) | null = null;
+
+  function registerMenuClose(cb: () => void): void {
+    closeOpenMenu = cb;
+  }
+  function unregisterMenuClose(): void {
+    closeOpenMenu = null;
+  }
+
   function paint(board: Board): void {
+    closeOpenMenu?.();
     const ro = ctx.readonly;
     ctx.root.innerHTML = '';
-    ctx.root.appendChild(renderChrome(board, ctx.mutate, ro, ctx));
+    ctx.root.appendChild(renderChrome(board, ctx.mutate, ro, ctx, registerMenuClose, unregisterMenuClose));
     ctx.root.appendChild(renderColumns(board, ctx.mutate, ro, ctx));
   }
 
@@ -32,6 +45,7 @@ export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
       animateColumnHeights(ctx.root, heightSnapshot);
     },
     destroy(): void {
+      closeOpenMenu?.();
       ctx.root.innerHTML = '';
     },
   };
@@ -41,7 +55,14 @@ export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
 // Chrome (board header: name + properties button)
 // ---------------------------------------------------------------------------
 
-function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boolean, ctx: BoardRendererCtx): HTMLElement {
+function renderChrome(
+  board: Board,
+  mutate: (next: Board) => void,
+  readOnly: boolean,
+  ctx: BoardRendererCtx,
+  registerMenuClose: (cb: () => void) => void,
+  unregisterMenuClose: () => void,
+): HTMLElement {
   const chrome = document.createElement('div');
   chrome.className = 'board-chrome';
 
@@ -75,7 +96,7 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
   chrome.appendChild(name);
 
   if (!readOnly) {
-    chrome.appendChild(buildHeaderMore(ctx));
+    chrome.appendChild(buildHeaderMore(ctx, registerMenuClose, unregisterMenuClose));
   }
 
   return chrome;
@@ -85,7 +106,11 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
 // ⋯ menu: view segmented control + embedded Properties content
 // ---------------------------------------------------------------------------
 
-function buildHeaderMore(ctx: BoardRendererCtx): HTMLElement {
+function buildHeaderMore(
+  ctx: BoardRendererCtx,
+  registerMenuClose: (cb: () => void) => void,
+  unregisterMenuClose: () => void,
+): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'bd-more';
 
@@ -158,6 +183,11 @@ function buildHeaderMore(ctx: BoardRendererCtx): HTMLElement {
     }
     removeOutside = () => document.removeEventListener('mousedown', onOutside, true);
     setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+
+    // Register with mountKanban so paint()/destroy() can close us before
+    // clearing ctx.root.innerHTML — prevents the document listener from leaking
+    // when a board mutation triggers a full re-render while the menu is open.
+    registerMenuClose(closeMenu);
   }
 
   function closeMenu(): void {
@@ -166,6 +196,7 @@ function buildHeaderMore(ctx: BoardRendererCtx): HTMLElement {
     propsHost.innerHTML = '';
     removeOutside?.();
     removeOutside = null;
+    unregisterMenuClose();
   }
 
   btn.addEventListener('click', () => {

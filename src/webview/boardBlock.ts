@@ -3,7 +3,7 @@ import { parseBoardSource, serializeBoard, type Board } from './boardModel';
 import { mountKanban } from './boardKanbanRender';
 // import { mountTable } from './boardTableRender';  // arrives in Task 9
 import { openBoardSidePanel } from './boardSidePanel';
-import { openPropertiesMenu } from './boardProperties';
+
 
 export interface BoardView {
   dom: HTMLElement;
@@ -22,8 +22,6 @@ export interface BoardRendererCtx {
   mutate:         (next: Board) => void;
   /** Open the card side-panel for the given card id. */
   openSidePanel:  (cardId: string) => void;
-  /** Open the board properties menu, anchored to the given button element. */
-  openProperties: (anchor: HTMLElement) => void;
   readonly:       boolean;
 }
 
@@ -116,9 +114,6 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
         ro,
         ro ? undefined : (nextBoard) => mutate(nextBoard),
       );
-    },
-    openProperties: (anchor: HTMLElement) => {
-      openPropertiesMenu(anchor, board, mutate);
     },
     readonly: opts.isReadOnly(),
   };
