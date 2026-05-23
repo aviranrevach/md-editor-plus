@@ -1,6 +1,8 @@
 // src/webview/boardBlock.ts
 import { parseBoardSource, serializeBoard, type Board } from './boardModel';
 import { mountKanban } from './boardKanbanRender';
+import { openBoardSidePanel } from './boardSidePanel';
+import { openPropertiesMenu } from './boardProperties';
 
 export interface BoardView {
   dom: HTMLElement;
@@ -14,10 +16,14 @@ export interface BoardViewOptions {
 
 /** Context object passed from the controller to a board renderer. */
 export interface BoardRendererCtx {
-  root:     HTMLElement;
-  getBoard: () => Board;
-  mutate:   (next: Board) => void;
-  readonly: boolean;
+  root:           HTMLElement;
+  getBoard:       () => Board;
+  mutate:         (next: Board) => void;
+  /** Open the card side-panel for the given card id. */
+  openSidePanel:  (cardId: string) => void;
+  /** Open the board properties menu, anchored to the given button element. */
+  openProperties: (anchor: HTMLElement) => void;
+  readonly:       boolean;
 }
 
 /** Lifecycle handles returned by a board renderer. */
@@ -85,6 +91,29 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     root:     dom,
     getBoard: () => board,
     mutate,
+    openSidePanel: (cardId: string) => {
+      const card = board.cards.find((c) => c.id === cardId);
+      if (!card) return;
+      const ro = opts.isReadOnly();
+      openBoardSidePanel(
+        board,
+        card,
+        ro
+          ? () => {}
+          : (nextCard) => {
+              const next: Board = {
+                ...board,
+                cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
+              };
+              mutate(next);
+            },
+        ro,
+        ro ? undefined : (nextBoard) => mutate(nextBoard),
+      );
+    },
+    openProperties: (anchor: HTMLElement) => {
+      openPropertiesMenu(anchor, board, mutate);
+    },
     readonly: opts.isReadOnly(),
   };
   const renderer = mountKanban(ctx);

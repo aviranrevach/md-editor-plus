@@ -5,16 +5,14 @@
 // that happens inside the board's root element.
 
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
-import { openBoardSidePanel } from './boardSidePanel';
-import { openPropertiesMenu } from './boardProperties';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
     const ro = ctx.readonly;
     ctx.root.innerHTML = '';
-    ctx.root.appendChild(renderChrome(board, ctx.mutate, ro));
-    ctx.root.appendChild(renderColumns(board, ctx.mutate, ro));
+    ctx.root.appendChild(renderChrome(board, ctx.mutate, ro, ctx));
+    ctx.root.appendChild(renderColumns(board, ctx.mutate, ro, ctx));
   }
 
   // Initial paint.
@@ -42,7 +40,7 @@ export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
 // Chrome (board header: name + properties button)
 // ---------------------------------------------------------------------------
 
-function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
+function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boolean, ctx: BoardRendererCtx): HTMLElement {
   const chrome = document.createElement('div');
   chrome.className = 'board-chrome';
 
@@ -89,7 +87,7 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
         <path d="M216,160H176.82a32,32,0,0,0-61.64,0H40a12,12,0,0,0,0,24h75.18a32,32,0,0,0,61.64,0H216a12,12,0,0,0,0-24Zm-70,20a8,8,0,1,1,8-8A8,8,0,0,1,146,180Z"/>
       </svg>
     `;
-    props.addEventListener('click', () => openPropertiesMenu(props, board, mutate));
+    props.addEventListener('click', () => ctx.openProperties(props));
     chrome.appendChild(props);
   }
 
@@ -100,17 +98,17 @@ function renderChrome(board: Board, mutate: (next: Board) => void, readOnly: boo
 // Columns row
 // ---------------------------------------------------------------------------
 
-function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
+function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: boolean, ctx: BoardRendererCtx): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-columns';
   if (!readOnly) attachEdgeScroll(row);
   const validNames = new Set(board.columns.map((c) => c.name));
   for (const col of board.columns) {
-    row.appendChild(renderColumn(board, col, mutate, readOnly));
+    row.appendChild(renderColumn(board, col, mutate, readOnly, ctx));
   }
   const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
   if (orphans.length) {
-    row.appendChild(renderUncategorized(board, orphans, mutate, readOnly));
+    row.appendChild(renderUncategorized(board, orphans, mutate, readOnly, ctx));
   }
 
   if (!readOnly) {
@@ -163,7 +161,7 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
 // Single column
 // ---------------------------------------------------------------------------
 
-function renderColumn(board: Board, col: { name: string; color: string }, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
+function renderColumn(board: Board, col: { name: string; color: string }, mutate: (next: Board) => void, readOnly: boolean, ctx: BoardRendererCtx): HTMLElement {
   const el = document.createElement('div');
   el.className = `board-column color-${col.color}`;
   el.dataset.column = col.name;
@@ -306,7 +304,7 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   const list = document.createElement('div');
   list.className = 'board-card-list';
   for (const card of cards) {
-    list.appendChild(renderCard(board, card, mutate, readOnly));
+    list.appendChild(renderCard(board, card, mutate, readOnly, ctx));
   }
   if (!readOnly) {
     // Listen on the body, not the list, so drops in the empty bottom area of
@@ -450,7 +448,7 @@ function startInlineNewCard(
 // Uncategorized column
 // ---------------------------------------------------------------------------
 
-function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
+function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) => void, readOnly: boolean, ctx: BoardRendererCtx): HTMLElement {
   const el = document.createElement('div');
   el.className = 'board-column color-gray board-column-uncategorized';
   el.dataset.column = '';
@@ -479,7 +477,7 @@ function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) 
 
   const list = document.createElement('div');
   list.className = 'board-card-list';
-  for (const card of cards) list.appendChild(renderCard(board, card, mutate, readOnly));
+  for (const card of cards) list.appendChild(renderCard(board, card, mutate, readOnly, ctx));
   body.appendChild(list);
 
   el.appendChild(body);
@@ -490,7 +488,7 @@ function renderUncategorized(board: Board, cards: Card[], mutate: (next: Board) 
 // Card
 // ---------------------------------------------------------------------------
 
-function renderCard(board: Board, card: Card, mutate: (next: Board) => void, readOnly: boolean): HTMLElement {
+function renderCard(board: Board, card: Card, mutate: (next: Board) => void, readOnly: boolean, ctx: BoardRendererCtx): HTMLElement {
   const el = document.createElement('div');
   el.className = 'board-card';
   el.dataset.cardId = card.id;
@@ -561,21 +559,7 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
     // Defer so a double-click doesn't open the panel before swapping to inline editor.
     setTimeout(() => {
       if (el.classList.contains('is-editing-title')) return;
-      openBoardSidePanel(
-        board,
-        card,
-        readOnly
-          ? () => {}
-          : (nextCard) => {
-              const next: Board = {
-                ...board,
-                cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
-              };
-              mutate(next);
-            },
-        readOnly,
-        readOnly ? undefined : (nextBoard) => mutate(nextBoard),
-      );
+      ctx.openSidePanel(card.id);
     }, 180);
   });
 
