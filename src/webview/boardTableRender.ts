@@ -5,6 +5,7 @@
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
+import { setViewSort } from './boardOps';
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   const root = ctx.root;
@@ -51,6 +52,30 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       const th = document.createElement('th');
       th.textContent = f.name;
       th.dataset.field = f.name;
+      if (!ctx.readonly) {
+        th.style.cursor = 'pointer';
+      }
+      if (v.sort?.field === f.name) {
+        const caret = document.createElement('span');
+        caret.className = 'bd-sort-caret';
+        caret.textContent = v.sort.dir === 'asc' ? ' ▲' : ' ▼';
+        th.appendChild(caret);
+      }
+      if (!ctx.readonly) {
+        th.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).classList.contains('bd-col-resizer')) return;
+          const cur = ctx.getBoard();
+          const curView = cur.views.find(x => x.name === 'table');
+          const curSort = curView?.sort;
+          const nextDir: 'asc' | 'desc' | null =
+            !curSort || curSort.field !== f.name ? 'asc' :
+            curSort.dir === 'asc'               ? 'desc' :
+                                                  null;
+          const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+          setViewSort(b2, 'table', nextDir ? { field: f.name, dir: nextDir } : null);
+          ctx.mutate(b2);
+        });
+      }
       headRow.appendChild(th);
     }
     thead.appendChild(headRow);
@@ -58,7 +83,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
     // tbody — empty rows in this task (real cells in Task 10/11)
     const tbody = document.createElement('tbody');
-    for (const card of b.cards) {
+    for (const card of applySort(b.cards, v, b)) {
       const tr = document.createElement('tr');
       tr.className = 'bd-table-row';
       tr.dataset.cardId = card.id;
@@ -98,6 +123,44 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.classList.remove('bd-table-host');
     },
   };
+}
+
+function applySort(cards: Card[], v: ViewDef, b: Board): Card[] {
+  if (!v.sort) return cards;
+  const { field, dir } = v.sort;
+  const f = b.fields.find(x => x.name === field);
+  if (!f) return cards;
+  const cmp = comparatorFor(f, b);
+  const sorted = [...cards].sort((a, c) => cmp(a.values[field] ?? '', c.values[field] ?? ''));
+  if (dir === 'desc') sorted.reverse();
+  return sorted;
+}
+
+function comparatorFor(f: FieldDef, b: Board): (a: string, c: string) => number {
+  if (f.type === 'date') {
+    return (a, c) => {
+      if (!a && !c) return 0;
+      if (!a) return 1;        // empty last
+      if (!c) return -1;
+      return new Date(a).getTime() - new Date(c).getTime();
+    };
+  }
+  if (f.type === 'status') {
+    const order = new Map(b.columns.map((col, i) => [col.name, i]));
+    return (a, c) => (order.get(a) ?? 1e9) - (order.get(c) ?? 1e9);
+  }
+  if (f.type === 'tags') {
+    return (a, c) => {
+      const aa = (a.split(',')[0] ?? '').trim().toLowerCase();
+      const cc = (c.split(',')[0] ?? '').trim().toLowerCase();
+      if (!aa && !cc) return 0;
+      if (!aa) return 1;
+      if (!cc) return -1;
+      return aa.localeCompare(cc);
+    };
+  }
+  // text, person
+  return (a, c) => a.localeCompare(c, undefined, { sensitivity: 'base' });
 }
 
 function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Board, ctx: BoardRendererCtx): void {

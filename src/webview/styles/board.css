@@ -1321,3 +1321,4 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-date-overdue { background: #fee2e2; color: #b91c1c; }
 .bd-tag { display: inline-block; padding: 1px 7px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); border-radius: 4px; font-size: 11px; margin-right: 4px; }
 .bd-date-input { font: 13px ui-sans-serif, sans-serif; padding: 4px 6px; border: 1px solid var(--link, #2563eb); border-radius: 5px; background: var(--bg); }
+.bd-sort-caret { color: var(--link, #2563eb); font-size: 9px; margin-left: 4px; }
