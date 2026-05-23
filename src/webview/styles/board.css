@@ -1317,3 +1317,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table-cell { cursor: text; }
 .bd-cell-status, .bd-cell-date, .bd-cell-tags { cursor: pointer; }
 .bd-cell-empty { color: var(--text-secondary, #888); font-size: 12px; }
+.bd-date { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); font: 500 11.5px ui-sans-serif, sans-serif; }
+.bd-date-overdue { background: #fee2e2; color: #b91c1c; }
+.bd-tag { display: inline-block; padding: 1px 7px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); border-radius: 4px; font-size: 11px; margin-right: 4px; }
+.bd-date-input { font: 13px ui-sans-serif, sans-serif; padding: 4px 6px; border: 1px solid var(--link, #2563eb); border-radius: 5px; background: var(--bg); }

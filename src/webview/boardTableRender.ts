@@ -130,9 +130,126 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Bo
       }
       return;
     }
+    case 'date': {
+      const dateStr = value;
+      if (!dateStr) {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'bd-cell-empty';
+        placeholder.textContent = '—';
+        td.appendChild(placeholder);
+      } else {
+        const pill = document.createElement('span');
+        pill.className = 'bd-date';
+        const d = new Date(dateStr + 'T00:00:00');
+        pill.textContent = isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        if (!isNaN(d.getTime()) && d.getTime() < startOfToday()) {
+          pill.classList.add('bd-date-overdue');
+          pill.textContent += ' · overdue';
+        }
+        td.appendChild(pill);
+      }
+      if (!ctx.readonly) {
+        td.addEventListener('click', (e) => { e.stopPropagation(); openDatePicker(td, card, field, ctx); });
+      }
+      return;
+    }
+    case 'tags': {
+      const tags = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+      if (tags.length === 0) {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'bd-cell-empty';
+        placeholder.textContent = '—';
+        td.appendChild(placeholder);
+      } else {
+        for (const t of tags) {
+          const chip = document.createElement('span');
+          chip.className = 'bd-tag';
+          chip.textContent = t;
+          td.appendChild(chip);
+        }
+      }
+      if (!ctx.readonly) {
+        td.addEventListener('click', (e) => { e.stopPropagation(); openTagsEditor(td, card, field, ctx); });
+      }
+      return;
+    }
     default:
       td.textContent = value;
   }
+}
+
+function startOfToday(): number {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = card.values[field.name] ?? '';
+  input.className = 'bd-date-input';
+  const r = anchor.getBoundingClientRect();
+  input.style.position = 'fixed';
+  input.style.left = `${r.left}px`;
+  input.style.top  = `${r.top}px`;
+  document.body.appendChild(input);
+  input.focus();
+  const commit = () => {
+    const v = input.value;
+    input.remove();
+    document.removeEventListener('mousedown', onOutside, true);
+    if (v !== (card.values[field.name] ?? '')) {
+      const cur = ctx.getBoard();
+      ctx.mutate({
+        ...cur,
+        cards: cur.cards.map(c =>
+          c.id === card.id
+            ? { ...c, values: { ...c.values, [field.name]: v } }
+            : c,
+        ),
+      });
+    }
+  };
+  const onOutside = (e: MouseEvent) => { if (e.target !== input) commit(); };
+  input.addEventListener('change', commit);
+  document.addEventListener('mousedown', onOutside, true);
+}
+
+function openTagsEditor(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
+  const td = anchor;
+  td.innerHTML = '';
+  td.textContent = (card.values[field.name] ?? '');
+  td.setAttribute('contenteditable', 'true');
+  td.focus();
+  const commit = () => {
+    td.removeAttribute('contenteditable');
+    const next = (td.textContent ?? '')
+      .split(',').map(s => s.trim()).filter(Boolean).join(', ');
+    if (next !== (card.values[field.name] ?? '')) {
+      const cur = ctx.getBoard();
+      ctx.mutate({
+        ...cur,
+        cards: cur.cards.map(c =>
+          c.id === card.id
+            ? { ...c, values: { ...c.values, [field.name]: next } }
+            : c,
+        ),
+      });
+    }
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); td.removeAttribute('contenteditable'); cleanup(); }
+  };
+  const onBlur = () => commit();
+  function cleanup() {
+    td.removeEventListener('keydown', onKey);
+    td.removeEventListener('blur',    onBlur);
+  }
+  td.addEventListener('keydown', onKey);
+  td.addEventListener('blur',    onBlur);
 }
 
 function openStatusDropdown(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): void {
