@@ -2676,23 +2676,24 @@ html.source-word-wrap #source-view .cb-content {
   user-select: none;
 }
 
-/* Visual-edit canvas: the header keeps a translucent white background so the
-   text stays legible against the dotted canvas, fades to full on hover.
-   Expand + Copy appear only on hover. Edit toggle stays visible. */
+/* Visual-edit canvas: the header is fully opaque (so the dotted canvas
+   below doesn't show through it) but with a soft bottom shadow instead of
+   a hard border, so it feels less rigid. Expand + Copy still hide until
+   hover. */
 .ProseMirror .mb.mb-visual .mb-header,
 .ProseMirror .mb.mb-visual-active .mb-header,
 .ProseMirror .mb-visual-active .mb-header {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: var(--bg);
   border-bottom-color: transparent;
-  opacity: 0.85;
-  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+  box-shadow: 0 1px 0 var(--border);
+  position: relative;
+  z-index: 2;
+  transition: box-shadow 160ms ease;
 }
-html.theme-dark .ProseMirror .mb.mb-visual .mb-header,
-html.theme-dark .ProseMirror .mb.mb-visual-active .mb-header,
-html.theme-dark .ProseMirror .mb-visual-active .mb-header {
-  background: rgba(30, 31, 35, 0.7);
+.ProseMirror .mb.mb-visual .mb-header:hover,
+.ProseMirror .mb.mb-visual-active .mb-header:hover,
+.ProseMirror .mb-visual-active .mb-header:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 .ProseMirror .mb.mb-visual .mb-header:hover,
 .ProseMirror .mb.mb-visual-active .mb-header:hover,

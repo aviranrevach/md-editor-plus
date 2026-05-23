@@ -148,6 +148,9 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     host.style.transformOrigin = '0 0';
     host.style.transform = `translate(${viewport.tx}px, ${viewport.ty}px) scale(${viewport.scale})`;
     zoomReadout?.update(viewport.scale);
+    // Re-pick the dot grid spacing so dots stay at a comfortable on-screen
+    // density (~14 px) regardless of zoom — snaps to powers of 2.
+    updateDotGrid(opts.previewPane, viewport.scale);
     // Selection overlays use getBoundingClientRect which already accounts for
     // CSS transforms, so they follow automatically — just refresh.
     refreshSelectionUI();
@@ -1443,6 +1446,25 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   }
 
   function onDragMouseUp(e: MouseEvent): void {
+    // Wrap the whole body so an unexpected error in any branch can't leave
+    // a draft / drag state dangling. If something throws, we still flush all
+    // in-progress state and remove our drag-active classes.
+    try { onDragMouseUpInner(e); }
+    catch (err) {
+      console.error('[mermaid] mouseup handler threw, recovering:', err);
+      edgeDraft = null;
+      lineDraft = null;
+      drag = null;
+      lineHandleDrag = null;
+      lineBodyDrag = null;
+      pan = null;
+      marquee = null;
+      opts.previewPane.classList.remove('mb-panning', 'mb-line-drag-active');
+      targetHooksLayer.classList.add('mb-hidden');
+      marqueeEl.classList.add('mb-hidden');
+    }
+  }
+  function onDragMouseUpInner(e: MouseEvent): void {
     if (pan) {
       pan = null;
       opts.previewPane.classList.remove('mb-panning');
@@ -3323,21 +3345,34 @@ function closestHook(g: SVGGElement, p: { x: number; y: number }): { x: number; 
 /** document.elementFromPoint, but climb out of any of our drag-related
     overlays (.mb-vEdgeDraft path, the connection dot) so we see the
     SVG nodes underneath. */
-// Install a Miro-style dot grid as a background layer inside the SVG. We
-// use an SVG <pattern> so the dots pan + zoom with the viewport
-// automatically (no JS sync needed) and a <rect> sized to the viewBox that
-// the pattern fills. Idempotent: replaces an existing grid on each call.
+// Install a Miro-style infinite dot grid as a background layer inside the
+// SVG. The grid spacing is computed in SVG user units, then a level snap
+// based on the current zoom keeps the on-screen dot spacing in a
+// comfortable range (~12-24 px) — same trick Excalidraw / Figma use:
+// as you zoom in past a threshold, the spacing halves; as you zoom out,
+// it doubles. Dots stay visually consistent at any zoom level.
+
+const DOT_GRID_BASE_UNIT = 8;          // SVG user units per "step"
+const DOT_GRID_TARGET_SCREEN_PX = 16;   // ideal on-screen distance between dots
+
+function gridSpacingForScale(scale: number): number {
+  // Want: spacing_screen_px = unitSpacing * scale ≈ DOT_GRID_TARGET_SCREEN_PX
+  // Snap unitSpacing to base * 2^level so spacing changes only at thresholds.
+  const safe = Math.max(0.001, scale);
+  const desiredUnit = DOT_GRID_TARGET_SCREEN_PX / safe;
+  const level = Math.round(Math.log2(desiredUnit / DOT_GRID_BASE_UNIT));
+  return DOT_GRID_BASE_UNIT * Math.pow(2, Math.max(-3, Math.min(6, level)));
+}
+
 function installDotGrid(host: HTMLElement): void {
   const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
   if (!svg) return;
   const dark = document.documentElement.classList.contains('theme-dark');
   const dotColor = dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.18)';
   const vb = svg.viewBox?.baseVal;
-  // Need a viewBox to know how big the background rect should be.
   if (!vb || !isFinite(vb.width) || vb.width <= 0) return;
 
-  // Remove the old grid (if any) before reinstalling — keeps it lean and
-  // lets us update the color when the theme flips.
+  // Remove any old grid bits before reinstalling.
   for (const old of Array.from(svg.querySelectorAll('.mb-vDotGrid, #mb-vDotGrid-pattern'))) {
     old.remove();
   }
@@ -3348,23 +3383,26 @@ function installDotGrid(host: HTMLElement): void {
     defs = document.createElementNS(ns, 'defs') as SVGDefsElement;
     svg.insertBefore(defs, svg.firstChild);
   }
+
+  // Start at the baseline spacing — `updateDotGrid` will rescale on zoom.
+  const spacing = DOT_GRID_BASE_UNIT * 2;
   const pattern = document.createElementNS(ns, 'pattern');
   pattern.setAttribute('id', 'mb-vDotGrid-pattern');
-  pattern.setAttribute('width',  '12');
-  pattern.setAttribute('height', '12');
+  pattern.setAttribute('width',  String(spacing));
+  pattern.setAttribute('height', String(spacing));
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
   const dot = document.createElementNS(ns, 'circle');
-  dot.setAttribute('cx', '1');
-  dot.setAttribute('cy', '1');
+  dot.setAttribute('cx', '0');
+  dot.setAttribute('cy', '0');
   dot.setAttribute('r',  '0.9');
   dot.setAttribute('fill', dotColor);
   pattern.appendChild(dot);
   defs.appendChild(pattern);
 
-  // Cover the viewBox (padded so dots reach past the edge if the user
-  // zooms out a little). Placed as the FIRST renderable child so it sits
-  // behind everything.
-  const pad = Math.max(vb.width, vb.height);
+  // Cover a generous area around the viewBox so panning / zoom-out
+  // stay populated. Placed as the first renderable child so it sits
+  // behind every other SVG layer.
+  const pad = Math.max(vb.width, vb.height) * 2;
   const bg = document.createElementNS(ns, 'rect');
   bg.setAttribute('class', 'mb-vDotGrid');
   bg.setAttribute('x',      String(vb.x - pad));
@@ -3373,9 +3411,18 @@ function installDotGrid(host: HTMLElement): void {
   bg.setAttribute('height', String(vb.height + pad * 2));
   bg.setAttribute('fill', 'url(#mb-vDotGrid-pattern)');
   bg.setAttribute('pointer-events', 'none');
-  // Insert as the first child AFTER defs so it sits behind everything.
   if (defs.nextSibling) svg.insertBefore(bg, defs.nextSibling);
   else                  svg.appendChild(bg);
+}
+
+// Update the pattern spacing for the current zoom — call on every viewport
+// change. Cheap: just an attribute write.
+function updateDotGrid(host: HTMLElement, scale: number): void {
+  const pattern = host.querySelector<SVGPatternElement>('#mb-vDotGrid-pattern');
+  if (!pattern) return;
+  const spacing = gridSpacingForScale(scale);
+  pattern.setAttribute('width',  String(spacing));
+  pattern.setAttribute('height', String(spacing));
 }
 
 function elementAtPoint(clientX: number, clientY: number, host: HTMLElement): Element | null {
