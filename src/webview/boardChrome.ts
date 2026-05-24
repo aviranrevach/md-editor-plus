@@ -137,15 +137,30 @@ export function buildHeaderMore(
 
   let removeOutside: (() => void) | null = null;
 
+  // Single, stable renderPropertiesContent instance per menu open. refreshProps
+  // calls its rebuild() to update the field list in-place, preserving any
+  // in-flight picker / focus / closure state inside the popover.
+  let propsHandle: { rebuild: () => void } | null = null;
   function refreshProps(): void {
+    if (propsHandle) {
+      propsHandle.rebuild();
+      return;
+    }
     propsHost.innerHTML = '';
-    renderPropertiesContent(propsHost, ctx.getBoard(), ctx.mutate, ctx.getBoard().activeView ?? 'kanban');
+    propsHandle = renderPropertiesContent(
+      propsHost,
+      () => ctx.getBoard(),
+      ctx.mutate,
+      ctx.getBoard().activeView ?? 'kanban',
+    );
   }
 
   function openMenu(): void {
     menu.classList.remove('bd-hidden');
     btn.setAttribute('aria-expanded', 'true');
     refreshViewSeg();
+    // Force a fresh render on each open in case viewName changed (kanban↔table).
+    propsHandle = null;
     refreshProps();
 
     function onOutside(e: MouseEvent): void {
@@ -164,6 +179,7 @@ export function buildHeaderMore(
     menu.classList.add('bd-hidden');
     btn.setAttribute('aria-expanded', 'false');
     propsHost.innerHTML = '';
+    propsHandle = null;
     removeOutside?.();
     removeOutside = null;
     unregisterMenuClose();

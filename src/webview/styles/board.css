@@ -1305,7 +1305,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
    (kanban columns have a top chip that occupies the same visual band as the
    table's tiny uppercase header, so without this nudge the table reads as
    "dropped lower" than the kanban). */
-.bd-table-host { padding: 0 0 12px 0; margin-top: -4px; overflow-x: auto; max-height: 80vh; overflow-y: auto; }
+.bd-table-host { padding: 0 0 12px 0; margin-top: -7px; overflow-x: auto; max-height: 80vh; overflow-y: auto; }
 .bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
 .bd-table thead th {
   text-align: left;

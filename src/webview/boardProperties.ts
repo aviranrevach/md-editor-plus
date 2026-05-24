@@ -328,35 +328,38 @@ export function openFieldActionMenu(
  * into an arbitrary host element. The caller is responsible for outside-click
  * handling, positioning, and cleanup — this function only manages the content.
  */
+/**
+ * Render the Properties popover content into `host`. Returns a `rebuild`
+ * function the caller can call to refresh the field list from `boardGetter()`
+ * without tearing down the popover DOM (which would destroy any in-flight
+ * picker / sub-popover state and confuse focus).
+ */
 export function renderPropertiesContent(
   host: HTMLElement,
-  board: Board,
+  boardGetter: () => Board,
   onChange: (next: Board) => void,
   viewName: string,
-): void {
+): { rebuild: () => void } {
   const header = document.createElement('div');
   header.className = 'board-properties-section';
   header.textContent = 'Properties';
   host.appendChild(header);
 
-  // Keep a local mirror of the board so we can rebuild the list after each
-  // mutate(). Without this, "Add a property" appears to do nothing because
-  // the user keeps seeing the old list.
-  let currentBoard = board;
   const wrappedOnChange = (next: Board) => {
-    currentBoard = next;
     onChange(next);
-    rebuildList();
+    // The mutate() chain will call rebuild() via the chrome's refreshProps,
+    // which now goes through this same function — so the list refreshes once.
   };
 
   const list = document.createElement('div');
   list.className = 'board-properties-list';
   host.appendChild(list);
 
-  function rebuildList() {
+  function rebuildList(): void {
+    const cur = boardGetter();
     list.innerHTML = '';
-    for (const field of currentBoard.fields) {
-      list.appendChild(renderFieldRow(currentBoard, field, list, wrappedOnChange, viewName));
+    for (const field of cur.fields) {
+      list.appendChild(renderFieldRow(cur, field, list, wrappedOnChange, viewName));
     }
   }
   rebuildList();
@@ -368,8 +371,10 @@ export function renderPropertiesContent(
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
     <span>Add a property</span>
   `;
-  add.addEventListener('click', () => promptNewField(add, currentBoard, wrappedOnChange));
+  add.addEventListener('click', () => promptNewField(add, boardGetter(), wrappedOnChange));
   host.appendChild(add);
+
+  return { rebuild: rebuildList };
 }
 
 export function openPropertiesMenu(
@@ -385,7 +390,11 @@ export function openPropertiesMenu(
   document.body.appendChild(menu);
   positionAnchored(menu, anchor);
 
-  renderPropertiesContent(menu, board, onChange, viewName);
+  // Legacy free-floating popover (no live caller in chrome path; kept for
+  // back-compat). Snapshot the board once since this path has no live getter.
+  let snapshot = board;
+  const wrappedChange = (next: Board) => { snapshot = next; onChange(next); result.rebuild(); };
+  const result = renderPropertiesContent(menu, () => snapshot, wrappedChange, viewName);
 
   function onOutside(e: MouseEvent) {
     const t = e.target as HTMLElement | null;
