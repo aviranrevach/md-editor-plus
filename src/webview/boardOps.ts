@@ -67,6 +67,24 @@ export function showFieldInView(board: Board, viewName: string, field: string): 
   pruneView(board, viewName);
 }
 
+export function addCard(board: Board, presets: Partial<Record<string, string>> = {}): string {
+  const id = nextCardId(board);
+  const values: Record<string, string> = { id };
+  for (const f of board.fields) {
+    values[f.name] = presets[f.name] ?? '';
+  }
+  if (!values.Status) values.Status = board.columns[0]?.name ?? '';
+  board.cards.push({ id, values, body: '' });
+  return id;
+}
+
+function nextCardId(board: Board): string {
+  const used = new Set(board.cards.map(c => c.id));
+  let i = board.cards.length + 1;
+  while (used.has(`c${i}`)) i++;
+  return `c${i}`;
+}
+
 export function deleteField(board: Board, field: string): void {
   board.fields = board.fields.filter(f => f.name !== field);
   for (const card of board.cards) delete card.values[field];

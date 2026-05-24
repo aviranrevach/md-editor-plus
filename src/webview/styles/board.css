@@ -1332,6 +1332,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-group-count { color: var(--text-secondary, #888); font-size: 11px; }
 .bd-group-add   { color: var(--link, #2563eb); background: transparent; border: none; cursor: pointer; font: 500 12px ui-sans-serif, sans-serif; }
 
+/* ── Table add-card row ─────────────────────────────────────────────────── */
+.bd-table-addrow td { padding: 9px 10px; color: var(--link); cursor: pointer; font: 500 12px ui-sans-serif, sans-serif; }
+.bd-table-addrow:hover td { background: var(--block-hover); }
+
 /* ── Table column ⋯ menu button ─────────────────────────────────────────── */
 .bd-col-menu-btn { background: transparent; border: none; color: var(--text-secondary, #888); font-size: 14px; padding: 0 4px; cursor: pointer; opacity: 0; }
 .bd-table thead th:hover .bd-col-menu-btn { opacity: 1; }

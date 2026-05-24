@@ -112,3 +112,19 @@ describe('boardOps.deleteField — empty-container cleanup', () => {
     expect(b.views).toHaveLength(0);
   });
 });
+
+describe('boardOps.addCard', () => {
+  it('appends a card with empty values + auto Status', () => {
+    const b = makeBoard();
+    const id = ops.addCard(b);
+    expect(b.cards.length).toBe(3);
+    expect(b.cards[2].id).toBe(id);
+    expect(b.cards[2].values.Status).toBe('Todo');
+  });
+  it('honors presets', () => {
+    const b = makeBoard();
+    ops.addCard(b, { Status: 'Doing', Title: 'X' });
+    expect(b.cards[2].values.Status).toBe('Doing');
+    expect(b.cards[2].values.Title).toBe('X');
+  });
+});

@@ -5,7 +5,7 @@
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
-import { setViewSort, setViewGroup, setViewWidth, hideFieldInView } from './boardOps';
+import { setViewSort, setViewGroup, setViewWidth, hideFieldInView, addCard } from './boardOps';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -14,6 +14,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   root.classList.add('bd-table-host');
   let detached = false;
   const collapsedGroups = new Set<string>();
+  const pendingFocus: { id: string | null; field: string | null } = { id: null, field: null };
 
   function render(): void {
     if (detached) return;
@@ -24,7 +25,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     const visibleFields = computeVisibleFields(b, v);
     const widths = v.widths ?? {};
 
-    if (b.cards.length === 0) {
+    if (b.cards.length === 0 && ctx.readonly) {
       const empty = document.createElement('div');
       empty.className = 'bd-table-empty';
       empty.textContent = 'No cards. Click + Add card to get started.';
@@ -122,6 +123,21 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         addBtn.type = 'button';
         addBtn.className = 'bd-group-add';
         addBtn.textContent = '+ Add card';
+        if (!ctx.readonly) {
+          addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, cards: [...cur.cards] };
+            const presets: Partial<Record<string, string>> = {};
+            if (v.groupBy) {
+              presets[v.groupBy] = (g.key === 'Uncategorized' || g.key === '—') ? '' : g.key;
+            }
+            const newId = addCard(b2, presets);
+            pendingFocus.id = newId;
+            pendingFocus.field = 'Title';
+            ctx.mutate(b2);
+          });
+        }
         row.append(left, addBtn);
         td.appendChild(row);
         head.appendChild(td);
@@ -149,9 +165,36 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         tbody.appendChild(tr);
       }
     }
+
+    if (!v.groupBy && !ctx.readonly) {
+      const addRow = document.createElement('tr');
+      addRow.className = 'bd-table-addrow';
+      const td = document.createElement('td');
+      td.colSpan = visibleFields.length + 1;
+      td.textContent = '+ Add card';
+      td.addEventListener('click', () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, cards: [...cur.cards] };
+        const newId = addCard(b2);
+        pendingFocus.id = newId;
+        pendingFocus.field = 'Title';
+        ctx.mutate(b2);
+      });
+      addRow.appendChild(td);
+      tbody.appendChild(addRow);
+    }
+
     table.appendChild(tbody);
 
     root.appendChild(table);
+
+    if (pendingFocus.id) {
+      const tr = root.querySelector<HTMLElement>(`tr.bd-table-row[data-card-id="${pendingFocus.id}"]`);
+      const td = tr?.querySelector<HTMLElement>(`.bd-table-cell[data-field="${pendingFocus.field}"]`);
+      pendingFocus.id = null;
+      pendingFocus.field = null;
+      if (td) td.click();
+    }
   }
 
   function computeVisibleFields(b: Board, v: ViewDef): FieldDef[] {
