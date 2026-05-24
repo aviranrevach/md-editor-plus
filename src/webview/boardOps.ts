@@ -53,6 +53,12 @@ export function setViewWidth(
   pruneView(board, viewName);
 }
 
+export function setViewColumns(board: Board, viewName: string, columns: string[]): void {
+  const v = ensureView(board, viewName);
+  v.columns = columns;
+  pruneView(board, viewName);
+}
+
 export function hideFieldInView(board: Board, viewName: string, field: string): void {
   const v = ensureView(board, viewName);
   v.hidden = Array.from(new Set([...(v.hidden ?? []), field]));

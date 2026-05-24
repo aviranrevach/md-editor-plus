@@ -1,6 +1,7 @@
 // src/webview/boardProperties.ts
 import type { Board, FieldDef, FieldType } from './boardModel';
 import { FIELD_TYPE_ICONS, FIELD_TYPE_LABELS } from './boardIcons';
+import { setViewColumns, hideFieldInView, showFieldInView } from './boardOps';
 
 // ===== Shared field-mutation helpers =====
 // These are used by both the Properties popover (board chrome) and the
@@ -27,6 +28,7 @@ function startManualFieldDrag(
   listEl: HTMLElement,
   board: Board,
   onChange: (next: Board) => void,
+  viewName: string,
 ): void {
   const startX = downEvent.clientX;
   const startY = downEvent.clientY;
@@ -96,15 +98,28 @@ function startManualFieldDrag(
     if (!hit) return;
     const toName = hit.row.dataset.fieldName || '';
     if (toName === 'Title' || toName === 'Status' || toName === fromName) return;
-    const fields = [...board.fields];
-    const fromIdx = fields.findIndex((f) => f.name === fromName);
-    let toIdx = fields.findIndex((f) => f.name === toName);
-    if (fromIdx < 0 || toIdx < 0) return;
-    const [moved] = fields.splice(fromIdx, 1);
-    toIdx = fields.findIndex((f) => f.name === toName);
-    const insertAt = hit.before ? toIdx : toIdx + 1;
-    fields.splice(insertAt, 0, moved);
-    onChange({ ...board, fields });
+    if (viewName === 'table') {
+      const order = board.fields.map(f => f.name);
+      const fromIdx2 = order.indexOf(fromName);
+      const toIdx2   = order.indexOf(toName);
+      if (fromIdx2 < 0 || toIdx2 < 0) return;
+      const [movedName] = order.splice(fromIdx2, 1);
+      const insertAt = hit.before ? order.indexOf(toName) : order.indexOf(toName) + 1;
+      order.splice(insertAt, 0, movedName);
+      const b2: Board = { ...board, views: board.views.map(v => ({ ...v })) };
+      setViewColumns(b2, viewName, order);
+      onChange(b2);
+    } else {
+      const fields = [...board.fields];
+      const fromIdx = fields.findIndex((f) => f.name === fromName);
+      let toIdx = fields.findIndex((f) => f.name === toName);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const [moved] = fields.splice(fromIdx, 1);
+      toIdx = fields.findIndex((f) => f.name === toName);
+      const insertAt = hit.before ? toIdx : toIdx + 1;
+      fields.splice(insertAt, 0, moved);
+      onChange({ ...board, fields });
+    }
   }
   void lastDropTarget;
 
@@ -231,6 +246,7 @@ export function openFieldActionMenu(
   field: FieldDef,
   onChange: (next: Board) => void,
   options: { onRename?: () => void } = {},
+  viewName = 'kanban',
 ): void {
   document.querySelectorAll('.board-field-action-menu').forEach((n) => n.remove());
 
@@ -256,13 +272,30 @@ export function openFieldActionMenu(
   };
 
   addItem(ICON_EDIT, 'Rename', '', isLocked, () => options.onRename?.());
-  addItem(
-    field.visibleOnCard ? ICON_EYE_OFF : ICON_EYE,
-    field.visibleOnCard ? 'Hide on card' : 'Show on card',
-    '',
-    isLocked,
-    () => onChange(toggleFieldVisibility(board, field.name)),
-  );
+  if (viewName === 'table') {
+    const tableView = board.views.find(x => x.name === 'table');
+    const isHiddenInTable = !!tableView?.hidden?.includes(field.name);
+    addItem(
+      isHiddenInTable ? ICON_EYE : ICON_EYE_OFF,
+      isHiddenInTable ? 'Show column' : 'Hide column',
+      '',
+      isLocked,
+      () => {
+        const b2: Board = { ...board, views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })) };
+        if (isHiddenInTable) showFieldInView(b2, 'table', field.name);
+        else                 hideFieldInView(b2, 'table', field.name);
+        onChange(b2);
+      },
+    );
+  } else {
+    addItem(
+      field.visibleOnCard ? ICON_EYE_OFF : ICON_EYE,
+      field.visibleOnCard ? 'Hide on card' : 'Show on card',
+      '',
+      isLocked,
+      () => onChange(toggleFieldVisibility(board, field.name)),
+    );
+  }
   const divider = document.createElement('div');
   divider.className = 'board-field-action-divider';
   menu.appendChild(divider);
@@ -300,6 +333,7 @@ export function renderPropertiesContent(
   host: HTMLElement,
   board: Board,
   onChange: (next: Board) => void,
+  viewName: string,
 ): void {
   const header = document.createElement('div');
   header.className = 'board-properties-section';
@@ -323,7 +357,7 @@ export function renderPropertiesContent(
   function rebuildList() {
     list.innerHTML = '';
     for (const field of currentBoard.fields) {
-      list.appendChild(renderFieldRow(currentBoard, field, list, wrappedOnChange));
+      list.appendChild(renderFieldRow(currentBoard, field, list, wrappedOnChange, viewName));
     }
   }
   rebuildList();
@@ -343,6 +377,7 @@ export function openPropertiesMenu(
   anchor: HTMLElement,
   board: Board,
   onChange: (next: Board) => void,
+  viewName = 'kanban',
 ): void {
   document.querySelectorAll('.board-properties-menu').forEach((n) => n.remove());
 
@@ -351,7 +386,7 @@ export function openPropertiesMenu(
   document.body.appendChild(menu);
   positionAnchored(menu, anchor);
 
-  renderPropertiesContent(menu, board, onChange);
+  renderPropertiesContent(menu, board, onChange, viewName);
 
   function onOutside(e: MouseEvent) {
     const t = e.target as HTMLElement | null;
@@ -386,7 +421,7 @@ export function openPropertiesMenu(
   });
 }
 
-function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onChange: (next: Board) => void): HTMLElement {
+function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onChange: (next: Board) => void, viewName: string): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-properties-row';
   row.dataset.fieldName = field.name;
@@ -404,7 +439,7 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      startManualFieldDrag(e, field.name, listEl, board, onChange);
+      startManualFieldDrag(e, field.name, listEl, board, onChange, viewName);
     });
   }
   row.appendChild(handle);
@@ -442,15 +477,28 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
   }
   row.appendChild(name);
 
-  // Toggle: Show on card
+  // Toggle: Show on card (kanban) or show in table view
   const toggle = document.createElement('button');
   toggle.type = 'button';
-  toggle.className = 'board-properties-toggle' + (field.visibleOnCard ? ' is-on' : '');
-  toggle.title = field.visibleOnCard ? 'Visible on card — click to hide' : 'Hidden — click to show';
   toggle.disabled = isLocked;
-  toggle.addEventListener('click', () => {
-    onChange(toggleFieldVisibility(board, field.name));
-  });
+  if (viewName === 'table') {
+    const tableView = board.views.find(x => x.name === 'table');
+    const isHidden = !!tableView?.hidden?.includes(field.name);
+    toggle.className = 'board-properties-toggle' + (!isHidden ? ' is-on' : '');
+    toggle.title = isHidden ? 'Hidden in table — click to show' : 'Visible in table — click to hide';
+    toggle.addEventListener('click', () => {
+      const b2: Board = { ...board, views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })) };
+      if (isHidden) showFieldInView(b2, 'table', field.name);
+      else          hideFieldInView(b2, 'table', field.name);
+      onChange(b2);
+    });
+  } else {
+    toggle.className = 'board-properties-toggle' + (field.visibleOnCard ? ' is-on' : '');
+    toggle.title = field.visibleOnCard ? 'Visible on card — click to hide' : 'Hidden — click to show';
+    toggle.addEventListener('click', () => {
+      onChange(toggleFieldVisibility(board, field.name));
+    });
+  }
   row.appendChild(toggle);
 
   // ⋯ more button (hover-revealed)
@@ -475,7 +523,7 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
             sel?.addRange(range);
           }
         },
-      });
+      }, viewName);
     });
   }
   row.appendChild(more);

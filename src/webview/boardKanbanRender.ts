@@ -172,7 +172,7 @@ function buildHeaderMore(
     btn.setAttribute('aria-expanded', 'true');
     refreshViewSeg();
     propsHost.innerHTML = '';
-    renderPropertiesContent(propsHost, ctx.getBoard(), ctx.mutate);
+    renderPropertiesContent(propsHost, ctx.getBoard(), ctx.mutate, ctx.getBoard().activeView ?? 'kanban');
 
     function onOutside(e: MouseEvent): void {
       const t = e.target as HTMLElement | null;

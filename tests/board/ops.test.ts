@@ -128,6 +128,14 @@ describe('boardOps.moveCard', () => {
   });
 });
 
+describe('boardOps.setViewColumns', () => {
+  it('persists column order on the view', () => {
+    const b = makeBoard();
+    ops.setViewColumns(b, 'table', ['Owner', 'Title', 'Status']);
+    expect(b.views[0].columns).toEqual(['Owner', 'Title', 'Status']);
+  });
+});
+
 describe('boardOps.addCard', () => {
   it('appends a card with empty values + auto Status', () => {
     const b = makeBoard();
