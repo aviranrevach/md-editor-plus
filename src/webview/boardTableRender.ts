@@ -4,6 +4,7 @@
 
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { renderChrome } from './boardChrome';
 import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
@@ -120,13 +121,22 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   // Cancel an in-progress row drag before wiping the DOM on re-render.
   let cancelRowDrag: (() => void) | null = null;
 
+  // Chrome menu-close lifecycle — mirrors mountKanban's approach.
+  let closeOpenMenu: (() => void) | null = null;
+  function registerMenuClose(cb: () => void): void { closeOpenMenu = cb; }
+  function unregisterMenuClose(): void { closeOpenMenu = null; }
+
   function render(): void {
     if (detached) return;
     cancelRowDrag?.();
     cancelRowDrag = null;
+    closeOpenMenu?.();
     const b = ctx.getBoard();
     const v = b.views.find(x => x.name === 'table') ?? { name: 'table' };
     root.innerHTML = '';
+
+    // Board chrome (name + ⋯ menu with view switcher and Properties)
+    root.appendChild(renderChrome(b, ctx.mutate, ctx.readonly, ctx, registerMenuClose, unregisterMenuClose));
 
     const visibleFields = computeVisibleFields(b, v);
     const widths = v.widths ?? {};
@@ -138,7 +148,6 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.appendChild(empty);
       return;
     }
-    const showEmptyHint = b.cards.length === 0 && !ctx.readonly;
 
     const table = document.createElement('table');
     table.className = 'bd-table';
@@ -163,9 +172,6 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       const th = document.createElement('th');
       th.textContent = f.name;
       th.dataset.field = f.name;
-      if (!ctx.readonly) {
-        th.style.cursor = 'pointer';
-      }
       if (v.sort?.field === f.name) {
         const caret = document.createElement('span');
         caret.className = 'bd-sort-caret';
@@ -230,7 +236,10 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           const t = e.target as HTMLElement;
           if (t.closest('.bd-col-resizer') || t.closest('.bd-col-menu-btn')) return;
           e.preventDefault();
+          th.classList.add('bd-th-dragging');
           startColumnDrag(e, f, visibleFields, ctx);
+          const cleanup = () => { th.classList.remove('bd-th-dragging'); };
+          document.addEventListener('mouseup', cleanup, { once: true });
         });
       }
       headRow.appendChild(th);
@@ -267,7 +276,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           const addBtn = document.createElement('button');
           addBtn.type = 'button';
           addBtn.className = 'bd-group-add';
-          addBtn.textContent = '+ Add card';
+          addBtn.textContent = '+ Add row';
           addBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const cur = ctx.getBoard();
@@ -307,10 +316,13 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         if (!v.sort && !ctx.readonly) {
           const grip = document.createElement('span');
           grip.className = 'bd-row-grip';
-          grip.textContent = '⋮';
+          grip.textContent = '⋮⋮';
           grip.addEventListener('mousedown', (ev) => {
             ev.preventDefault();
+            tr.classList.add('bd-tr-dragging');
             cancelRowDrag = startRowDrag(ev, card, g, ctx);
+            const cleanup = () => { tr.classList.remove('bd-tr-dragging'); };
+            document.addEventListener('mouseup', cleanup, { once: true });
           });
           gutter.appendChild(grip);
         }
@@ -324,23 +336,22 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       }
     }
 
-    if (showEmptyHint) {
-      const hintRow = document.createElement('tr');
-      const hintTd = document.createElement('td');
-      hintTd.colSpan = visibleFields.length + 1;
-      hintTd.className = 'bd-table-empty-hint';
-      hintTd.textContent = 'No cards yet';
-      hintRow.appendChild(hintTd);
-      tbody.appendChild(hintRow);
-    }
-
     if (!v.groupBy && !ctx.readonly) {
       const addRow = document.createElement('tr');
       addRow.className = 'bd-table-addrow';
-      const td = document.createElement('td');
-      td.colSpan = visibleFields.length + 1;
-      td.textContent = '+ Add card';
-      td.addEventListener('click', () => {
+      const gutter = document.createElement('td');
+      gutter.className = 'bd-table-gutter';
+      addRow.appendChild(gutter);
+      for (const f of visibleFields) {
+        const td = document.createElement('td');
+        td.className = 'bd-table-cell bd-addrow-cell';
+        if (f.name === 'Title' || (visibleFields.indexOf(f) === 0 && !visibleFields.some(x => x.name === 'Title'))) {
+          td.textContent = '+ Add row';
+          td.classList.add('bd-addrow-placeholder');
+        }
+        addRow.appendChild(td);
+      }
+      addRow.addEventListener('click', () => {
         const cur = ctx.getBoard();
         const b2: Board = { ...cur, cards: [...cur.cards] };
         const newId = addCard(b2);
@@ -348,7 +359,6 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         pendingFocus.field = 'Title';
         ctx.mutate(b2);
       });
-      addRow.appendChild(td);
       tbody.appendChild(addRow);
     }
 
@@ -367,11 +377,17 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
   function computeVisibleFields(b: Board, v: ViewDef): FieldDef[] {
     const hidden = new Set(v.hidden ?? []);
-    const order  = v.columns ?? b.fields.map(f => f.name);
+    const explicit = v.columns ?? [];
+    const explicitSet = new Set(explicit);
+    const remaining = b.fields.map(f => f.name).filter(n => !explicitSet.has(n));
+    const orderedNames = [...explicit, ...remaining];
     const out: FieldDef[] = [];
-    for (const name of order) {
+    for (const name of orderedNames) {
       const f = b.fields.find(x => x.name === name);
-      if (f && !hidden.has(name)) out.push(f);
+      if (!f) continue;
+      if (hidden.has(name)) continue;
+      if (!f.visibleOnCard) continue;
+      out.push(f);
     }
     return out;
   }
@@ -382,6 +398,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     update: (_next: Board) => render(),
     destroy: () => {
       detached = true;
+      closeOpenMenu?.();
       root.innerHTML = '';
       root.classList.remove('bd-table-host');
     },

@@ -482,13 +482,22 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
   toggle.disabled = isLocked;
   if (viewName === 'table') {
     const tableView = board.views.find(x => x.name === 'table');
-    const isHidden = !!tableView?.hidden?.includes(field.name);
+    const isHidden = !!tableView?.hidden?.includes(field.name) || !field.visibleOnCard;
     toggle.className = 'board-properties-toggle' + (!isHidden ? ' is-on' : '');
     toggle.title = isHidden ? 'Hidden in table — click to show' : 'Visible in table — click to hide';
     toggle.addEventListener('click', () => {
-      const b2: Board = { ...board, views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })) };
-      if (isHidden) showFieldInView(b2, 'table', field.name);
-      else          hideFieldInView(b2, 'table', field.name);
+      const b2: Board = {
+        ...board,
+        fields: board.fields.map(ff =>
+          ff.name === field.name ? { ...ff, visibleOnCard: isHidden ? true : ff.visibleOnCard } : ff
+        ),
+        views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })),
+      };
+      if (isHidden) {
+        showFieldInView(b2, 'table', field.name);
+      } else {
+        hideFieldInView(b2, 'table', field.name);
+      }
       onChange(b2);
     });
   } else {

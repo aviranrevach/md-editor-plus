@@ -1316,7 +1316,6 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table-row:hover { background: var(--block-hover); }
 .bd-table-gutter { width: 36px; }
 .bd-table-empty { padding: 60px 0; text-align: center; color: var(--text-secondary); font-size: 13px; }
-.bd-table-empty-hint { padding: 18px 10px; color: var(--text-secondary, #888); font-size: 12.5px; text-align: center; }
 .bd-cell-editing { background: var(--bg); outline: 2px solid var(--link); outline-offset: -2px; }
 .bd-table-cell { cursor: text; }
 .bd-cell-status, .bd-cell-date, .bd-cell-tags { cursor: pointer; }
@@ -1336,8 +1335,8 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-group-count { color: var(--text-secondary, #888); font-size: 11px; }
 .bd-group-add   { color: var(--link, #2563eb); background: transparent; border: none; cursor: pointer; font: 500 12px ui-sans-serif, sans-serif; }
 
-/* ── Table add-card row ─────────────────────────────────────────────────── */
-.bd-table-addrow td { padding: 9px 10px; color: var(--link, #2563eb); cursor: pointer; font: 500 12px ui-sans-serif, sans-serif; }
+/* ── Table add-row ──────────────────────────────────────────────────────── */
+.bd-table-addrow td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); cursor: pointer; }
 .bd-table-addrow:hover td { background: var(--block-hover); }
 
 /* ── Table column ⋯ menu button ─────────────────────────────────────────── */
@@ -1350,16 +1349,34 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 /* ── Column resizer handle ──────────────────────────────────────────────── */
 .bd-col-resizer {
   position: absolute;
-  top: 0; right: 0; bottom: 0;
-  width: 4px;
+  top: 0; right: -3px; bottom: 0;
+  width: 7px;
   cursor: col-resize;
+  z-index: 3;
 }
-.bd-col-resizer:hover { background: var(--link, #2563eb); opacity: 0.3; }
+.bd-col-resizer:hover { background: var(--link, #2563eb); opacity: 0.35; }
 
 /* ── Column header drag cursor ──────────────────────────────────────────── */
 .bd-table thead th { cursor: grab; }
+.bd-table thead th .bd-col-resizer { cursor: col-resize; }
+.bd-table thead th .bd-col-menu-btn { cursor: pointer; }
+.bd-th-dragging { opacity: 0.5; }
 
 /* ── Row drag grip ──────────────────────────────────────────────────────── */
-.bd-row-grip { color: transparent; cursor: grab; font-size: 14px; padding: 0 4px; }
-.bd-table-row:hover .bd-row-grip { color: var(--text-secondary); }
+.bd-row-grip {
+  color: var(--text-secondary, #888);
+  opacity: 0.25;
+  cursor: grab;
+  font-size: 12px;
+  padding: 0 4px;
+  letter-spacing: -2px;
+  user-select: none;
+}
+.bd-table-row:hover .bd-row-grip { opacity: 1; }
+.bd-row-grip:active { cursor: grabbing; }
+.bd-tr-dragging { opacity: 0.5; }
 .bd-drop-line-reject { background: #ef4444 !important; }
+
+/* ── Table add-row (new design) ─────────────────────────────────────────── */
+.bd-addrow-placeholder { color: var(--text-secondary, #888); font-style: normal; font-size: 13px; }
+.bd-table-addrow .bd-table-gutter { width: 36px; }
