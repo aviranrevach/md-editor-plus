@@ -361,18 +361,17 @@ export function renderPropertiesContent(
     for (const field of cur.fields) {
       list.appendChild(renderFieldRow(cur, field, list, wrappedOnChange, viewName));
     }
-    // Synthetic "Description" row, table-view only — surfaces card.body as a
-    // togglable column. In kanban the body is always edited via the side panel,
-    // so there's no kanban-side toggle to expose.
-    if (viewName === 'table') {
-      list.appendChild(renderFieldRow(
-        cur,
-        { name: 'Description', type: 'text', visibleOnCard: false },
-        list,
-        wrappedOnChange,
-        viewName,
-      ));
-    }
+    // Synthetic "Description" row — surfaces card.body. Visible in both views:
+    // table-side toggle controls the Description column, kanban-side toggle
+    // controls whether the body preview shows on the card. Both write to
+    // view.hidden for their respective view, so the two stay independent.
+    list.appendChild(renderFieldRow(
+      cur,
+      { name: 'Description', type: 'text', visibleOnCard: false },
+      list,
+      wrappedOnChange,
+      viewName,
+    ));
   }
   rebuildList();
 
