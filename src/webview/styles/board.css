@@ -1348,34 +1348,35 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table-addrow:hover td { background: var(--block-hover); }
 
 /* ── Table column ⋯ menu button ─────────────────────────────────────────── */
-.bd-col-menu-btn { background: transparent; border: none; color: var(--text-secondary, #888); font-size: 14px; padding: 0 4px; cursor: pointer; opacity: 0; }
+.bd-col-menu-btn { background: transparent; border: none; color: var(--text-secondary, #888); font-size: 14px; padding: 0 4px; cursor: pointer; opacity: 0.4; transition: opacity 0.15s; }
 .bd-table thead th:hover .bd-col-menu-btn { opacity: 1; }
 .bd-col-menu { position: fixed; display: flex; flex-direction: column; gap: 1px; padding: 6px; background: var(--bg, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.12); z-index: 7; min-width: 180px; }
 .bd-col-menu-item { text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: 5px; cursor: pointer; font: 500 12.5px ui-sans-serif, sans-serif; color: var(--text-primary, #222); }
 .bd-col-menu-item:hover { background: var(--block-hover, rgba(0,0,0,0.05)); }
 
 /* ── Column resizer handle ──────────────────────────────────────────────── */
+/* Always faintly visible so the user can find the hit area without hovering. */
 .bd-col-resizer {
   position: absolute;
   top: 4px; right: -3px; bottom: 4px;
   width: 8px;
   cursor: col-resize;
   z-index: 3;
-  border-right: 1px solid transparent;
-  transition: border-color 0.1s;
+  border-right: 2px solid var(--border, rgba(0, 0, 0, 0.15));
+  transition: border-color 0.1s, background-color 0.1s;
 }
 .bd-col-resizer:hover {
   border-right-color: var(--link, #2563eb);
-  background: var(--link, #2563eb);
-  opacity: 0.25;
+  background: rgba(37, 99, 235, 0.15);
 }
 
 /* ── Column header drag handle ──────────────────────────────────────────── */
+/* Always faintly visible so the user can find it without hovering the header. */
 .bd-col-drag-handle {
   display: inline-flex;
   align-items: center;
   cursor: grab;
-  opacity: 0;
+  opacity: 0.35;
   color: var(--text-secondary, #9b9b97);
   padding: 0 2px;
   vertical-align: middle;
@@ -1383,25 +1384,26 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   flex-shrink: 0;
   transition: opacity 0.15s;
 }
-.bd-table thead th:hover .bd-col-drag-handle { opacity: 0.55; }
+.bd-table thead th:hover .bd-col-drag-handle { opacity: 0.75; }
 .bd-col-drag-handle:hover { opacity: 1 !important; }
 .bd-col-drag-handle:active { cursor: grabbing; }
-.bd-col-drag-handle svg { fill: currentColor; }
+.bd-col-drag-handle svg { fill: currentColor; display: block; }
 .bd-th-dragging { opacity: 0.5; }
 
 /* ── Row drag grip ──────────────────────────────────────────────────────── */
+/* Always faintly visible so the user can find the drag affordance. */
 .bd-row-grip {
   display: inline-flex;
   align-items: center;
   color: var(--text-secondary, #9b9b97);
-  opacity: 0;
+  opacity: 0.35;
   cursor: grab;
   padding: 0 2px;
   user-select: none;
   transition: opacity 0.15s;
 }
-.bd-row-grip svg { fill: currentColor; }
-.bd-table-row:hover .bd-row-grip { opacity: 0.55; }
+.bd-row-grip svg { fill: currentColor; display: block; }
+.bd-table-row:hover .bd-row-grip { opacity: 0.75; }
 .bd-row-grip:hover { opacity: 1 !important; }
 .bd-row-grip:active { cursor: grabbing; }
 .bd-tr-dragging { opacity: 0.5; }
