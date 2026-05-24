@@ -1,7 +1,0 @@
-[    3019ms] [LOG] [harness] rendered ok (3 lines) @ http://localhost:8765/harness.bundle.js:171008
-[    7320ms] [LOG] [harness] visual editor activated @ http://localhost:8765/harness.bundle.js:171008
-[   21559ms] [LOG] [harness] visual editor exited @ http://localhost:8765/harness.bundle.js:171008
-[   97312ms] [LOG] [harness] visual editor activated @ http://localhost:8765/harness.bundle.js:171008
-[  128445ms] [LOG] [harness] visual editor activated @ http://localhost:8765/harness.bundle.js:171008
-[  156821ms] [LOG] [harness] source changed @ http://localhost:8765/harness.bundle.js:171008
-[  159394ms] [LOG] [harness] rendered ok (4 lines) @ http://localhost:8765/harness.bundle.js:171008

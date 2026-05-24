@@ -3,3 +3,9 @@ dist/
 dist-webview/
 *.vsix
 .superpowers/
+
+# OS junk + dev screenshots accidentally swept in once
+.DS_Store
+**/.DS_Store
+.playwright-mcp/
+*.png

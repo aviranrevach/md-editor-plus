@@ -1,9 +1,0 @@
-[    5886ms] [LOG] [harness] rendered ok (3 lines) @ http://localhost:8765/harness.bundle.js:174305
-[    7642ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8765/favicon.ico:0
-[   21930ms] [LOG] [harness] visual editor activated @ http://localhost:8765/harness.bundle.js:174305
-[   22367ms] [LOG] [harness] source changed @ http://localhost:8765/harness.bundle.js:174305
-[   23865ms] [LOG] [harness] rendered ok (5 lines) @ http://localhost:8765/harness.bundle.js:174305
-[   24234ms] [LOG] [harness] source changed @ http://localhost:8765/harness.bundle.js:174305
-[   25770ms] [LOG] [harness] rendered ok (6 lines) @ http://localhost:8765/harness.bundle.js:174305
-[   72956ms] [LOG] [harness] source changed @ http://localhost:8765/harness.bundle.js:174305
-[   77751ms] [LOG] [harness] rendered ok (6 lines) @ http://localhost:8765/harness.bundle.js:174305
