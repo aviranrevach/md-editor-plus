@@ -14,16 +14,15 @@ function startRowDrag(
   e: MouseEvent,
   card: Card,
   group: Group,
-  _tbody: HTMLTableSectionElement,
   ctx: BoardRendererCtx,
-  _v: ViewDef,
-): void {
+): () => void {
   const ind = dropIndicator();
   ind.style.position = 'fixed';
   document.body.appendChild(ind);
   let dropBeforeId: string | null = null;
   let isReject = false;
-  startDrag(e, {
+  let hasValidDrop = false;
+  return startDrag(e, {
     onMove: (ev) => {
       const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('tr.bd-table-row') as HTMLElement | null;
       if (!target) { ind.hide(); return; }
@@ -31,12 +30,14 @@ function startRowDrag(
       const targetCard = group.cards.find(c => c.id === targetCardId);
       if (!targetCard) {
         isReject = true;
+        hasValidDrop = false;
         ind.classList.add('bd-drop-line-reject');
         const r = target.getBoundingClientRect();
         ind.show(r.left, r.top, r.width, 2);
         return;
       }
       isReject = false;
+      hasValidDrop = true;
       ind.classList.remove('bd-drop-line-reject');
       const r = target.getBoundingClientRect();
       const above = ev.clientY < r.top + r.height / 2;
@@ -46,7 +47,7 @@ function startRowDrag(
     },
     onDrop: () => {
       ind.remove();
-      if (!isReject) {
+      if (hasValidDrop && !isReject) {
         const cur = ctx.getBoard();
         const b2: Board = { ...cur, cards: [...cur.cards] };
         moveCard(b2, card.id, dropBeforeId);
@@ -70,7 +71,8 @@ function startColumnDrag(
   const ind = dropIndicator();
   ind.style.position = 'fixed';
   document.body.appendChild(ind);
-  let dropIdx = visibleFields.indexOf(f);
+  // -1 signals "no drop observed yet"; onMove always fires before onDrop.
+  let dropIdx = -1;
   startDrag(e, {
     onMove: (ev) => {
       let chosen = visibleFields.length;
@@ -89,6 +91,7 @@ function startColumnDrag(
     },
     onDrop: () => {
       ind.remove();
+      if (dropIdx < 0) return;  // no valid drop position observed
       const board = ctx.getBoard();
       const allNames = board.fields.map(x => x.name);
       const visibleNames = visibleFields.map(x => x.name);
@@ -114,9 +117,13 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   let detached = false;
   const collapsedGroups = new Set<string>();
   const pendingFocus: { id: string | null; field: string | null } = { id: null, field: null };
+  // Cancel an in-progress row drag before wiping the DOM on re-render.
+  let cancelRowDrag: (() => void) | null = null;
 
   function render(): void {
     if (detached) return;
+    cancelRowDrag?.();
+    cancelRowDrag = null;
     const b = ctx.getBoard();
     const v = b.views.find(x => x.name === 'table') ?? { name: 'table' };
     root.innerHTML = '';
@@ -131,6 +138,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.appendChild(empty);
       return;
     }
+    const showEmptyHint = b.cards.length === 0 && !ctx.readonly;
 
     const table = document.createElement('table');
     table.className = 'bd-table';
@@ -194,9 +202,11 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         resizer.addEventListener('mousedown', (e) => {
           e.preventDefault();
           e.stopPropagation();
+          document.body.style.cursor = 'col-resize';
           const start = e.clientX;
           const col = table.querySelectorAll('colgroup col')[1 + visibleFields.indexOf(f)] as HTMLTableColElement;
-          const startW = parseInt(col.style.width, 10) || 160;
+          const parsedW = parseInt(col.style.width, 10);
+          const startW = Number.isNaN(parsedW) ? 160 : parsedW;
           const onMove = (ev: MouseEvent) => {
             const next = Math.max(60, startW + (ev.clientX - start));
             col.style.width = `${next}px`;
@@ -204,6 +214,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           const onUp = (ev: MouseEvent) => {
             document.removeEventListener('mousemove', onMove, true);
             document.removeEventListener('mouseup', onUp, true);
+            document.body.style.cursor = '';
             const next = Math.max(60, startW + (ev.clientX - start));
             const cur = ctx.getBoard();
             const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2, widths: { ...(v2.widths ?? {}) } })) };
@@ -267,7 +278,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
             }
             const newId = addCard(b2, presets);
             pendingFocus.id = newId;
-            pendingFocus.field = 'Title';
+            pendingFocus.field = 'Title'; // NOTE: if the Title field is ever renamed, this focus silently no-ops
             ctx.mutate(b2);
           });
           row.append(left, addBtn);
@@ -299,18 +310,28 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           grip.textContent = '⋮';
           grip.addEventListener('mousedown', (ev) => {
             ev.preventDefault();
-            startRowDrag(ev, card, g, tbody, ctx, v);
+            cancelRowDrag = startRowDrag(ev, card, g, ctx);
           });
           gutter.appendChild(grip);
         }
         tr.appendChild(gutter);
         for (const f of visibleFields) {
           const td = document.createElement('td');
-          renderCell(td, card, f, b, ctx);
+          renderCell(td, card, f, ctx);
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
       }
+    }
+
+    if (showEmptyHint) {
+      const hintRow = document.createElement('tr');
+      const hintTd = document.createElement('td');
+      hintTd.colSpan = visibleFields.length + 1;
+      hintTd.className = 'bd-table-empty-hint';
+      hintTd.textContent = 'No cards yet';
+      hintRow.appendChild(hintTd);
+      tbody.appendChild(hintRow);
     }
 
     if (!v.groupBy && !ctx.readonly) {
@@ -404,7 +425,14 @@ function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
   return keys.map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
 }
 
+let currentColumnMenuOutside: ((e: MouseEvent) => void) | null = null;
+
 function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx, collapsedGroups: Set<string>): void {
+  // Close any existing menu AND remove its stale outside-click listener.
+  if (currentColumnMenuOutside) {
+    document.removeEventListener('mousedown', currentColumnMenuOutside, true);
+    currentColumnMenuOutside = null;
+  }
   const existing = document.querySelector('.bd-col-menu');
   existing?.remove();
   const menu = document.createElement('div');
@@ -415,7 +443,7 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     btn.className = 'bd-col-menu-item';
     btn.textContent = label;
     btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
-    btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); });
+    btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); currentColumnMenuOutside = null; });
     menu.appendChild(btn);
   };
   mkItem('Sort ascending', () => {
@@ -461,8 +489,13 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
   menu.style.top  = `${r.bottom + 4}px`;
   document.body.appendChild(menu);
   const close = (e: MouseEvent) => {
-    if (!menu.contains(e.target as Node)) { menu.remove(); document.removeEventListener('mousedown', close, true); }
+    if (!menu.contains(e.target as Node)) {
+      menu.remove();
+      document.removeEventListener('mousedown', close, true);
+      currentColumnMenuOutside = null;
+    }
   };
+  currentColumnMenuOutside = close;
   document.addEventListener('mousedown', close, true);
 }
 
@@ -483,7 +516,12 @@ function comparatorFor(f: FieldDef, b: Board): (a: string, c: string) => number 
       if (!a && !c) return 0;
       if (!a) return 1;        // empty last
       if (!c) return -1;
-      return new Date(a).getTime() - new Date(c).getTime();
+      const at = new Date(a).getTime();
+      const ct = new Date(c).getTime();
+      if (isNaN(at) && isNaN(ct)) return 0;
+      if (isNaN(at)) return 1;
+      if (isNaN(ct)) return -1;
+      return at - ct;
     };
   }
   if (f.type === 'status') {
@@ -500,11 +538,16 @@ function comparatorFor(f: FieldDef, b: Board): (a: string, c: string) => number 
       return aa.localeCompare(cc);
     };
   }
-  // text, person
-  return (a, c) => a.localeCompare(c, undefined, { sensitivity: 'base' });
+  // text, person — empties sort last to match date/tags semantics
+  return (a, c) => {
+    if (!a && !c) return 0;
+    if (!a) return 1;
+    if (!c) return -1;
+    return a.localeCompare(c, undefined, { sensitivity: 'base' });
+  };
 }
 
-function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Board, ctx: BoardRendererCtx): void {
+function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
   td.dataset.field = field.name;
   td.className = `bd-table-cell bd-cell-${field.type}`;
   const value = card.values[field.name] ?? '';
@@ -517,7 +560,7 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Bo
       }
       return;
     case 'status': {
-      const colDef = b.columns.find(c => c.name === value);
+      const colDef = ctx.getBoard().columns.find(c => c.name === value);
       if (value) {
         td.appendChild(buildChip(value, colDef?.color ?? 'gray'));
       } else {
@@ -535,8 +578,7 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Bo
       return;
     }
     case 'date': {
-      const dateStr = value;
-      if (!dateStr) {
+      if (!value) {
         const placeholder = document.createElement('span');
         placeholder.className = 'bd-cell-empty';
         placeholder.textContent = '—';
@@ -544,8 +586,8 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, b: Bo
       } else {
         const pill = document.createElement('span');
         pill.className = 'bd-date';
-        const d = new Date(dateStr + 'T00:00:00');
-        pill.textContent = isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        const d = new Date(value + 'T00:00:00');
+        pill.textContent = isNaN(d.getTime()) ? value : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
         if (!isNaN(d.getTime()) && d.getTime() < startOfToday()) {
           pill.classList.add('bd-date-overdue');
           pill.textContent += ' · overdue';
@@ -626,6 +668,12 @@ function openTagsEditor(anchor: HTMLElement, card: Card, field: FieldDef, ctx: B
   td.textContent = (card.values[field.name] ?? '');
   td.setAttribute('contenteditable', 'true');
   td.focus();
+  const range = document.createRange();
+  range.selectNodeContents(td);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
   const commit = () => {
     td.removeAttribute('contenteditable');
     const next = (td.textContent ?? '')
@@ -656,8 +704,14 @@ function openTagsEditor(anchor: HTMLElement, card: Card, field: FieldDef, ctx: B
   td.addEventListener('blur',    onBlur);
 }
 
+let currentStatusOutside: ((e: MouseEvent) => void) | null = null;
+
 function openStatusDropdown(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): void {
   document.querySelectorAll('.board-status-dropdown').forEach((n) => n.remove());
+  if (currentStatusOutside) {
+    document.removeEventListener('mousedown', currentStatusOutside, true);
+    currentStatusOutside = null;
+  }
   const pop = document.createElement('div');
   pop.className = 'board-status-dropdown';
 
@@ -665,6 +719,7 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, ctx: BoardRendererC
     if (!pop.contains(e.target as Node)) {
       pop.remove();
       document.removeEventListener('mousedown', closeOnOutside, true);
+      currentStatusOutside = null;
     }
   }
 
@@ -694,6 +749,7 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, ctx: BoardRendererC
   pop.style.left = `${r.left}px`;
   pop.style.top = `${r.bottom + 4}px`;
   document.body.appendChild(pop);
+  currentStatusOutside = closeOnOutside;
   document.addEventListener('mousedown', closeOnOutside, true);
 }
 
@@ -711,7 +767,10 @@ function beginInlineText(
   sel?.removeAllRanges();
   sel?.addRange(range);
 
+  let resolved = false;
   const commit = () => {
+    if (resolved) return;
+    resolved = true;
     const next = (td.textContent ?? '').trim();
     td.removeAttribute('contenteditable');
     td.classList.remove('bd-cell-editing');
@@ -729,6 +788,8 @@ function beginInlineText(
     }
   };
   const cancel = () => {
+    if (resolved) return;
+    resolved = true;
     td.textContent = card.values[field.name] ?? '';
     td.removeAttribute('contenteditable');
     td.classList.remove('bd-cell-editing');

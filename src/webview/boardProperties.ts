@@ -101,8 +101,7 @@ function startManualFieldDrag(
     if (viewName === 'table') {
       const order = board.fields.map(f => f.name);
       const fromIdx2 = order.indexOf(fromName);
-      const toIdx2   = order.indexOf(toName);
-      if (fromIdx2 < 0 || toIdx2 < 0) return;
+      if (fromIdx2 < 0 || order.indexOf(toName) < 0) return;
       const [movedName] = order.splice(fromIdx2, 1);
       const insertAt = hit.before ? order.indexOf(toName) : order.indexOf(toName) + 1;
       order.splice(insertAt, 0, movedName);

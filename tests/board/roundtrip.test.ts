@@ -61,6 +61,32 @@ describe('board source round-trip', () => {
     });
   }
 
+  it('bare board:view round-trips stably (current behavior: bare view is preserved by serializer)', () => {
+    // A view with only a name and no other attrs is "meaninglessly empty" from
+    // pruneView's perspective, but pruneView only runs when an op is called.
+    // The serializer emits it as-is; parse re-creates the same object.
+    const md1 = [
+      `<!-- board:start id="b1" columns="Todo" column-colors="blue" field-types="Title=text,Status=status" -->`,
+      `<!-- board:view name="table" -->`,
+      ``,
+      `| Title | Status |`,
+      `|---|---|`,
+      ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const parsed1 = parseBoardSource(md1);
+    expect(parsed1.views).toHaveLength(1);
+    expect(parsed1.views[0]).toEqual({ name: 'table' });
+
+    const md2 = serializeBoard(parsed1);
+    // Serializer re-emits the bare view block.
+    expect(md2).toContain('<!-- board:view name="table" -->');
+
+    const parsed2 = parseBoardSource(md2);
+    // parse(serialize(parse(md1))) deep-equals parse(md1)
+    expect(parsed2).toEqual(parsed1);
+  });
+
   it('preserves orphan board:body blocks on round-trip', () => {
     const source = [
       `<!-- board:start id="b1" -->`,

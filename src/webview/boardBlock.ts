@@ -4,7 +4,6 @@ import { mountKanban } from './boardKanbanRender';
 import { mountTable } from './boardTableRender';
 import { openBoardSidePanel } from './boardSidePanel';
 
-
 export interface BoardView {
   dom: HTMLElement;
   update(source: string): void;

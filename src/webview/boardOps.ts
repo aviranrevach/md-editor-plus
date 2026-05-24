@@ -53,6 +53,7 @@ export function setViewWidth(
   pruneView(board, viewName);
 }
 
+/** NOTE: passing an empty array will prune the view if no other settings exist. */
 export function setViewColumns(board: Board, viewName: string, columns: string[]): void {
   const v = ensureView(board, viewName);
   v.columns = columns;
