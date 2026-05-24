@@ -144,8 +144,16 @@ function startColumnDrag(
 }
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
+  // DIAGNOSTIC: prove the fresh build is mounted + that mousedown reaches us.
+  dbgFlash('mountTable() running', '#9333ea');
   const root = ctx.root;
   root.classList.add('bd-table-host');
+  root.addEventListener('mousedown', (e) => {
+    const t = e.target as HTMLElement | null;
+    const cls = t?.className || t?.tagName || '?';
+    const inDrag = !!t?.closest('[data-board-drag]');
+    dbgFlash(`host mousedown: ${typeof cls === 'string' ? cls.slice(0, 30) : '?'} drag=${inDrag}`, '#0891b2');
+  }, true);
   let detached = false;
   const collapsedGroups = new Set<string>();
   const pendingFocus: { id: string | null; field: string | null } = { id: null, field: null };
