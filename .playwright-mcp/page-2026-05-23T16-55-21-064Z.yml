@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - heading "Mermaid visual edit — harness" [level=2] [ref=e2]
+  - paragraph [ref=e3]: Click Activate, then click a node in the diagram. Selection ring + context tip should appear.
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button "Activate" [ref=e7] [cursor=pointer]
+        - button "Deactivate" [ref=e8] [cursor=pointer]
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: mermaid
+          - generic [ref=e12]: harness
+        - document [ref=e15]:
+          - generic [ref=e18]:
+            - paragraph [ref=e25]: Start
+            - paragraph [ref=e32]: Process
+            - paragraph [ref=e39]: Done
+      - generic [ref=e40]: rendered ok (3 lines)
+    - generic [ref=e41]:
+      - heading "Source" [level=3] [ref=e42]
+      - textbox [ref=e43]: flowchart LR Start --> Process Process --> Done
+      - button "Update from textarea" [ref=e44] [cursor=pointer]

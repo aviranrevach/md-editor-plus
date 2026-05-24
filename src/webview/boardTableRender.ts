@@ -181,6 +181,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         const dragHandle = document.createElement('span');
         dragHandle.className = 'bd-col-drag-handle';
         dragHandle.title = 'Drag to reorder column';
+        dragHandle.setAttribute('data-board-drag', '');
         dragHandle.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
         dragHandle.addEventListener('mousedown', (e) => {
           e.preventDefault();
@@ -219,6 +220,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
         const resizer = document.createElement('div');
         resizer.className = 'bd-col-resizer';
+        resizer.setAttribute('data-board-drag', '');
         resizer.addEventListener('mousedown', (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -355,6 +357,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         if (!v.sort && !ctx.readonly) {
           const grip = document.createElement('span');
           grip.className = 'bd-row-grip';
+          grip.setAttribute('data-board-drag', '');
           grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
           grip.addEventListener('mousedown', (ev) => {
             ev.preventDefault();
@@ -417,16 +420,23 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
   function computeVisibleFields(b: Board, v: ViewDef): FieldDef[] {
     const hidden = new Set(v.hidden ?? []);
-    const explicit = v.columns ?? [];
-    const explicitSet = new Set(explicit);
-    const remaining = b.fields.map(f => f.name).filter(n => !explicitSet.has(n));
-    const orderedNames = [...explicit, ...remaining];
+    const explicit = v.columns;
+    const hasExplicitOrder = !!explicit && explicit.length > 0;
+    const hasHidden = hidden.size > 0;
+    // Fresh view (no per-view column or hidden config): fall back to the
+    // board-level `visibleOnCard` so the table mirrors what the kanban shows.
+    // Once the user has expressed per-view intent (reorder OR hide), trust
+    // view.hidden as the only source of "hidden" and ignore visibleOnCard.
+    const usesFallback = !hasExplicitOrder && !hasHidden;
+    const explicitSet = new Set(explicit ?? []);
+    const tail = b.fields.map(f => f.name).filter(n => !explicitSet.has(n));
+    const orderedNames = hasExplicitOrder ? [...explicit!, ...tail] : tail;
     const out: FieldDef[] = [];
     for (const name of orderedNames) {
       const f = b.fields.find(x => x.name === name);
       if (!f) continue;
       if (hidden.has(name)) continue;
-      if (!f.visibleOnCard) continue;
+      if (usesFallback && !f.visibleOnCard) continue;
       out.push(f);
     }
     return out;

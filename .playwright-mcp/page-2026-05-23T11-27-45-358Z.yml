@@ -1,0 +1,16 @@
+- generic [active] [ref=e1]:
+  - heading "Mermaid visual edit — harness" [level=2] [ref=e2]
+  - paragraph [ref=e3]: Click Activate, then click a node in the diagram. Selection ring + context tip should appear.
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button "Activate" [ref=e7] [cursor=pointer]
+        - button "Deactivate" [ref=e8] [cursor=pointer]
+      - generic [ref=e10]:
+        - generic [ref=e11]: mermaid
+        - generic [ref=e12]: harness
+      - generic [ref=e14]: idle
+    - generic [ref=e15]:
+      - heading "Source" [level=3] [ref=e16]
+      - textbox [ref=e17]
+      - button "Update from textarea" [ref=e18] [cursor=pointer]

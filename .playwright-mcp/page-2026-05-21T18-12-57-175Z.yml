@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - heading "Mermaid visual edit — harness" [level=2] [ref=e2]
+  - paragraph [ref=e3]: Click Activate, then click a node in the diagram. Selection ring + context tip should appear.
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button "Activate" [ref=e7] [cursor=pointer]
+        - button "Deactivate" [ref=e8] [cursor=pointer]
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: mermaid
+          - generic [ref=e12]: harness
+        - generic [ref=e13]:
+          - document [ref=e15]:
+            - generic [ref=e18]:
+              - paragraph [ref=e25]: Start
+              - paragraph [ref=e32]: Process
+              - paragraph [ref=e39]: Done
+          - generic [ref=e45]:
+            - button "Select (V)" [ref=e46] [cursor=pointer]:
+              - img [ref=e47]
+            - button "Rectangle (R)" [ref=e50] [cursor=pointer]:
+              - img [ref=e51]
+            - button "Pill (P)" [ref=e53] [cursor=pointer]:
+              - img [ref=e54]
+            - button "Circle (C)" [ref=e56] [cursor=pointer]:
+              - img [ref=e57]
+            - button "Diamond (D)" [ref=e59] [cursor=pointer]:
+              - img [ref=e60]
+            - button "Arrow (A)" [ref=e63] [cursor=pointer]:
+              - img [ref=e64]
+            - button "Text (T)" [ref=e67] [cursor=pointer]:
+              - img [ref=e68]
+          - generic [ref=e70]:
+            - button "Shape ▾" [ref=e71] [cursor=pointer]
+            - button "Delete node" [ref=e73] [cursor=pointer]: ×
+      - generic [ref=e40]: visual editor activated
+    - generic [ref=e41]:
+      - heading "Source" [level=3] [ref=e42]
+      - textbox [ref=e43]: flowchart LR Start --> Process Process --> Done
+      - button "Update from textarea" [ref=e44] [cursor=pointer]
