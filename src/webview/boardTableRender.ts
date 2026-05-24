@@ -153,24 +153,47 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   dbgFlash('mountTable() running', '#9333ea');
   const root = ctx.root;
   root.classList.add('bd-table-host');
-  // Three-tier capture listeners to pinpoint WHERE mousedown is being eaten.
-  const onDoc = (e: MouseEvent) => {
+  dbgFlash(`mount: root tag=${root.tagName} cls=${root.className} parent=${root.parentElement?.tagName ?? 'NULL'}`, '#9333ea');
+  // Diagnostic capture listeners (document → board-dom → host → bubble on host)
+  document.addEventListener('mousedown', (e) => {
     const t = e.target as HTMLElement | null;
     const inTable = !!t?.closest('.bd-table-host');
-    if (inTable) dbgFlash(`DOC capture: tag=${t?.tagName}`, '#dc2626');
-  };
-  document.addEventListener('mousedown', onDoc, true);
-  const onDom = (e: MouseEvent) => {
+    if (inTable) dbgFlash(`DOC capture: ${t?.tagName}`, '#dc2626');
+  }, true);
+  root.parentElement?.addEventListener('mousedown', (e) => {
     const t = e.target as HTMLElement | null;
     const inTable = !!t?.closest('.bd-table-host');
-    if (inTable) dbgFlash(`DOM(board) capture: tag=${t?.tagName}`, '#f59e0b');
-  };
-  root.parentElement?.addEventListener('mousedown', onDom, true);
+    if (inTable) dbgFlash(`DOM(board) capture: ${t?.tagName}`, '#f59e0b');
+  }, true);
   root.addEventListener('mousedown', (e) => {
     const t = e.target as HTMLElement | null;
-    const cls = t?.className || t?.tagName || '?';
     const inDrag = !!t?.closest('[data-board-drag]');
-    dbgFlash(`HOST capture: ${typeof cls === 'string' ? cls.slice(0, 30) : '?'} drag=${inDrag}`, '#0891b2');
+    dbgFlash(`HOST capture: ${t?.tagName} drag=${inDrag}`, '#0891b2');
+  }, true);
+  // Also bubble-phase on root, AND on document, to see if the click reaches us at all in bubble.
+  root.addEventListener('mousedown', (e) => {
+    const t = e.target as HTMLElement | null;
+    dbgFlash(`HOST bubble: ${t?.tagName}`, '#10b981');
+  });
+  document.addEventListener('mousedown', (e) => {
+    const t = e.target as HTMLElement | null;
+    const inTable = !!t?.closest('.bd-table-host');
+    if (inTable) {
+      // Walk from target up to body and log each ancestor's tag+class.
+      let cur: HTMLElement | null = t;
+      const chain: string[] = [];
+      while (cur && chain.length < 12) {
+        chain.push(`${cur.tagName}${cur.id ? '#' + cur.id : ''}${cur.className ? '.' + (cur.className as string).split(' ').filter(Boolean).slice(0, 2).join('.') : ''}`);
+        cur = cur.parentElement;
+      }
+      dbgFlash(`PATH (bubble): ${chain.join(' > ')}`, '#a855f7');
+    }
+  });
+  // Compare references at click time: is the original `root` still equal to the
+  // current .bd-table-host in the document?
+  document.addEventListener('mousedown', () => {
+    const live = document.querySelector('.bd-table-host');
+    dbgFlash(`live==root? ${live === root}  live.parent=${live?.parentElement?.tagName}  root.parent=${root.parentElement?.tagName ?? 'NULL'}  root.isConnected=${root.isConnected}`, '#eab308');
   }, true);
   let detached = false;
   const collapsedGroups = new Set<string>();
