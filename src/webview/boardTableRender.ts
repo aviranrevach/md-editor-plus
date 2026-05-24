@@ -193,11 +193,12 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         countSpan.className = 'bd-group-count';
         countSpan.textContent = String(g.cards.length);
         left.append(caret, nameSpan, countSpan);
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'bd-group-add';
-        addBtn.textContent = '+ Add card';
-        if (!ctx.readonly) {
+        const isUncategorizedStatus = v.groupBy === 'Status' && g.key === 'Uncategorized';
+        if (!ctx.readonly && !isUncategorizedStatus) {
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'bd-group-add';
+          addBtn.textContent = '+ Add card';
           addBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const cur = ctx.getBoard();
@@ -211,21 +212,20 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
             pendingFocus.field = 'Title';
             ctx.mutate(b2);
           });
-        }
-        const isUncategorizedStatus = v.groupBy === 'Status' && g.key === 'Uncategorized';
-        if (!isUncategorizedStatus) {
           row.append(left, addBtn);
         } else {
           row.append(left);
         }
         td.appendChild(row);
         head.appendChild(td);
-        head.addEventListener('click', (e) => {
-          if ((e.target as HTMLElement).closest('.bd-group-add')) return;
-          if (collapsedGroups.has(g.key)) collapsedGroups.delete(g.key);
-          else                            collapsedGroups.add(g.key);
-          render();
-        });
+        if (!ctx.readonly) {
+          head.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).closest('.bd-group-add')) return;
+            if (collapsedGroups.has(g.key)) collapsedGroups.delete(g.key);
+            else                            collapsedGroups.add(g.key);
+            render();
+          });
+        }
         tbody.appendChild(head);
       }
       if (collapsedGroups.has(g.key)) continue;
