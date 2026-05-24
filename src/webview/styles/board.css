@@ -1297,7 +1297,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-hidden { display: none !important; }
 
 /* ── Table view ─────────────────────────────────────────────────────────── */
-.bd-table-host { padding: 8px 10px 12px 10px; overflow-x: auto; }
+.bd-table-host { padding: 8px 10px 12px 10px; overflow-x: auto; max-height: 600px; overflow-y: auto; }
 .bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
 .bd-table thead th {
   text-align: left;
@@ -1307,7 +1307,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
-  position: relative;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 2;
 }
 .bd-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
 .bd-table-row:hover { background: var(--block-hover); }
