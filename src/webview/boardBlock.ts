@@ -3,6 +3,7 @@ import { parseBoardSource, serializeBoard, type Board } from './boardModel';
 import { mountKanban } from './boardKanbanRender';
 import { mountTable } from './boardTableRender';
 import { openBoardSidePanel } from './boardSidePanel';
+import { renderChrome, type ChromeHandle } from './boardChrome';
 
 export interface BoardView {
   dom: HTMLElement;
@@ -79,10 +80,17 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
 
   let board = parseBoardSource(initialSource);
 
+  // Stable body container — renderers paint into this. Chrome lives above it
+  // in a separate element so it survives body re-renders (e.g. when a popover
+  // inside the chrome triggers mutate()).
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'board-body';
+
   function mutate(next: Board): void {
     const prevActiveView = board.activeView;
     board = next;
     opts.onMutate(serializeBoard(board));
+    chromeHandle.update(board);
     if (board.activeView !== prevActiveView) {
       mountForActiveView();
     } else {
@@ -91,7 +99,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   }
 
   const ctx: BoardRendererCtx = {
-    root:     dom,
+    root:     bodyEl,
     getBoard: () => board,
     mutate,
     openSidePanel: (cardId: string) => {
@@ -116,6 +124,26 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     },
     readonly: opts.isReadOnly(),
   };
+
+  // Chrome (name + ⋯ menu) is built once and prepended to dom before bodyEl.
+  // It stays in the DOM across body re-renders so popovers inside the chrome
+  // survive mutate() calls.
+  let closeOpenMenu: (() => void) | null = null;
+  function registerMenuClose(cb: () => void): void { closeOpenMenu = cb; }
+  function unregisterMenuClose(): void { closeOpenMenu = null; }
+  void closeOpenMenu; // referenced via closure in renderers that may call registerMenuClose
+
+  const chromeHandle: ChromeHandle = renderChrome(
+    board,
+    mutate,
+    opts.isReadOnly(),
+    ctx,
+    registerMenuClose,
+    unregisterMenuClose,
+  );
+  dom.appendChild(chromeHandle.el);
+  dom.appendChild(bodyEl);
+
   let renderer: BoardRendererOps | null = null;
   function mountForActiveView(): void {
     renderer?.destroy();
@@ -131,6 +159,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
       const prevActiveView = board.activeView;
       board = parseBoardSource(source);
       ctx.readonly = opts.isReadOnly();
+      chromeHandle.update(board);
       if (board.activeView !== prevActiveView) {
         mountForActiveView();
       } else {

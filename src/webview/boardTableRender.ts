@@ -4,12 +4,22 @@
 
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
-import { renderChrome } from './boardChrome';
 import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
 
 interface Group { key: string; cards: Card[]; }
+
+/** After a successful drag (onDrop), suppress the next click event so the
+ *  sort click handler that fires on the same mouseup does not also run. */
+function suppressNextClick(): void {
+  const suppress = (e: MouseEvent) => {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    window.removeEventListener('click', suppress, true);
+  };
+  window.addEventListener('click', suppress, true);
+}
 
 function startRowDrag(
   e: MouseEvent,
@@ -48,6 +58,7 @@ function startRowDrag(
     },
     onDrop: () => {
       ind.remove();
+      suppressNextClick();
       if (hasValidDrop && !isReject) {
         const cur = ctx.getBoard();
         const b2: Board = { ...cur, cards: [...cur.cards] };
@@ -92,6 +103,7 @@ function startColumnDrag(
     },
     onDrop: () => {
       ind.remove();
+      suppressNextClick();
       if (dropIdx < 0) return;  // no valid drop position observed
       const board = ctx.getBoard();
       const allNames = board.fields.map(x => x.name);
@@ -121,22 +133,13 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   // Cancel an in-progress row drag before wiping the DOM on re-render.
   let cancelRowDrag: (() => void) | null = null;
 
-  // Chrome menu-close lifecycle — mirrors mountKanban's approach.
-  let closeOpenMenu: (() => void) | null = null;
-  function registerMenuClose(cb: () => void): void { closeOpenMenu = cb; }
-  function unregisterMenuClose(): void { closeOpenMenu = null; }
-
   function render(): void {
     if (detached) return;
     cancelRowDrag?.();
     cancelRowDrag = null;
-    closeOpenMenu?.();
     const b = ctx.getBoard();
     const v = b.views.find(x => x.name === 'table') ?? { name: 'table' };
     root.innerHTML = '';
-
-    // Board chrome (name + ⋯ menu with view switcher and Properties)
-    root.appendChild(renderChrome(b, ctx.mutate, ctx.readonly, ctx, registerMenuClose, unregisterMenuClose));
 
     const visibleFields = computeVisibleFields(b, v);
     const widths = v.widths ?? {};
@@ -155,7 +158,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     // colgroup with widths
     const colgroup = document.createElement('colgroup');
     const gutterCol = document.createElement('col');
-    gutterCol.style.width = '36px';
+    gutterCol.style.width = '14px';
     colgroup.appendChild(gutterCol);
     for (const f of visibleFields) {
       const col = document.createElement('col');
@@ -170,17 +173,29 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     headRow.appendChild(document.createElement('th'));  // gutter
     for (const f of visibleFields) {
       const th = document.createElement('th');
-      th.textContent = f.name;
       th.dataset.field = f.name;
+
+      // Wrap all th content in a relative-positioned div so the resizer's
+      // position:absolute is anchored reliably (th with position:sticky +
+      // border-collapse does not reliably establish a containing block).
+      const inner = document.createElement('div');
+      inner.className = 'bd-th-inner';
+
+      const label = document.createElement('span');
+      label.className = 'bd-th-label';
+      label.textContent = f.name;
+      inner.appendChild(label);
+
       if (v.sort?.field === f.name) {
         const caret = document.createElement('span');
         caret.className = 'bd-sort-caret';
         caret.textContent = v.sort.dir === 'asc' ? ' ▲' : ' ▼';
-        th.appendChild(caret);
+        inner.appendChild(caret);
       }
+
       if (!ctx.readonly) {
         th.addEventListener('click', (e) => {
-          if ((e.target as HTMLElement).classList.contains('bd-col-resizer')) return;
+          if ((e.target as HTMLElement).closest('.bd-col-resizer')) return;
           if ((e.target as HTMLElement).closest('.bd-col-menu-btn')) return;
           const cur = ctx.getBoard();
           const curView = cur.views.find(x => x.name === 'table');
@@ -193,6 +208,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           setViewSort(b2, 'table', nextDir ? { field: f.name, dir: nextDir } : null);
           ctx.mutate(b2);
         });
+
         const headerMenuBtn = document.createElement('button');
         headerMenuBtn.type = 'button';
         headerMenuBtn.className = 'bd-col-menu-btn';
@@ -201,7 +217,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           e.stopPropagation();
           openColumnMenu(headerMenuBtn, f, ctx, collapsedGroups);
         });
-        th.appendChild(headerMenuBtn);
+        inner.appendChild(headerMenuBtn);
 
         const resizer = document.createElement('div');
         resizer.className = 'bd-col-resizer';
@@ -230,7 +246,9 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           document.addEventListener('mousemove', onMove, true);
           document.addEventListener('mouseup', onUp, true);
         });
-        th.appendChild(resizer);
+        // Resizer goes inside inner so it is positioned relative to the
+        // reliable containing block (.bd-th-inner has position:relative).
+        inner.appendChild(resizer);
 
         th.addEventListener('mousedown', (e) => {
           const t = e.target as HTMLElement;
@@ -242,6 +260,8 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           document.addEventListener('mouseup', cleanup, { once: true });
         });
       }
+
+      th.appendChild(inner);
       headRow.appendChild(th);
     }
     thead.appendChild(headRow);
@@ -259,18 +279,36 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         td.colSpan = visibleFields.length + 1;
         const row = document.createElement('div');
         row.className = 'bd-group-row';
-        const left = document.createElement('span');
-        left.className = 'bd-group-left';
-        const caret = document.createElement('span');
-        caret.className = 'bd-group-caret';
-        caret.textContent = collapsedGroups.has(g.key) ? '▸' : '▾';
+
+        // Caret lives outside the chip — clicking it (or the chip) collapses.
+        const caretEl = document.createElement('span');
+        caretEl.className = 'bd-group-caret';
+        caretEl.textContent = collapsedGroups.has(g.key) ? '▸' : '▾';
+
+        // Chip: colored pill matching the Status chip palette.
+        let chipColor = 'gray';
+        if (v.groupBy === 'Status') {
+          const colDef = b.columns.find(c => c.name === g.key);
+          if (colDef) chipColor = colDef.color;
+        }
+        const chip = document.createElement('span');
+        chip.className = `board-column-chip color-${chipColor} bd-group-chip`;
+        const dot = document.createElement('span');
+        dot.className = 'board-column-chip-dot';
+        chip.appendChild(dot);
         const nameSpan = document.createElement('span');
-        nameSpan.className = 'bd-group-name';
+        nameSpan.className = 'board-column-name';
         nameSpan.textContent = g.key;
+        chip.appendChild(nameSpan);
         const countSpan = document.createElement('span');
         countSpan.className = 'bd-group-count';
         countSpan.textContent = String(g.cards.length);
-        left.append(caret, nameSpan, countSpan);
+        chip.appendChild(countSpan);
+
+        const left = document.createElement('span');
+        left.className = 'bd-group-left';
+        left.append(caretEl, chip);
+
         const isUncategorizedStatus = v.groupBy === 'Status' && g.key === 'Uncategorized';
         if (!ctx.readonly && !isUncategorizedStatus) {
           const addBtn = document.createElement('button');
@@ -398,7 +436,6 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     update: (_next: Board) => render(),
     destroy: () => {
       detached = true;
-      closeOpenMenu?.();
       root.innerHTML = '';
       root.classList.remove('bd-table-host');
     },

@@ -6,26 +6,11 @@
 
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
-import { renderChrome } from './boardChrome';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
-  // Tracks the cleanup callback registered by the currently-open ⋯ menu so
-  // paint() and destroy() can close the menu (and remove its document listener)
-  // before tearing down the DOM.
-  let closeOpenMenu: (() => void) | null = null;
-
-  function registerMenuClose(cb: () => void): void {
-    closeOpenMenu = cb;
-  }
-  function unregisterMenuClose(): void {
-    closeOpenMenu = null;
-  }
-
   function paint(board: Board): void {
-    closeOpenMenu?.();
     const ro = ctx.readonly;
     ctx.root.innerHTML = '';
-    ctx.root.appendChild(renderChrome(board, ctx.mutate, ro, ctx, registerMenuClose, unregisterMenuClose));
     ctx.root.appendChild(renderColumns(board, ctx.mutate, ro, ctx));
   }
 
@@ -45,7 +30,6 @@ export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
       animateColumnHeights(ctx.root, heightSnapshot);
     },
     destroy(): void {
-      closeOpenMenu?.();
       ctx.root.innerHTML = '';
     },
   };

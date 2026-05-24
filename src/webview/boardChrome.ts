@@ -6,6 +6,11 @@ import type { Board } from './boardModel';
 import type { BoardRendererCtx } from './boardBlock';
 import { renderPropertiesContent } from './boardProperties';
 
+export interface ChromeHandle {
+  el: HTMLElement;
+  update: (board: Board) => void;
+}
+
 export function renderChrome(
   board: Board,
   mutate: (next: Board) => void,
@@ -13,9 +18,12 @@ export function renderChrome(
   ctx: BoardRendererCtx,
   registerMenuClose: (cb: () => void) => void,
   unregisterMenuClose: () => void,
-): HTMLElement {
+): ChromeHandle {
   const chrome = document.createElement('div');
   chrome.className = 'board-chrome';
+
+  // Track the current board so the blur handler can reference the latest name.
+  let currentBoard = board;
 
   const name = document.createElement('div');
   name.className = 'board-name';
@@ -29,7 +37,7 @@ export function renderChrome(
     });
     name.addEventListener('blur', () => {
       const next = name.textContent || '';
-      if (next !== board.name) mutate({ ...board, name: next });
+      if (next !== currentBoard.name) mutate({ ...currentBoard, name: next });
     });
     name.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -44,18 +52,32 @@ export function renderChrome(
   }
   chrome.appendChild(name);
 
+  let refreshViewSeg: (() => void) | null = null;
+
   if (!readOnly) {
-    chrome.appendChild(buildHeaderMore(ctx, registerMenuClose, unregisterMenuClose));
+    const moreResult = buildHeaderMore(ctx, registerMenuClose, unregisterMenuClose);
+    chrome.appendChild(moreResult.el);
+    refreshViewSeg = moreResult.refreshViewSeg;
   }
 
-  return chrome;
+  function update(nextBoard: Board): void {
+    currentBoard = nextBoard;
+    // Update name text if focus is not currently in the name element.
+    if (document.activeElement !== name) {
+      name.textContent = nextBoard.name || '';
+      name.classList.toggle('is-placeholder', !nextBoard.name);
+    }
+    refreshViewSeg?.();
+  }
+
+  return { el: chrome, update };
 }
 
 export function buildHeaderMore(
   ctx: BoardRendererCtx,
   registerMenuClose: (cb: () => void) => void,
   unregisterMenuClose: () => void,
-): HTMLElement {
+): { el: HTMLElement; refreshViewSeg: () => void } {
   const wrap = document.createElement('div');
   wrap.className = 'bd-more';
 
@@ -153,7 +175,7 @@ export function buildHeaderMore(
     closeMenu();
   });
 
-  return wrap;
+  return { el: wrap, refreshViewSeg };
 }
 
 function selectAllText(el: HTMLElement): void {
