@@ -1342,3 +1342,12 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-col-menu { display: flex; flex-direction: column; gap: 1px; padding: 6px; background: var(--bg, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.12); z-index: 7; min-width: 180px; }
 .bd-col-menu-item { text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: 5px; cursor: pointer; font: 500 12.5px ui-sans-serif, sans-serif; color: var(--text-primary, #222); }
 .bd-col-menu-item:hover { background: var(--block-hover, rgba(0,0,0,0.05)); }
+
+/* ── Column resizer handle ──────────────────────────────────────────────── */
+.bd-col-resizer {
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+}
+.bd-col-resizer:hover { background: var(--link, #2563eb); opacity: 0.3; }

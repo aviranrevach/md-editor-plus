@@ -89,6 +89,32 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           openColumnMenu(headerMenuBtn, f, ctx, collapsedGroups);
         });
         th.appendChild(headerMenuBtn);
+
+        const resizer = document.createElement('div');
+        resizer.className = 'bd-col-resizer';
+        resizer.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const start = e.clientX;
+          const col = table.querySelectorAll('colgroup col')[1 + visibleFields.indexOf(f)] as HTMLTableColElement;
+          const startW = parseInt(col.style.width, 10) || 160;
+          const onMove = (ev: MouseEvent) => {
+            const next = Math.max(60, startW + (ev.clientX - start));
+            col.style.width = `${next}px`;
+          };
+          const onUp = (ev: MouseEvent) => {
+            document.removeEventListener('mousemove', onMove, true);
+            document.removeEventListener('mouseup', onUp, true);
+            const next = Math.max(60, startW + (ev.clientX - start));
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2, widths: { ...(v2.widths ?? {}) } })) };
+            setViewWidth(b2, 'table', f.name, next);
+            ctx.mutate(b2);
+          };
+          document.addEventListener('mousemove', onMove, true);
+          document.addEventListener('mouseup', onUp, true);
+        });
+        th.appendChild(resizer);
       }
       headRow.appendChild(th);
     }
