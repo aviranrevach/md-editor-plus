@@ -53,11 +53,17 @@ export function renderChrome(
   chrome.appendChild(name);
 
   let refreshViewSeg: (() => void) | null = null;
+  let refreshPropsIfOpen: (() => void) | null = null;
 
   if (!readOnly) {
     const moreResult = buildHeaderMore(ctx, registerMenuClose, unregisterMenuClose);
     chrome.appendChild(moreResult.el);
     refreshViewSeg = moreResult.refreshViewSeg;
+    refreshPropsIfOpen = () => {
+      if (moreResult.isMenuOpen()) {
+        moreResult.refreshProps();
+      }
+    };
   }
 
   function update(nextBoard: Board): void {
@@ -68,6 +74,8 @@ export function renderChrome(
       name.classList.toggle('is-placeholder', !nextBoard.name);
     }
     refreshViewSeg?.();
+    // If the more menu is open, refresh the props so newly-added fields appear.
+    refreshPropsIfOpen?.();
   }
 
   return { el: chrome, update };
@@ -77,7 +85,7 @@ export function buildHeaderMore(
   ctx: BoardRendererCtx,
   registerMenuClose: (cb: () => void) => void,
   unregisterMenuClose: () => void,
-): { el: HTMLElement; refreshViewSeg: () => void } {
+): { el: HTMLElement; refreshViewSeg: () => void; refreshProps: () => void; isMenuOpen: () => boolean } {
   const wrap = document.createElement('div');
   wrap.className = 'bd-more';
 
@@ -129,12 +137,16 @@ export function buildHeaderMore(
 
   let removeOutside: (() => void) | null = null;
 
+  function refreshProps(): void {
+    propsHost.innerHTML = '';
+    renderPropertiesContent(propsHost, ctx.getBoard(), ctx.mutate, ctx.getBoard().activeView ?? 'kanban');
+  }
+
   function openMenu(): void {
     menu.classList.remove('bd-hidden');
     btn.setAttribute('aria-expanded', 'true');
     refreshViewSeg();
-    propsHost.innerHTML = '';
-    renderPropertiesContent(propsHost, ctx.getBoard(), ctx.mutate, ctx.getBoard().activeView ?? 'kanban');
+    refreshProps();
 
     function onOutside(e: MouseEvent): void {
       const t = e.target as HTMLElement | null;
@@ -175,7 +187,7 @@ export function buildHeaderMore(
     closeMenu();
   });
 
-  return { el: wrap, refreshViewSeg };
+  return { el: wrap, refreshViewSeg, refreshProps, isMenuOpen: () => !menu.classList.contains('bd-hidden') };
 }
 
 function selectAllText(el: HTMLElement): void {

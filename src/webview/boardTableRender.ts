@@ -174,41 +174,39 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     for (const f of visibleFields) {
       const th = document.createElement('th');
       th.dataset.field = f.name;
+      th.style.position = 'relative';
 
-      // Wrap all th content in a relative-positioned div so the resizer's
-      // position:absolute is anchored reliably (th with position:sticky +
-      // border-collapse does not reliably establish a containing block).
-      const inner = document.createElement('div');
-      inner.className = 'bd-th-inner';
+      if (!ctx.readonly) {
+        // Left: dedicated drag handle — dragging ONLY, never triggers sort.
+        const dragHandle = document.createElement('span');
+        dragHandle.className = 'bd-col-drag-handle';
+        dragHandle.title = 'Drag to reorder column';
+        dragHandle.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
+        dragHandle.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          th.classList.add('bd-th-dragging');
+          startColumnDrag(e, f, visibleFields, ctx);
+          const cleanup = () => { th.classList.remove('bd-th-dragging'); };
+          document.addEventListener('mouseup', cleanup, { once: true });
+        });
+        th.appendChild(dragHandle);
+      }
 
+      // Label (clickable for sort)
       const label = document.createElement('span');
       label.className = 'bd-th-label';
       label.textContent = f.name;
-      inner.appendChild(label);
+      th.appendChild(label);
 
       if (v.sort?.field === f.name) {
         const caret = document.createElement('span');
         caret.className = 'bd-sort-caret';
         caret.textContent = v.sort.dir === 'asc' ? ' ▲' : ' ▼';
-        inner.appendChild(caret);
+        th.appendChild(caret);
       }
 
       if (!ctx.readonly) {
-        th.addEventListener('click', (e) => {
-          if ((e.target as HTMLElement).closest('.bd-col-resizer')) return;
-          if ((e.target as HTMLElement).closest('.bd-col-menu-btn')) return;
-          const cur = ctx.getBoard();
-          const curView = cur.views.find(x => x.name === 'table');
-          const curSort = curView?.sort;
-          const nextDir: 'asc' | 'desc' | null =
-            !curSort || curSort.field !== f.name ? 'asc' :
-            curSort.dir === 'asc'               ? 'desc' :
-                                                  null;
-          const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-          setViewSort(b2, 'table', nextDir ? { field: f.name, dir: nextDir } : null);
-          ctx.mutate(b2);
-        });
-
         const headerMenuBtn = document.createElement('button');
         headerMenuBtn.type = 'button';
         headerMenuBtn.className = 'bd-col-menu-btn';
@@ -217,7 +215,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           e.stopPropagation();
           openColumnMenu(headerMenuBtn, f, ctx, collapsedGroups);
         });
-        inner.appendChild(headerMenuBtn);
+        th.appendChild(headerMenuBtn);
 
         const resizer = document.createElement('div');
         resizer.className = 'bd-col-resizer';
@@ -246,22 +244,25 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           document.addEventListener('mousemove', onMove, true);
           document.addEventListener('mouseup', onUp, true);
         });
-        // Resizer goes inside inner so it is positioned relative to the
-        // reliable containing block (.bd-th-inner has position:relative).
-        inner.appendChild(resizer);
+        th.appendChild(resizer);
 
-        th.addEventListener('mousedown', (e) => {
+        // Sort click on the th — drag handle, menu btn, resizer all stop propagation.
+        th.addEventListener('click', (e) => {
           const t = e.target as HTMLElement;
-          if (t.closest('.bd-col-resizer') || t.closest('.bd-col-menu-btn')) return;
-          e.preventDefault();
-          th.classList.add('bd-th-dragging');
-          startColumnDrag(e, f, visibleFields, ctx);
-          const cleanup = () => { th.classList.remove('bd-th-dragging'); };
-          document.addEventListener('mouseup', cleanup, { once: true });
+          if (t.closest('.bd-col-resizer, .bd-col-menu-btn, .bd-col-drag-handle')) return;
+          const cur = ctx.getBoard();
+          const curView = cur.views.find(x => x.name === 'table');
+          const curSort = curView?.sort;
+          const nextDir: 'asc' | 'desc' | null =
+            !curSort || curSort.field !== f.name ? 'asc' :
+            curSort.dir === 'asc'               ? 'desc' :
+                                                  null;
+          const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+          setViewSort(b2, 'table', nextDir ? { field: f.name, dir: nextDir } : null);
+          ctx.mutate(b2);
         });
       }
 
-      th.appendChild(inner);
       headRow.appendChild(th);
     }
     thead.appendChild(headRow);
@@ -354,9 +355,10 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         if (!v.sort && !ctx.readonly) {
           const grip = document.createElement('span');
           grip.className = 'bd-row-grip';
-          grip.textContent = '⋮⋮';
+          grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
           grip.addEventListener('mousedown', (ev) => {
             ev.preventDefault();
+            ev.stopPropagation();
             tr.classList.add('bd-tr-dragging');
             cancelRowDrag = startRowDrag(ev, card, g, ctx);
             const cleanup = () => { tr.classList.remove('bd-tr-dragging'); };
