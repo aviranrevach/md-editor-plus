@@ -1352,6 +1352,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 }
 .bd-col-resizer:hover { background: var(--link, #2563eb); opacity: 0.3; }
 
+/* ── Column header drag cursor ──────────────────────────────────────────── */
+.bd-table thead th { cursor: grab; }
+.bd-table thead th .bd-col-resizer { cursor: col-resize; }
+
 /* ── Row drag grip ──────────────────────────────────────────────────────── */
 .bd-row-grip { color: transparent; cursor: grab; font-size: 14px; padding: 0 4px; }
 .bd-table-row:hover .bd-row-grip { color: var(--text-secondary); }

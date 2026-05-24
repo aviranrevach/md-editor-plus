@@ -5,7 +5,7 @@
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
-import { setViewSort, setViewGroup, setViewWidth, hideFieldInView, addCard, moveCard } from './boardOps';
+import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
 
 interface Group { key: string; cards: Card[]; }
@@ -52,6 +52,57 @@ function startRowDrag(
         moveCard(b2, card.id, dropBeforeId);
         ctx.mutate(b2);
       }
+    },
+    onCancel: () => ind.remove(),
+  });
+}
+
+function startColumnDrag(
+  e: MouseEvent,
+  f: FieldDef,
+  visibleFields: FieldDef[],
+  ctx: BoardRendererCtx,
+): void {
+  const table = ctx.root.querySelector('table');
+  if (!table) return;
+  const headRow = table.querySelector('thead tr')!;
+  const ths = Array.from(headRow.querySelectorAll('th'));
+  const ind = dropIndicator();
+  ind.style.position = 'fixed';
+  document.body.appendChild(ind);
+  let dropIdx = visibleFields.indexOf(f);
+  startDrag(e, {
+    onMove: (ev) => {
+      let chosen = visibleFields.length;
+      for (let i = 0; i < visibleFields.length; i++) {
+        const rect = ths[i + 1].getBoundingClientRect();   // +1 for gutter
+        const mid = rect.left + rect.width / 2;
+        if (ev.clientX < mid) { chosen = i; break; }
+      }
+      dropIdx = chosen;
+      const targetRect = chosen === visibleFields.length
+        ? ths[visibleFields.length].getBoundingClientRect()
+        : ths[chosen + 1].getBoundingClientRect();
+      const x = chosen === visibleFields.length ? targetRect.right : targetRect.left;
+      const tableRect = table.getBoundingClientRect();
+      ind.show(x - 1, tableRect.top, 2, tableRect.bottom - tableRect.top);
+    },
+    onDrop: () => {
+      ind.remove();
+      const board = ctx.getBoard();
+      const allNames = board.fields.map(x => x.name);
+      const visibleNames = visibleFields.map(x => x.name);
+      const anchorField = dropIdx < visibleNames.length ? visibleNames[dropIdx] : null;
+      const filtered = allNames.filter(n => n !== f.name);
+      const insertAt = anchorField ? filtered.indexOf(anchorField) : filtered.length;
+      const next = [...filtered];
+      next.splice(insertAt, 0, f.name);
+      const b2: Board = {
+        ...board,
+        views: board.views.map(v => ({ ...v, columns: v.columns ? [...v.columns] : undefined })),
+      };
+      setViewColumns(b2, 'table', next);
+      ctx.mutate(b2);
     },
     onCancel: () => ind.remove(),
   });
@@ -163,6 +214,13 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           document.addEventListener('mouseup', onUp, true);
         });
         th.appendChild(resizer);
+
+        th.addEventListener('mousedown', (e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest('.bd-col-resizer') || t.closest('.bd-col-menu-btn')) return;
+          e.preventDefault();
+          startColumnDrag(e, f, visibleFields, ctx);
+        });
       }
       headRow.appendChild(th);
     }
