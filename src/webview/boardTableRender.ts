@@ -138,7 +138,12 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
             ctx.mutate(b2);
           });
         }
-        row.append(left, addBtn);
+        const isUncategorizedStatus = v.groupBy === 'Status' && g.key === 'Uncategorized';
+        if (!isUncategorizedStatus) {
+          row.append(left, addBtn);
+        } else {
+          row.append(left);
+        }
         td.appendChild(row);
         head.appendChild(td);
         head.addEventListener('click', (e) => {
