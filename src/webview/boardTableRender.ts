@@ -115,10 +115,13 @@ function startColumnDrag(
       suppressNextClick();
       if (dropIdx < 0) return;  // no valid drop position observed
       const board = ctx.getBoard();
-      const allNames = board.fields.map(x => x.name);
+      // Build the new column order from the fields the user can actually SEE
+      // in this view. Including hidden fields (like 'id' which is scaffolding)
+      // would accidentally promote them into view.columns and make them visible
+      // since `view.columns` overrides the default-hidden rule.
       const visibleNames = visibleFields.map(x => x.name);
       const anchorField = dropIdx < visibleNames.length ? visibleNames[dropIdx] : null;
-      const filtered = allNames.filter(n => n !== f.name);
+      const filtered = visibleNames.filter(n => n !== f.name);
       const insertAt = anchorField ? filtered.indexOf(anchorField) : filtered.length;
       const next = [...filtered];
       next.splice(insertAt, 0, f.name);
@@ -375,28 +378,59 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     }
 
     if (!v.groupBy && !ctx.readonly) {
+      // Inline-edit add-row: click → first cell becomes contenteditable with
+      // placeholder text cleared → Enter/blur-with-content commits and a fresh
+      // add-row appears; Escape/blur-empty cancels. Matches the kanban's
+      // "+ New card" flow so no card is created until the user actually names it.
       const addRow = document.createElement('tr');
       addRow.className = 'bd-table-addrow';
       const gutter = document.createElement('td');
       gutter.className = 'bd-table-gutter';
       addRow.appendChild(gutter);
+      let placeholderCell: HTMLElement | null = null;
       for (const f of visibleFields) {
         const td = document.createElement('td');
         td.className = 'bd-table-cell bd-addrow-cell';
-        if (f.name === 'Title' || (visibleFields.indexOf(f) === 0 && !visibleFields.some(x => x.name === 'Title'))) {
+        if (!placeholderCell && (f.name === 'Title' || visibleFields.indexOf(f) === 0)) {
           td.textContent = '+ Add row';
           td.classList.add('bd-addrow-placeholder');
+          placeholderCell = td;
         }
         addRow.appendChild(td);
       }
-      addRow.addEventListener('click', () => {
-        const cur = ctx.getBoard();
-        const b2: Board = { ...cur, cards: [...cur.cards] };
-        const newId = addCard(b2);
-        pendingFocus.id = newId;
-        pendingFocus.field = 'Title';
-        ctx.mutate(b2);
-      });
+      const beginAdd = (): void => {
+        if (!placeholderCell) return;
+        if (placeholderCell.getAttribute('contenteditable') === 'true') return;
+        placeholderCell.textContent = '';
+        placeholderCell.classList.remove('bd-addrow-placeholder');
+        placeholderCell.setAttribute('contenteditable', 'true');
+        placeholderCell.focus();
+        let resolved = false;
+        const commit = (): void => {
+          if (resolved) return;
+          const title = (placeholderCell!.textContent ?? '').trim();
+          if (!title) { cancel(); return; }
+          resolved = true;
+          placeholderCell!.removeAttribute('contenteditable');
+          const cur = ctx.getBoard();
+          const b2: Board = { ...cur, cards: [...cur.cards] };
+          addCard(b2, { Title: title });
+          ctx.mutate(b2);
+        };
+        const cancel = (): void => {
+          if (resolved) return;
+          resolved = true;
+          placeholderCell!.removeAttribute('contenteditable');
+          placeholderCell!.textContent = '+ Add row';
+          placeholderCell!.classList.add('bd-addrow-placeholder');
+        };
+        placeholderCell.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+          else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+        });
+        placeholderCell.addEventListener('blur', () => commit());
+      };
+      addRow.addEventListener('click', beginAdd);
       tbody.appendChild(addRow);
     }
 
@@ -453,36 +487,28 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       if (!f || !lastTable) return;
       e.preventDefault();
       e.stopPropagation();
-      const tableEl = lastTable;
-      const colIdx = 1 + lastVisibleFields.indexOf(f);  // +1 for gutter
-      const col = tableEl.querySelectorAll('colgroup col')[colIdx] as HTMLTableColElement;
-      // Snap-to-cursor: set the column's right edge to the cursor X on every move.
-      // This is immune to any timing / scroll / delta-accumulation issues.
-      const computeColLeftX = (): number => {
-        const cols = tableEl.querySelectorAll('colgroup col');
-        const tableRect = tableEl.getBoundingClientRect();
-        let offset = 0;
-        for (let i = 0; i < colIdx; i++) {
-          offset += parseFloat((cols[i] as HTMLTableColElement).style.width) || 0;
-        }
-        return tableRect.left + offset;
-      };
+      // Simple delta math: capture cursor + width at mousedown, apply 1:1.
+      // Both `startX` and `col` are stable across the drag — no recomputation
+      // that could be thrown off if the table re-renders.
+      const startX = e.clientX;
+      const colIdx = 1 + lastVisibleFields.indexOf(f);
+      const col = lastTable.querySelectorAll('colgroup col')[colIdx] as HTMLTableColElement;
+      const startW = parseFloat(col.style.width) || 160;
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
-      let lastNext = parseFloat(col.style.width) || 160;
       const onMove = (ev: MouseEvent): void => {
-        const next = Math.max(60, ev.clientX - computeColLeftX());
-        lastNext = next;
+        const next = Math.max(60, startW + (ev.clientX - startX));
         col.style.width = `${next}px`;
       };
-      const onUp = (): void => {
+      const onUp = (ev: MouseEvent): void => {
         document.removeEventListener('mousemove', onMove, true);
         document.removeEventListener('mouseup', onUp, true);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
+        const next = Math.max(60, startW + (ev.clientX - startX));
         const cur = ctx.getBoard();
         const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2, widths: { ...(v2.widths ?? {}) } })) };
-        setViewWidth(b2, 'table', f.name, Math.round(lastNext));
+        setViewWidth(b2, 'table', f.name, Math.round(next));
         ctx.mutate(b2);
       };
       document.addEventListener('mousemove', onMove, true);

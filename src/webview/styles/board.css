@@ -1301,7 +1301,11 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 /* ── Table view ─────────────────────────────────────────────────────────── */
 /* No top padding — the chrome's margin-bottom already provides spacing.
    Matches the kanban's columns-row visual rhythm. */
-.bd-table-host { padding: 0 0 12px 0; overflow-x: auto; max-height: 80vh; overflow-y: auto; }
+/* -4px top margin pulls the table up to match the kanban's optical rhythm
+   (kanban columns have a top chip that occupies the same visual band as the
+   table's tiny uppercase header, so without this nudge the table reads as
+   "dropped lower" than the kanban). */
+.bd-table-host { padding: 0 0 12px 0; margin-top: -4px; overflow-x: auto; max-height: 80vh; overflow-y: auto; }
 .bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
 .bd-table thead th {
   text-align: left;
