@@ -345,13 +345,24 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         tr.dataset.cardId = card.id;
         const gutter = document.createElement('td');
         gutter.className = 'bd-table-gutter';
-        if (!v.sort && !ctx.readonly) {
+        if (!ctx.readonly) {
           const grip = document.createElement('span');
           grip.className = 'bd-row-grip';
-          grip.setAttribute('data-board-drag', '');
+          if (v.sort) {
+            // Row reorder is disabled when the table is sort-ordered (the user's
+            // sort would just snap back on the next render). Show the grip in a
+            // disabled state with an explanatory tooltip rather than hiding it,
+            // so the affordance stays discoverable.
+            grip.classList.add('bd-row-grip-disabled');
+            grip.title = 'Clear sort to reorder rows';
+          } else {
+            grip.setAttribute('data-board-drag', '');
+            grip.title = 'Drag to reorder row';
+          }
           grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
           gutter.appendChild(grip);
-          // mousedown is wired via the document-level delegated listener.
+          // mousedown is wired via the document-level delegated listener; the
+          // listener checks `data-board-drag` so disabled grips don't trigger.
         }
         tr.appendChild(gutter);
         for (const f of visibleFields) {
@@ -406,12 +417,6 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     const hidden = new Set(v.hidden ?? []);
     const explicit = v.columns;
     const hasExplicitOrder = !!explicit && explicit.length > 0;
-    const hasHidden = hidden.size > 0;
-    // Fresh view (no per-view column or hidden config): fall back to the
-    // board-level `visibleOnCard` so the table mirrors what the kanban shows.
-    // Once the user has expressed per-view intent (reorder OR hide), trust
-    // view.hidden as the only source of "hidden" and ignore visibleOnCard.
-    const usesFallback = !hasExplicitOrder && !hasHidden;
     const explicitSet = new Set(explicit ?? []);
     const tail = b.fields.map(f => f.name).filter(n => !explicitSet.has(n));
     const orderedNames = hasExplicitOrder ? [...explicit!, ...tail] : tail;
@@ -420,7 +425,11 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       const f = b.fields.find(x => x.name === name);
       if (!f) continue;
       if (hidden.has(name)) continue;
-      if (usesFallback && !f.visibleOnCard) continue;
+      // Only the conventional `id` field defaults to hidden in the table
+      // (it's board scaffolding, not user data). Any other field with
+      // visibleOnCard=false is still shown in the table — the table and
+      // kanban have independent visibility expectations.
+      if (name === 'id' && !f.visibleOnCard && !explicitSet.has('id')) continue;
       out.push(f);
     }
     return out;
@@ -444,23 +453,36 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       if (!f || !lastTable) return;
       e.preventDefault();
       e.stopPropagation();
+      const tableEl = lastTable;
+      const colIdx = 1 + lastVisibleFields.indexOf(f);  // +1 for gutter
+      const col = tableEl.querySelectorAll('colgroup col')[colIdx] as HTMLTableColElement;
+      // Snap-to-cursor: set the column's right edge to the cursor X on every move.
+      // This is immune to any timing / scroll / delta-accumulation issues.
+      const computeColLeftX = (): number => {
+        const cols = tableEl.querySelectorAll('colgroup col');
+        const tableRect = tableEl.getBoundingClientRect();
+        let offset = 0;
+        for (let i = 0; i < colIdx; i++) {
+          offset += parseFloat((cols[i] as HTMLTableColElement).style.width) || 0;
+        }
+        return tableRect.left + offset;
+      };
       document.body.style.cursor = 'col-resize';
-      const start = e.clientX;
-      const col = lastTable.querySelectorAll('colgroup col')[1 + lastVisibleFields.indexOf(f)] as HTMLTableColElement;
-      const parsedW = parseInt(col.style.width, 10);
-      const startW = Number.isNaN(parsedW) ? 160 : parsedW;
+      document.body.style.userSelect = 'none';
+      let lastNext = parseFloat(col.style.width) || 160;
       const onMove = (ev: MouseEvent): void => {
-        const next = Math.max(60, startW + (ev.clientX - start));
+        const next = Math.max(60, ev.clientX - computeColLeftX());
+        lastNext = next;
         col.style.width = `${next}px`;
       };
-      const onUp = (ev: MouseEvent): void => {
+      const onUp = (): void => {
         document.removeEventListener('mousemove', onMove, true);
         document.removeEventListener('mouseup', onUp, true);
         document.body.style.cursor = '';
-        const next = Math.max(60, startW + (ev.clientX - start));
+        document.body.style.userSelect = '';
         const cur = ctx.getBoard();
         const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2, widths: { ...(v2.widths ?? {}) } })) };
-        setViewWidth(b2, 'table', f.name, next);
+        setViewWidth(b2, 'table', f.name, Math.round(lastNext));
         ctx.mutate(b2);
       };
       document.addEventListener('mousemove', onMove, true);

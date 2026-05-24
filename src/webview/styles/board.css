@@ -1299,7 +1299,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-hidden { display: none !important; }
 
 /* ── Table view ─────────────────────────────────────────────────────────── */
-.bd-table-host { padding: 8px 10px 12px 10px; overflow-x: auto; max-height: 80vh; overflow-y: auto; }
+/* No top padding — the chrome's margin-bottom already provides spacing.
+   Matches the kanban's columns-row visual rhythm. */
+.bd-table-host { padding: 0 0 12px 0; overflow-x: auto; max-height: 80vh; overflow-y: auto; }
 .bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
 .bd-table thead th {
   text-align: left;
@@ -1412,6 +1414,8 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table-row:hover .bd-row-grip { opacity: 0.75; }
 .bd-row-grip:hover { opacity: 1 !important; }
 .bd-row-grip:active { cursor: grabbing; }
+.bd-row-grip-disabled { opacity: 0.15 !important; cursor: not-allowed !important; }
+.bd-table-row:hover .bd-row-grip-disabled { opacity: 0.4 !important; }
 .bd-tr-dragging { opacity: 0.5; }
 .bd-drop-line-reject { background: #ef4444 !important; }
 
