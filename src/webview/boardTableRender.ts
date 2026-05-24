@@ -19,6 +19,11 @@ import { startDrag, dropIndicator } from './boardDragShared';
 
 interface Group { key: string; cards: Card[]; }
 
+// "Description" is a synthetic field that surfaces card.body as a table column.
+// It's not stored in board.fields — it's a virtual entry the table view + the
+// Properties popover treat as always-available.
+export const DESCRIPTION_FIELD: FieldDef = { name: 'Description', type: 'text', visibleOnCard: false };
+
 /** After a successful drag (onDrop), suppress the next click event so the
  *  sort click handler that fires on the same mouseup does not also run. */
 function suppressNextClick(): void {
@@ -466,6 +471,12 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       if (name === 'id' && !f.visibleOnCard && !explicitSet.has('id')) continue;
       out.push(f);
     }
+    // Synthetic "Description" field — backed by card.body, always available
+    // (it's a first-class concept on every card, edited via the side panel).
+    // Hidden if the user explicitly hides it via the Properties popover.
+    if (!hidden.has(DESCRIPTION_FIELD.name)) {
+      out.push(DESCRIPTION_FIELD);
+    }
     return out;
   }
 
@@ -726,6 +737,27 @@ function comparatorFor(f: FieldDef, b: Board): (a: string, c: string) => number 
 function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
   td.dataset.field = field.name;
   td.className = `bd-table-cell bd-cell-${field.type}`;
+  // Synthetic Description column — shows a single-line preview of card.body.
+  // Click opens the side panel for full markdown editing.
+  if (field.name === DESCRIPTION_FIELD.name) {
+    const body = (card.body || '').trim();
+    const preview = body.replace(/[\r\n]+/g, ' • ').slice(0, 200);
+    if (preview) {
+      td.textContent = preview;
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'bd-cell-empty';
+      placeholder.textContent = '—';
+      td.appendChild(placeholder);
+    }
+    td.classList.add('bd-cell-description');
+    if (!ctx.readonly) {
+      td.style.cursor = 'pointer';
+      td.title = 'Click to edit';
+      td.addEventListener('click', () => ctx.openSidePanel(card.id));
+    }
+    return;
+  }
   const value = card.values[field.name] ?? '';
   switch (field.type) {
     case 'text':

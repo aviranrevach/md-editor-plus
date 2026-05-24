@@ -249,7 +249,7 @@ export function openFieldActionMenu(
 ): void {
   document.querySelectorAll('.board-field-action-menu').forEach((n) => n.remove());
 
-  const isLocked = field.name === 'Title' || field.name === 'Status';
+  const isLocked = field.name === 'Title' || field.name === 'Status' || field.name === 'Description';
 
   const menu = document.createElement('div');
   menu.className = 'board-field-action-menu';
@@ -361,6 +361,18 @@ export function renderPropertiesContent(
     for (const field of cur.fields) {
       list.appendChild(renderFieldRow(cur, field, list, wrappedOnChange, viewName));
     }
+    // Synthetic "Description" row, table-view only — surfaces card.body as a
+    // togglable column. In kanban the body is always edited via the side panel,
+    // so there's no kanban-side toggle to expose.
+    if (viewName === 'table') {
+      list.appendChild(renderFieldRow(
+        cur,
+        { name: 'Description', type: 'text', visibleOnCard: false },
+        list,
+        wrappedOnChange,
+        viewName,
+      ));
+    }
   }
   rebuildList();
 
@@ -434,7 +446,7 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
   row.className = 'board-properties-row';
   row.dataset.fieldName = field.name;
 
-  const isLocked = field.name === 'Title' || field.name === 'Status';
+  const isLocked = field.name === 'Title' || field.name === 'Status' || field.name === 'Description';
 
   // Drag handle — always visible. Mouse-based reorder (we don't use HTML5
   // drag-and-drop here because ProseMirror intercepts dragstart events on the
