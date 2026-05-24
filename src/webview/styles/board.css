@@ -1310,15 +1310,15 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
   position: relative;
-  cursor: pointer;
+  cursor: default;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible; /* must be visible so the absolute-positioned resizer can extend past the cell edge */
 }
 .bd-th-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer; /* clicking the label fires sort */
 }
 .bd-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
 .bd-table-row:hover { background: var(--block-hover); }
@@ -1355,20 +1355,26 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-col-menu-item:hover { background: var(--block-hover, rgba(0,0,0,0.05)); }
 
 /* ── Column resizer handle ──────────────────────────────────────────────── */
-/* Always faintly visible so the user can find the hit area without hovering. */
+/* Always faintly visible so the user can find the hit area without hovering.
+   Full-height + extends 5px past the cell edge for an easy 10px hit area. */
 .bd-col-resizer {
   position: absolute;
-  top: 4px; right: -3px; bottom: 4px;
-  width: 8px;
-  cursor: col-resize;
+  top: 0; right: -5px; bottom: 0;
+  width: 10px;
+  cursor: col-resize !important;
   z-index: 3;
-  border-right: 2px solid var(--border, rgba(0, 0, 0, 0.15));
-  transition: border-color 0.1s, background-color 0.1s;
+  background: transparent;
+  pointer-events: auto;
 }
-.bd-col-resizer:hover {
-  border-right-color: var(--link, #2563eb);
-  background: rgba(37, 99, 235, 0.15);
+.bd-col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 4px;
+  width: 2px;
+  background: var(--border, rgba(0, 0, 0, 0.15));
+  transition: background-color 0.1s;
 }
+.bd-col-resizer:hover::after { background: var(--link, #2563eb); }
 
 /* ── Column header drag handle ──────────────────────────────────────────── */
 /* Always faintly visible so the user can find it without hovering the header. */
