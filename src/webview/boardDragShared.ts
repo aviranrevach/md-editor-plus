@@ -1,22 +1,3 @@
-// TEMPORARY DIAGNOSTIC: append-only log overlay (mirrors boardTableRender).
-function flashDbg(label: string, color: string): void {
-  let panel = document.getElementById('bd-dbg-log') as HTMLDivElement | null;
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'bd-dbg-log';
-    panel.style.cssText = 'position:fixed;top:8px;right:8px;z-index:99999;background:rgba(0,0,0,0.9);color:#fff;font:600 11px ui-monospace,monospace;padding:6px 10px;border-radius:6px;pointer-events:auto;max-width:380px;max-height:60vh;overflow-y:auto;cursor:pointer;';
-    panel.addEventListener('click', () => { panel!.innerHTML = ''; });
-    document.body.appendChild(panel);
-  }
-  const line = document.createElement('div');
-  const ts = new Date().toISOString().slice(14, 23);
-  line.textContent = `[${ts}] ${label}`;
-  line.style.cssText = `color:${color};line-height:1.4;border-left:3px solid ${color};padding-left:6px;margin:1px 0;`;
-  panel.appendChild(line);
-  panel.scrollTop = panel.scrollHeight;
-  while (panel.children.length > 50) panel.removeChild(panel.firstChild!);
-}
-
 /** A drop indicator element with show/hide helpers. */
 export interface DropIndicator extends HTMLDivElement {
   show: (left: number, top: number, width: number, height: number) => void;
@@ -74,21 +55,14 @@ export function startDrag(
       const dy = e.clientY - startY;
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       moved = true;
-      // TEMPORARY DIAGNOSTIC: announce drag promotion. Remove once verified.
-      flashDbg('startDrag promoted', '#7c2d12');
     }
     opts.onMove(e);
   };
 
   const onUp = (e: MouseEvent) => {
     teardown();
-    if (moved) {
-      flashDbg('startDrag onDrop', '#16a34a');
-      opts.onDrop(e);
-    } else {
-      flashDbg('startDrag onCancel (no drag)', '#dc2626');
-      opts.onCancel?.();
-    }
+    if (moved) opts.onDrop(e);
+    else       opts.onCancel?.();
   };
 
   // Internal teardown — just remove listeners, no callback.

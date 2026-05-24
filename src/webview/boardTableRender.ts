@@ -1,30 +1,15 @@
 // src/webview/boardTableRender.ts
 // Table renderer: builds an empty-state OR a <table> with one header per
-// visible field and one row per card.  Real cell editors arrive in Tasks 10-12.
-
-// ── TEMPORARY DIAGNOSTIC: append-only log overlay ──────────────────────────
-// Each event adds a new line. Click the panel to clear. Remove before merge.
-const BUILD_MARKER = 'BOARD-2026-05-25-r7';
-function dbgFlash(label: string, color: string): void {
-  let panel = document.getElementById('bd-dbg-log') as HTMLDivElement | null;
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'bd-dbg-log';
-    panel.style.cssText = 'position:fixed;top:8px;right:8px;z-index:99999;background:rgba(0,0,0,0.9);color:#fff;font:600 11px ui-monospace,monospace;padding:6px 10px;border-radius:6px;pointer-events:auto;max-width:380px;max-height:60vh;overflow-y:auto;cursor:pointer;';
-    panel.title = `Click to clear (${BUILD_MARKER})`;
-    panel.addEventListener('click', () => { panel!.innerHTML = ''; });
-    document.body.appendChild(panel);
-  }
-  const line = document.createElement('div');
-  const ts = new Date().toISOString().slice(14, 23);
-  line.textContent = `[${ts}] ${label}`;
-  line.style.cssText = `color:${color};line-height:1.4;border-left:3px solid ${color};padding-left:6px;margin:1px 0;`;
-  panel.appendChild(line);
-  panel.scrollTop = panel.scrollHeight;
-  // Cap to last 50 lines so it doesn't grow forever.
-  while (panel.children.length > 50) panel.removeChild(panel.firstChild!);
-}
-// ──────────────────────────────────────────────────────────────────────────
+// visible field and one row per card.
+//
+// NOTE on drag wiring: ProseMirror's atom-node handling intercepts mousedown
+// somewhere between the board-block element and its bodyEl descendant —
+// mousedown listeners attached to the table or any of its descendants don't
+// fire. To route around this, the column-drag, column-resize, and row-drag
+// handlers are installed as a single document-level capture-phase listener
+// per mount, with delegation by `data-board-drag` and a per-mount scope
+// check (target.closest('.bd-table-host') === this mount's bodyEl). The
+// listener is removed on destroy.
 
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
@@ -149,57 +134,22 @@ function startColumnDrag(
 }
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
-  // DIAGNOSTIC: prove the fresh build is mounted + that mousedown reaches us.
-  dbgFlash('mountTable() running', '#9333ea');
   const root = ctx.root;
   root.classList.add('bd-table-host');
-  dbgFlash(`mount: root tag=${root.tagName} cls=${root.className} parent=${root.parentElement?.tagName ?? 'NULL'}`, '#9333ea');
-  // Diagnostic capture listeners (document → board-dom → host → bubble on host)
-  document.addEventListener('mousedown', (e) => {
-    const t = e.target as HTMLElement | null;
-    const inTable = !!t?.closest('.bd-table-host');
-    if (inTable) dbgFlash(`DOC capture: ${t?.tagName}`, '#dc2626');
-  }, true);
-  root.parentElement?.addEventListener('mousedown', (e) => {
-    const t = e.target as HTMLElement | null;
-    const inTable = !!t?.closest('.bd-table-host');
-    if (inTable) dbgFlash(`DOM(board) capture: ${t?.tagName}`, '#f59e0b');
-  }, true);
-  root.addEventListener('mousedown', (e) => {
-    const t = e.target as HTMLElement | null;
-    const inDrag = !!t?.closest('[data-board-drag]');
-    dbgFlash(`HOST capture: ${t?.tagName} drag=${inDrag}`, '#0891b2');
-  }, true);
-  // Also bubble-phase on root, AND on document, to see if the click reaches us at all in bubble.
-  root.addEventListener('mousedown', (e) => {
-    const t = e.target as HTMLElement | null;
-    dbgFlash(`HOST bubble: ${t?.tagName}`, '#10b981');
-  });
-  document.addEventListener('mousedown', (e) => {
-    const t = e.target as HTMLElement | null;
-    const inTable = !!t?.closest('.bd-table-host');
-    if (inTable) {
-      // Walk from target up to body and log each ancestor's tag+class.
-      let cur: HTMLElement | null = t;
-      const chain: string[] = [];
-      while (cur && chain.length < 12) {
-        chain.push(`${cur.tagName}${cur.id ? '#' + cur.id : ''}${cur.className ? '.' + (cur.className as string).split(' ').filter(Boolean).slice(0, 2).join('.') : ''}`);
-        cur = cur.parentElement;
-      }
-      dbgFlash(`PATH (bubble): ${chain.join(' > ')}`, '#a855f7');
-    }
-  });
-  // Compare references at click time: is the original `root` still equal to the
-  // current .bd-table-host in the document?
-  document.addEventListener('mousedown', () => {
-    const live = document.querySelector('.bd-table-host');
-    dbgFlash(`live==root? ${live === root}  live.parent=${live?.parentElement?.tagName}  root.parent=${root.parentElement?.tagName ?? 'NULL'}  root.isConnected=${root.isConnected}`, '#eab308');
-  }, true);
   let detached = false;
   const collapsedGroups = new Set<string>();
   const pendingFocus: { id: string | null; field: string | null } = { id: null, field: null };
   // Cancel an in-progress row drag before wiping the DOM on re-render.
   let cancelRowDrag: (() => void) | null = null;
+  // Latest computed visible fields per render — the delegated mousedown handler
+  // reads this to translate a `data-field` attribute back into a FieldDef.
+  let lastVisibleFields: FieldDef[] = [];
+  // Latest <table> element so the resizer handler can find <colgroup col>s.
+  let lastTable: HTMLTableElement | null = null;
+  // Latest groups (for row-drag scoping). The grip's tr.dataset.cardId maps
+  // back to a Card via b.cards, but startRowDrag needs the surrounding group
+  // so cross-group drops can be rejected.
+  let lastGroups: Group[] = [];
 
   function render(): void {
     if (detached) return;
@@ -210,6 +160,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     root.innerHTML = '';
 
     const visibleFields = computeVisibleFields(b, v);
+    lastVisibleFields = visibleFields;
     const widths = v.widths ?? {};
 
     if (b.cards.length === 0 && ctx.readonly) {
@@ -222,6 +173,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
     const table = document.createElement('table');
     table.className = 'bd-table';
+    lastTable = table;
 
     // colgroup with widths
     const colgroup = document.createElement('colgroup');
@@ -251,15 +203,8 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         dragHandle.title = 'Drag to reorder column';
         dragHandle.setAttribute('data-board-drag', '');
         dragHandle.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
-        dragHandle.addEventListener('mousedown', (e) => {
-          dbgFlash('colDrag mousedown', '#15803d');
-          e.preventDefault();
-          e.stopPropagation();
-          th.classList.add('bd-th-dragging');
-          startColumnDrag(e, f, visibleFields, ctx);
-          const cleanup = () => { th.classList.remove('bd-th-dragging'); };
-          document.addEventListener('mouseup', cleanup, { once: true });
-        });
+        // mousedown is wired via the document-level delegated listener at the
+        // bottom of mountTable (see NOTE in file header).
         th.appendChild(dragHandle);
       }
 
@@ -290,32 +235,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         const resizer = document.createElement('div');
         resizer.className = 'bd-col-resizer';
         resizer.setAttribute('data-board-drag', '');
-        resizer.addEventListener('mousedown', (e) => {
-          dbgFlash('resize mousedown', '#1d4ed8');
-          e.preventDefault();
-          e.stopPropagation();
-          document.body.style.cursor = 'col-resize';
-          const start = e.clientX;
-          const col = table.querySelectorAll('colgroup col')[1 + visibleFields.indexOf(f)] as HTMLTableColElement;
-          const parsedW = parseInt(col.style.width, 10);
-          const startW = Number.isNaN(parsedW) ? 160 : parsedW;
-          const onMove = (ev: MouseEvent) => {
-            const next = Math.max(60, startW + (ev.clientX - start));
-            col.style.width = `${next}px`;
-          };
-          const onUp = (ev: MouseEvent) => {
-            document.removeEventListener('mousemove', onMove, true);
-            document.removeEventListener('mouseup', onUp, true);
-            document.body.style.cursor = '';
-            const next = Math.max(60, startW + (ev.clientX - start));
-            const cur = ctx.getBoard();
-            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2, widths: { ...(v2.widths ?? {}) } })) };
-            setViewWidth(b2, 'table', f.name, next);
-            ctx.mutate(b2);
-          };
-          document.addEventListener('mousemove', onMove, true);
-          document.addEventListener('mouseup', onUp, true);
-        });
+        // mousedown is wired via the document-level delegated listener.
         th.appendChild(resizer);
 
         // Sort click on the th — drag handle, menu btn, resizer all stop propagation.
@@ -344,6 +264,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     const tbody = document.createElement('tbody');
     const sortedCards = applySort(b.cards, v, b);
     const groups = applyGroup(sortedCards, v, b);
+    lastGroups = groups;
     for (const g of groups) {
       if (v.groupBy) {
         const head = document.createElement('tr');
@@ -429,16 +350,8 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           grip.className = 'bd-row-grip';
           grip.setAttribute('data-board-drag', '');
           grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
-          grip.addEventListener('mousedown', (ev) => {
-            dbgFlash('rowDrag mousedown', '#b45309');
-            ev.preventDefault();
-            ev.stopPropagation();
-            tr.classList.add('bd-tr-dragging');
-            cancelRowDrag = startRowDrag(ev, card, g, ctx);
-            const cleanup = () => { tr.classList.remove('bd-tr-dragging'); };
-            document.addEventListener('mouseup', cleanup, { once: true });
-          });
           gutter.appendChild(grip);
+          // mousedown is wired via the document-level delegated listener.
         }
         tr.appendChild(gutter);
         for (const f of visibleFields) {
@@ -513,12 +426,90 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     return out;
   }
 
+  // Document-level capture mousedown delegation.
+  // See file-header NOTE for why this can't be wired directly on the elements.
+  // Scope check: target must be inside THIS mount's `root` (bodyEl with
+  // bd-table-host class), so other boards on the page aren't affected.
+  function onDocMousedown(e: MouseEvent): void {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const host = target.closest('.bd-table-host');
+    if (host !== root) return;
+
+    const resizerEl = target.closest('.bd-col-resizer') as HTMLElement | null;
+    if (resizerEl) {
+      const th = resizerEl.closest('th[data-field]') as HTMLElement | null;
+      const fieldName = th?.dataset.field;
+      const f = lastVisibleFields.find(x => x.name === fieldName);
+      if (!f || !lastTable) return;
+      e.preventDefault();
+      e.stopPropagation();
+      document.body.style.cursor = 'col-resize';
+      const start = e.clientX;
+      const col = lastTable.querySelectorAll('colgroup col')[1 + lastVisibleFields.indexOf(f)] as HTMLTableColElement;
+      const parsedW = parseInt(col.style.width, 10);
+      const startW = Number.isNaN(parsedW) ? 160 : parsedW;
+      const onMove = (ev: MouseEvent): void => {
+        const next = Math.max(60, startW + (ev.clientX - start));
+        col.style.width = `${next}px`;
+      };
+      const onUp = (ev: MouseEvent): void => {
+        document.removeEventListener('mousemove', onMove, true);
+        document.removeEventListener('mouseup', onUp, true);
+        document.body.style.cursor = '';
+        const next = Math.max(60, startW + (ev.clientX - start));
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2, widths: { ...(v2.widths ?? {}) } })) };
+        setViewWidth(b2, 'table', f.name, next);
+        ctx.mutate(b2);
+      };
+      document.addEventListener('mousemove', onMove, true);
+      document.addEventListener('mouseup', onUp, true);
+      return;
+    }
+
+    const dragHandleEl = target.closest('.bd-col-drag-handle') as HTMLElement | null;
+    if (dragHandleEl) {
+      const th = dragHandleEl.closest('th[data-field]') as HTMLElement | null;
+      const fieldName = th?.dataset.field;
+      const f = lastVisibleFields.find(x => x.name === fieldName);
+      if (!f) return;
+      e.preventDefault();
+      e.stopPropagation();
+      th?.classList.add('bd-th-dragging');
+      startColumnDrag(e, f, lastVisibleFields, ctx);
+      document.addEventListener('mouseup', () => th?.classList.remove('bd-th-dragging'), { once: true });
+      return;
+    }
+
+    const gripEl = target.closest('.bd-row-grip') as HTMLElement | null;
+    if (gripEl) {
+      const tr = gripEl.closest('tr.bd-table-row') as HTMLElement | null;
+      const cardId = tr?.dataset.cardId;
+      if (!cardId) return;
+      const b = ctx.getBoard();
+      const card = b.cards.find(c => c.id === cardId);
+      if (!card) return;
+      // Find the group this card belongs to (matches the rendered grouping).
+      const group = lastGroups.find(g => g.cards.some(c => c.id === cardId)) ?? { key: '', cards: [card] };
+      e.preventDefault();
+      e.stopPropagation();
+      tr?.classList.add('bd-tr-dragging');
+      cancelRowDrag = startRowDrag(e, card, group, ctx);
+      document.addEventListener('mouseup', () => tr?.classList.remove('bd-tr-dragging'), { once: true });
+      return;
+    }
+  }
+  document.addEventListener('mousedown', onDocMousedown, true);
+
   render();
 
   return {
     update: (_next: Board) => render(),
     destroy: () => {
       detached = true;
+      document.removeEventListener('mousedown', onDocMousedown, true);
+      cancelRowDrag?.();
       root.innerHTML = '';
       root.classList.remove('bd-table-host');
     },
