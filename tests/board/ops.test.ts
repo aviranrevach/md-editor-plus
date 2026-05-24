@@ -113,6 +113,21 @@ describe('boardOps.deleteField — empty-container cleanup', () => {
   });
 });
 
+describe('boardOps.moveCard', () => {
+  it('reorders cards array to put fromId at the position before beforeId', () => {
+    const b = makeBoard();   // cards: c1, c2
+    // Add a 3rd:
+    b.cards.push({ id: 'c3', values: { id: 'c3', Title: 'C', Status: 'Todo', Owner: '' }, body: '' });
+    ops.moveCard(b, 'c3', 'c2');  // put c3 before c2
+    expect(b.cards.map(c => c.id)).toEqual(['c1', 'c3', 'c2']);
+  });
+  it('null beforeId moves to end', () => {
+    const b = makeBoard();
+    ops.moveCard(b, 'c1', null);
+    expect(b.cards.map(c => c.id)).toEqual(['c2', 'c1']);
+  });
+});
+
 describe('boardOps.addCard', () => {
   it('appends a card with empty values + auto Status', () => {
     const b = makeBoard();

@@ -5,9 +5,57 @@
 import type { Board, Card, ViewDef, FieldDef } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
-import { setViewSort, setViewGroup, setViewWidth, hideFieldInView, addCard } from './boardOps';
+import { setViewSort, setViewGroup, setViewWidth, hideFieldInView, addCard, moveCard } from './boardOps';
+import { startDrag, dropIndicator } from './boardDragShared';
 
 interface Group { key: string; cards: Card[]; }
+
+function startRowDrag(
+  e: MouseEvent,
+  card: Card,
+  group: Group,
+  _tbody: HTMLTableSectionElement,
+  ctx: BoardRendererCtx,
+  _v: ViewDef,
+): void {
+  const ind = dropIndicator();
+  ind.style.position = 'fixed';
+  document.body.appendChild(ind);
+  let dropBeforeId: string | null = null;
+  let isReject = false;
+  startDrag(e, {
+    onMove: (ev) => {
+      const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('tr.bd-table-row') as HTMLElement | null;
+      if (!target) { ind.hide(); return; }
+      const targetCardId = target.dataset.cardId!;
+      const targetCard = group.cards.find(c => c.id === targetCardId);
+      if (!targetCard) {
+        isReject = true;
+        ind.classList.add('bd-drop-line-reject');
+        const r = target.getBoundingClientRect();
+        ind.show(r.left, r.top, r.width, 2);
+        return;
+      }
+      isReject = false;
+      ind.classList.remove('bd-drop-line-reject');
+      const r = target.getBoundingClientRect();
+      const above = ev.clientY < r.top + r.height / 2;
+      const y = above ? r.top : r.bottom;
+      ind.show(r.left, y - 1, r.width, 2);
+      dropBeforeId = above ? targetCardId : (group.cards[group.cards.indexOf(targetCard) + 1]?.id ?? null);
+    },
+    onDrop: () => {
+      ind.remove();
+      if (!isReject) {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, cards: [...cur.cards] };
+        moveCard(b2, card.id, dropBeforeId);
+        ctx.mutate(b2);
+      }
+    },
+    onCancel: () => ind.remove(),
+  });
+}
 
 export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   const root = ctx.root;
@@ -187,6 +235,16 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         tr.dataset.cardId = card.id;
         const gutter = document.createElement('td');
         gutter.className = 'bd-table-gutter';
+        if (!v.sort && !ctx.readonly) {
+          const grip = document.createElement('span');
+          grip.className = 'bd-row-grip';
+          grip.textContent = '⋮';
+          grip.addEventListener('mousedown', (ev) => {
+            ev.preventDefault();
+            startRowDrag(ev, card, g, tbody, ctx, v);
+          });
+          gutter.appendChild(grip);
+        }
         tr.appendChild(gutter);
         for (const f of visibleFields) {
           const td = document.createElement('td');

@@ -85,6 +85,16 @@ function nextCardId(board: Board): string {
   return `c${i}`;
 }
 
+export function moveCard(board: Board, fromId: string, beforeId: string | null): void {
+  const fromIdx = board.cards.findIndex(c => c.id === fromId);
+  if (fromIdx < 0) return;
+  const [card] = board.cards.splice(fromIdx, 1);
+  if (beforeId === null) { board.cards.push(card); return; }
+  const insertIdx = board.cards.findIndex(c => c.id === beforeId);
+  if (insertIdx < 0) { board.cards.push(card); return; }
+  board.cards.splice(insertIdx, 0, card);
+}
+
 export function deleteField(board: Board, field: string): void {
   board.fields = board.fields.filter(f => f.name !== field);
   for (const card of board.cards) delete card.values[field];

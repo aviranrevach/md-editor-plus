@@ -1351,3 +1351,8 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   cursor: col-resize;
 }
 .bd-col-resizer:hover { background: var(--link, #2563eb); opacity: 0.3; }
+
+/* ── Row drag grip ──────────────────────────────────────────────────────── */
+.bd-row-grip { color: transparent; cursor: grab; font-size: 14px; padding: 0 4px; }
+.bd-table-row:hover .bd-row-grip { color: var(--text-secondary); }
+.bd-drop-line-reject { background: #ef4444 !important; }
