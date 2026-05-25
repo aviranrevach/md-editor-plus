@@ -1305,18 +1305,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
    (kanban columns have a top chip that occupies the same visual band as the
    table's tiny uppercase header, so without this nudge the table reads as
    "dropped lower" than the kanban). */
-/* No max-height / overflow-y — the surrounding editor already handles document
-   scrolling. Horizontal overflow is allowed so wide tables can scroll, but the
-   scrollbar is hidden by default and only appears when actively scrolling. */
-.bd-table-host { padding: 0 0 12px 0; margin-top: -7px; overflow-x: auto; overflow-y: visible; scrollbar-width: none; }
-.bd-table-host::-webkit-scrollbar { height: 0; width: 0; background: transparent; }
-.bd-table-host::-webkit-scrollbar-track { background: transparent; }
-.bd-table-host::-webkit-scrollbar-thumb { background: transparent; }
-/* On hover, show a thin scrollbar that matches the kanban columns row. */
-.bd-table-host:hover { scrollbar-width: thin; }
-.bd-table-host:hover::-webkit-scrollbar { height: 8px; width: 8px; }
-.bd-table-host:hover::-webkit-scrollbar-thumb { background: rgba(127, 127, 127, 0.35); border-radius: 4px; }
-.bd-table-host:hover::-webkit-scrollbar-thumb:hover { background: rgba(127, 127, 127, 0.55); }
+/* No scroll container — the surrounding editor handles document scrolling.
+   `overflow: visible` means no scrollbar ever appears on the table-host, even
+   if the table is wider than the host (it just extends visibly past). */
+.bd-table-host { padding: 0 0 12px 0; margin-top: -7px; overflow: visible; }
 .bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
 .bd-table thead th {
   text-align: left;
