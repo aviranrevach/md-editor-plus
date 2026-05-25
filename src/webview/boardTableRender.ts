@@ -24,6 +24,82 @@ interface Group { key: string; cards: Card[]; }
 // Properties popover treat as always-available.
 export const DESCRIPTION_FIELD: FieldDef = { name: 'Description', type: 'text', visibleOnCard: false };
 
+// Pending-header-rename setter (filled by mountTable). Lets external code
+// (e.g. the chrome's "+ Add property" button) request that the next render
+// of the table renderer enter inline-rename on a specific column header.
+let pendingHeaderRenameRequest: ((fieldName: string) => void) | null = null;
+export function requestHeaderRename(fieldName: string): void {
+  pendingHeaderRenameRequest?.(fieldName);
+}
+
+function cssEscape(s: string): string {
+  // Minimal CSS attribute-value escape — only the characters likely to appear
+  // in a field name that would break an attribute selector.
+  return s.replace(/["\\]/g, '\\$&');
+}
+
+function beginHeaderRename(label: HTMLElement, fieldName: string, ctx: BoardRendererCtx): void {
+  if (label.getAttribute('contenteditable') === 'true') return;
+  const original = label.textContent ?? fieldName;
+  label.setAttribute('contenteditable', 'true');
+  label.classList.add('bd-th-label-editing');
+  label.focus();
+  // Select all so the user can type to replace.
+  const range = document.createRange();
+  range.selectNodeContents(label);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+
+  let resolved = false;
+  const cleanup = (): void => {
+    label.removeAttribute('contenteditable');
+    label.classList.remove('bd-th-label-editing');
+    label.removeEventListener('keydown', onKey);
+    label.removeEventListener('blur', onBlur);
+  };
+  const commit = (): void => {
+    if (resolved) return;
+    resolved = true;
+    const next = (label.textContent ?? '').trim();
+    cleanup();
+    if (!next || next === fieldName) {
+      label.textContent = original;
+      return;
+    }
+    const cur = ctx.getBoard();
+    if (cur.fields.some(f => f.name === next)) {
+      // Name conflict — restore.
+      label.textContent = original;
+      return;
+    }
+    ctx.mutate({
+      ...cur,
+      fields: cur.fields.map(f => (f.name === fieldName ? { ...f, name: next } : f)),
+      cards: cur.cards.map(c => {
+        if (!(fieldName in c.values)) return c;
+        const v: Record<string, string> = { ...c.values };
+        v[next] = v[fieldName];
+        delete v[fieldName];
+        return { ...c, values: v };
+      }),
+    });
+  };
+  const cancel = (): void => {
+    if (resolved) return;
+    resolved = true;
+    label.textContent = original;
+    cleanup();
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  };
+  const onBlur = (): void => commit();
+  label.addEventListener('keydown', onKey);
+  label.addEventListener('blur', onBlur);
+}
+
 /** After a successful drag (onDrop), suppress the next click event so the
  *  sort click handler that fires on the same mouseup does not also run. */
 function suppressNextClick(): void {
@@ -158,6 +234,11 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
   // back to a Card via b.cards, but startRowDrag needs the surrounding group
   // so cross-group drops can be rejected.
   let lastGroups: Group[] = [];
+  // When set, the next render enters inline-rename mode on this column's
+  // header (used after "+ Add property" so the user can name the new column
+  // immediately without re-clicking).
+  let pendingHeaderRename: string | null = null;
+  pendingHeaderRenameRequest = (name) => { pendingHeaderRename = name; };
 
   function render(): void {
     if (detached) return;
@@ -224,6 +305,16 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       const label = document.createElement('span');
       label.className = 'bd-th-label';
       label.textContent = f.name;
+      // Double-click → inline rename. Locked for Title/Status/Description
+      // (they're system fields with fixed names).
+      const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
+      if (!ctx.readonly && !isLockedName) {
+        label.addEventListener('dblclick', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          beginHeaderRename(label, f.name, ctx);
+        });
+      }
       left.appendChild(label);
 
       if (v.sort?.field === f.name) {
@@ -458,6 +549,15 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       pendingFocus.field = null;
       if (td) td.click();
     }
+    // Pending header rename — e.g. user just added a property via chrome '+'.
+    if (pendingHeaderRename) {
+      const labelEl = root.querySelector<HTMLElement>(
+        `th[data-field="${cssEscape(pendingHeaderRename)}"] .bd-th-label`,
+      );
+      const fieldName = pendingHeaderRename;
+      pendingHeaderRename = null;
+      if (labelEl) beginHeaderRename(labelEl, fieldName, ctx);
+    }
   }
 
   function computeVisibleFields(b: Board, v: ViewDef): FieldDef[] {
@@ -577,6 +677,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       detached = true;
       document.removeEventListener('mousedown', onDocMousedown, true);
       cancelRowDrag?.();
+      pendingHeaderRenameRequest = null;
       root.innerHTML = '';
       root.classList.remove('bd-table-host');
     },

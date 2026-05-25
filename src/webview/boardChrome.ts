@@ -5,6 +5,7 @@
 import type { Board } from './boardModel';
 import type { BoardRendererCtx } from './boardBlock';
 import { renderPropertiesContent, promptNewField } from './boardProperties';
+import { requestHeaderRename } from './boardTableRender';
 
 export interface ChromeHandle {
   el: HTMLElement;
@@ -64,7 +65,12 @@ export function renderChrome(
     addPropBtn.title = 'Add property';
     addPropBtn.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>`;
     addPropBtn.addEventListener('click', () => {
-      promptNewField(addPropBtn, ctx.getBoard(), (next, _name) => ctx.mutate(next));
+      promptNewField(addPropBtn, ctx.getBoard(), (next, name) => {
+        // Ask the table renderer (if active) to enter inline-rename on the
+        // new column's header so the user can name it immediately.
+        requestHeaderRename(name);
+        ctx.mutate(next);
+      });
     });
     chrome.appendChild(addPropBtn);
 

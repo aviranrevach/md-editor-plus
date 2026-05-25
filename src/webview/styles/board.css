@@ -151,7 +151,7 @@
 .board-columns {
   display: flex;
   gap: 10px;
-  align-items: flex-start;
+  align-items: stretch;  /* let "+ Add column" match the tallest column's height */
   overflow-x: auto;
   padding-bottom: 4px;
   scrollbar-width: thin;
@@ -1250,15 +1250,17 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 /* ===== ⋯ More menu: view segmented control + embedded Properties ===== */
 .bd-more { position: relative; display: inline-flex; }
 .bd-more-btn {
+  /* Subtle, matches the editor's top-right toolbar buttons (.toolbar-icon). */
   width: 28px; height: 28px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--bg);
+  background: transparent;
   color: var(--text-secondary);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 7px;
   cursor: pointer;
+  transition: background 0.1s, color 0.1s;
 }
-.bd-more-btn:hover { background: var(--block-hover); color: var(--text-primary); }
+.bd-more-btn:hover { background: var(--toolbar-btn-hover, var(--block-hover)); color: var(--text-primary); }
 .bd-more-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -1345,6 +1347,19 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.bd-th-label-editing {
+  background: var(--bg);
+  outline: 2px solid var(--link, #2563eb);
+  outline-offset: -2px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  cursor: text;
+  white-space: nowrap;
+  overflow: visible;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
 .bd-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
 .bd-table-row:hover { background: var(--block-hover); }
 .bd-table-gutter { width: 14px; }
@@ -1375,8 +1390,20 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table-addrow:hover td { background: var(--block-hover); }
 
 /* ── Table column ⋯ menu button ─────────────────────────────────────────── */
-.bd-col-menu-btn { background: transparent; border: none; color: var(--text-secondary, #888); font-size: 14px; padding: 0 4px; cursor: pointer; opacity: 0.4; transition: opacity 0.15s; }
+.bd-col-menu-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #888);
+  font-size: 14px;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.1s, color 0.1s;
+}
 .bd-table thead th:hover .bd-col-menu-btn { opacity: 1; }
+.bd-col-menu-btn:hover { background: var(--toolbar-btn-hover, var(--block-hover)); color: var(--text-primary); }
 .bd-col-menu { position: fixed; display: flex; flex-direction: column; gap: 1px; padding: 6px; background: var(--bg, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.12); z-index: 7; min-width: 180px; }
 .bd-col-menu-item { text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: 5px; cursor: pointer; font: 500 12.5px ui-sans-serif, sans-serif; color: var(--text-primary, #222); }
 .bd-col-menu-item:hover { background: var(--block-hover, rgba(0,0,0,0.05)); }
