@@ -379,6 +379,10 @@ function buildMermaidView(props: unknown) {
   // into our contentDOM before we read it.
   requestAnimationFrame(() => { void renderPreview(); });
 
+  (dom as Element & { __mbOpenVisualMode?: () => void }).__mbOpenVisualMode = () => {
+    if (canEdit(currentSource())) setVisualEditing(true);
+  };
+
   return {
     dom,
     contentDOM: code,
