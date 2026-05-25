@@ -131,12 +131,6 @@ function buildMermaidView(props: unknown) {
   let lastSvg: string | null = null;
   let snackbarTimer: ReturnType<typeof setTimeout> | null = null;
   let renderToken = 0;
-  // Tracks whether the first preview render has completed. The slash-menu
-  // auto-open hook (`__mbOpenVisualMode`) needs to wait for this; otherwise
-  // the visual editor captures an empty viewBox on initialization and locks
-  // the canvas to a wrong size.
-  let firstRenderComplete = false;
-  let pendingVisualOpen = false;
 
   function showSnackbar(): void {
     snackbar.classList.add('mb-snackbar-show');
@@ -257,15 +251,6 @@ function buildMermaidView(props: unknown) {
       // Defer one frame so the new <g.node> elements are laid out before we
       // measure their bounding rects.
       if (visualHandle) requestAnimationFrame(() => visualHandle?.onMermaidRerender());
-      // Fire any deferred visual-mode open request now that the SVG exists
-      // and nodes have been positioned — only on first successful render.
-      if (!firstRenderComplete) {
-        firstRenderComplete = true;
-        if (pendingVisualOpen) {
-          pendingVisualOpen = false;
-          if (canEdit(currentSource())) setVisualEditing(true);
-        }
-      }
     } else {
       svgHost.innerHTML = errorHtml(result.message, result.line);
       lastSvg = null;
@@ -395,7 +380,6 @@ function buildMermaidView(props: unknown) {
   requestAnimationFrame(() => { void renderPreview(); });
 
   (dom as Element & { __mbOpenVisualMode?: () => void }).__mbOpenVisualMode = () => {
-    if (!firstRenderComplete) { pendingVisualOpen = true; return; }
     if (canEdit(currentSource())) setVisualEditing(true);
   };
 
