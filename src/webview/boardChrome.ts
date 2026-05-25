@@ -4,7 +4,7 @@
 
 import type { Board } from './boardModel';
 import type { BoardRendererCtx } from './boardBlock';
-import { renderPropertiesContent } from './boardProperties';
+import { renderPropertiesContent, promptNewField } from './boardProperties';
 
 export interface ChromeHandle {
   el: HTMLElement;
@@ -56,6 +56,18 @@ export function renderChrome(
   let refreshPropsIfOpen: (() => void) | null = null;
 
   if (!readOnly) {
+    // "+ Add property" quick-action button — same look as the ⋯ button.
+    const addPropBtn = document.createElement('button');
+    addPropBtn.type = 'button';
+    addPropBtn.className = 'bd-more-btn bd-add-prop-btn';
+    addPropBtn.setAttribute('aria-label', 'Add property');
+    addPropBtn.title = 'Add property';
+    addPropBtn.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>`;
+    addPropBtn.addEventListener('click', () => {
+      promptNewField(addPropBtn, ctx.getBoard(), (next, _name) => ctx.mutate(next));
+    });
+    chrome.appendChild(addPropBtn);
+
     const moreResult = buildHeaderMore(ctx, registerMenuClose, unregisterMenuClose);
     chrome.appendChild(moreResult.el);
     refreshViewSeg = moreResult.refreshViewSeg;

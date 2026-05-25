@@ -204,30 +204,36 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       th.dataset.field = f.name;
       th.style.position = 'relative';
 
+      // Flex wrapper: [drag-handle] [label] [sort-caret] <spacer> [menu-btn]
+      // Resizer stays as a direct child of th (position:absolute relative to th).
+      const inner = document.createElement('div');
+      inner.className = 'bd-th-inner';
+
+      const left = document.createElement('span');
+      left.className = 'bd-th-left';
+
       if (!ctx.readonly) {
-        // Left: dedicated drag handle — dragging ONLY, never triggers sort.
         const dragHandle = document.createElement('span');
         dragHandle.className = 'bd-col-drag-handle';
         dragHandle.title = 'Drag to reorder column';
         dragHandle.setAttribute('data-board-drag', '');
         dragHandle.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
-        // mousedown is wired via the document-level delegated listener at the
-        // bottom of mountTable (see NOTE in file header).
-        th.appendChild(dragHandle);
+        left.appendChild(dragHandle);
       }
 
-      // Label (clickable for sort)
       const label = document.createElement('span');
       label.className = 'bd-th-label';
       label.textContent = f.name;
-      th.appendChild(label);
+      left.appendChild(label);
 
       if (v.sort?.field === f.name) {
         const caret = document.createElement('span');
         caret.className = 'bd-sort-caret';
         caret.textContent = v.sort.dir === 'asc' ? ' ▲' : ' ▼';
-        th.appendChild(caret);
+        left.appendChild(caret);
       }
+      inner.appendChild(left);
+      th.appendChild(inner);
 
       if (!ctx.readonly) {
         const headerMenuBtn = document.createElement('button');
@@ -238,12 +244,14 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           e.stopPropagation();
           openColumnMenu(headerMenuBtn, f, ctx, collapsedGroups);
         });
-        th.appendChild(headerMenuBtn);
+        // Append menu button INSIDE the flex wrapper so it sits at the far right
+        // of the header (the `.bd-th-left` consumes flex space; menu-btn doesn't).
+        inner.appendChild(headerMenuBtn);
 
         const resizer = document.createElement('div');
         resizer.className = 'bd-col-resizer';
         resizer.setAttribute('data-board-drag', '');
-        // mousedown is wired via the document-level delegated listener.
+        // Resizer is absolutely positioned on the th's right edge (outside inner).
         th.appendChild(resizer);
 
         // Sort click on the th — drag handle, menu btn, resizer all stop propagation.

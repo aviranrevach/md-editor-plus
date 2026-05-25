@@ -445,7 +445,17 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
   row.className = 'board-properties-row';
   row.dataset.fieldName = field.name;
 
+  // `isLocked` controls rename / drag / delete affordances — applies to Title,
+  // Status, and the synthetic Description (none of those can be renamed,
+  // deleted, or reordered).
   const isLocked = field.name === 'Title' || field.name === 'Status' || field.name === 'Description';
+  // The visibility toggle is its own concept:
+  // - Title: always shown (it's the card's primary identifier).
+  // - Status: hideable in TABLE view as a column, but locked-on in KANBAN
+  //   because the kanban groups cards INTO Status columns — it has nowhere
+  //   to hide.
+  // - Everything else (including Description): hideable in both views.
+  const isToggleLocked = field.name === 'Title' || (viewName === 'kanban' && field.name === 'Status');
 
   // Drag handle — always visible. Mouse-based reorder (we don't use HTML5
   // drag-and-drop here because ProseMirror intercepts dragstart events on the
@@ -499,7 +509,7 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
   // Toggle: Show on card (kanban) or show in table view
   const toggle = document.createElement('button');
   toggle.type = 'button';
-  toggle.disabled = isLocked;
+  toggle.disabled = isToggleLocked;
   if (viewName === 'table') {
     const tableView = board.views.find(x => x.name === 'table');
     // Table-view visibility mirrors the table renderer's `computeVisibleFields`:
@@ -521,6 +531,23 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
       };
       if (isHidden) showFieldInView(b2, 'table', field.name);
       else          hideFieldInView(b2, 'table', field.name);
+      onChange(b2);
+    });
+  } else if (field.name === 'Description') {
+    // Synthetic Description in kanban: toggle writes to the kanban view's
+    // .hidden array (controls the body preview on cards). visibleOnCard
+    // doesn't apply since Description isn't a real field in board.fields.
+    const kanbanView = board.views.find(x => x.name === 'kanban');
+    const isHidden = !!kanbanView?.hidden?.includes('Description');
+    toggle.className = 'board-properties-toggle' + (!isHidden ? ' is-on' : '');
+    toggle.title = isHidden ? 'Hidden on card — click to show' : 'Visible on card — click to hide';
+    toggle.addEventListener('click', () => {
+      const b2: Board = {
+        ...board,
+        views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })),
+      };
+      if (isHidden) showFieldInView(b2, 'kanban', 'Description');
+      else          hideFieldInView(b2, 'kanban', 'Description');
       onChange(b2);
     });
   } else {

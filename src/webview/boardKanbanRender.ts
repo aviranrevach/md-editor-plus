@@ -439,7 +439,11 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
   title.textContent = card.values.Title || 'Untitled';
   el.appendChild(title);
 
-  const preview = bodyPreview(card.body);
+  // Skip the body preview when the kanban view's Properties popover has hidden
+  // the synthetic "Description" entry.
+  const kanbanView = board.views.find(v => v.name === 'kanban');
+  const descriptionHidden = !!kanbanView?.hidden?.includes('Description');
+  const preview = descriptionHidden ? '' : bodyPreview(card.body);
   if (preview) {
     const p = document.createElement('div');
     p.className = 'board-card-preview';

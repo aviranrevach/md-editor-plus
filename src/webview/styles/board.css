@@ -1320,7 +1320,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table { border-collapse: collapse; table-layout: fixed; font: 13px ui-sans-serif, sans-serif; }
 .bd-table thead th {
   text-align: left;
-  padding: 8px 10px;
+  padding: 0; /* inner div owns padding so flex layout works correctly */
   font: 600 10.5px ui-sans-serif, sans-serif;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -1329,13 +1329,27 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   position: relative;
   cursor: default;
   white-space: nowrap;
-  overflow: visible; /* must be visible so the absolute-positioned resizer can extend past the cell edge */
+  overflow: visible;
+}
+.bd-th-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.bd-th-left {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  cursor: pointer; /* clicking anywhere on the label area fires sort */
 }
 .bd-th-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer; /* clicking the label fires sort */
 }
 .bd-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
 .bd-table-row:hover { background: var(--block-hover); }
@@ -1349,7 +1363,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-date-overdue { background: #fee2e2; color: #b91c1c; }
 .bd-tag { display: inline-block; padding: 1px 7px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); border-radius: 4px; font-size: 11px; margin-right: 4px; }
 .bd-date-input { font: 13px ui-sans-serif, sans-serif; padding: 4px 6px; border: 1px solid var(--link, #2563eb); border-radius: 5px; background: var(--bg); }
-.bd-sort-caret { color: var(--link, #2563eb); font-size: 9px; margin-left: 4px; }
+/* Sort caret inherits the header's secondary text color so it doesn't read as
+   a clickable link. Slightly smaller than the label text. */
+.bd-sort-caret { color: currentColor; font-size: 9px; opacity: 0.7; }
 
 /* ── Table group-by headers ─────────────────────────────────────────────── */
 .bd-table-group td { background: var(--bg-secondary, transparent); padding: 4px 10px; font: 500 12px ui-sans-serif, sans-serif; }
