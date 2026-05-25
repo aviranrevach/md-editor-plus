@@ -765,14 +765,16 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
   // Shown but disabled for system fields (Title / Status / Description) so
   // users can SEE the action exists, even if they can't use it on these fields.
   const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
+  // Phosphor Bold 16px — viewBox 0 0 256 256, fill currentColor (matches the
+  // project's existing icon style in blockPicker.ts).
   const ICON = {
-    rename: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-3 1 1-3 7.5-7.5z"/></svg>`,
-    sortAsc: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 12V4M2 6l2-2 2 2M8 5h6M8 9h4M8 13h2"/></svg>`,
-    sortDesc: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4v8M2 10l2 2 2-2M8 5h6M8 9h4M8 13h2"/></svg>`,
-    sortClear: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M5 8h6M7 12h2M14 3l-2 2-2-2"/></svg>`,
-    group: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="3" rx="1"/><rect x="2" y="8" width="12" height="2" rx="0.5"/><rect x="2" y="11" width="12" height="2" rx="0.5"/></svg>`,
-    resetWidth: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4v8M14 4v8M5 8h6M5 8l2-2M5 8l2 2M11 8l-2-2M11 8l-2 2"/></svg>`,
-    hide: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8c1.5 3 4 4 6 4s4.5-1 6-4-4-4-6-4-4.5 1-6 4z"/><line x1="2" y1="2" x2="14" y2="14"/></svg>`,
+    rename: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
+    sortAsc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M152,72a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H160A8,8,0,0,1,152,72Zm8,48h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm-50.34-26.34L96,187.31V40a8,8,0,0,0-16,0V187.31L66.34,173.66a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l24-24A8,8,0,0,0,109.66,173.66Z"/></svg>`,
+    sortDesc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M160,80h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm48,24H160a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm-98.34-90.34L96,107.31V216a8,8,0,0,1-16,0V107.31L66.34,120.97A8,8,0,0,1,55,109.65l24-24a8,8,0,0,1,11.32,0l24,24A8,8,0,0,1,109.66,93.66Z"/></svg>`,
+    sortClear: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a96.12,96.12,0,0,1-93.5,95.94,8,8,0,0,1-.5-16A80.11,80.11,0,0,0,224,128a80,80,0,0,0-140.45-52.45L96.4,88.4a8,8,0,0,1-5.66,13.66H40A8,8,0,0,1,32,94V43.3a8,8,0,0,1,13.66-5.66l13.7,13.7A96,96,0,0,1,240,128Z"/></svg>`,
+    group: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></svg>`,
+    resetWidth: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,56V200a8,8,0,0,1-16,0V56a8,8,0,0,1,16,0ZM32,200V56a8,8,0,0,0-16,0V200a8,8,0,0,0,16,0Zm164.69-71.85L168.85,156a4,4,0,0,1-6.85-2.83V136H94v17.17a4,4,0,0,1-6.85,2.83l-27.84-27.85a4,4,0,0,1,0-5.66l27.84-27.85a4,4,0,0,1,6.85,2.83V114h68V102.83a4,4,0,0,1,6.85-2.83l27.84,27.85A4,4,0,0,1,196.69,128.15Z"/></svg>`,
+    hide: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l21.92,24.11a8,8,0,1,0,11.84-10.76Zm46.34,79.42a36,36,0,0,1,49.4,49.4Zm-3.18,90A102.45,102.45,0,0,1,46.71,143C39.62,134.21,32.31,123.5,29,116.74c8.45-17.59,30.93-46.74,72.17-60.18l21.93,24.12a52,52,0,0,0,75.79,71.18l24,26.4A111.55,111.55,0,0,1,128,192a112.46,112.46,0,0,1-30.92-12.27Zm130-31.46a8,8,0,0,1-1.31-11.21c2.66-3.51,17.51-23.81,17.51-32.74,0-8.62-13.79-26.39-21.33-36.06l-.55-.71a112.46,112.46,0,0,0-37.45-32.78,8,8,0,1,1,7.55-14.12,128.39,128.39,0,0,1,42.86,37.43c5.31,6.83,29.92,39.5,29.92,46.24,0,7.5-22.16,40.59-20.94,42.13A8,8,0,0,1,227.08,172.55Z"/></svg>`,
   };
   mkItem(ICON.rename, 'Rename', () => {
     requestHeaderRename(f.name);
@@ -820,6 +822,22 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
   menu.style.left = `${r.left}px`;
   menu.style.top  = `${r.bottom + 4}px`;
   document.body.appendChild(menu);
+  // Edge-aware repositioning: after the menu is sized by the browser, check
+  // for viewport overflow on right and bottom; flip / clamp so it stays
+  // fully visible. The rightmost columns frequently hit this.
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    const margin = 8;
+    if (menuRect.right > window.innerWidth - margin) {
+      // Align the menu's RIGHT edge with the anchor's right edge.
+      const left = Math.max(margin, r.right - menuRect.width);
+      menu.style.left = `${left}px`;
+    }
+    if (menuRect.bottom > window.innerHeight - margin) {
+      const top = Math.max(margin, r.top - menuRect.height - 4);
+      menu.style.top = `${top}px`;
+    }
+  });
   const close = (e: MouseEvent) => {
     if (!menu.contains(e.target as Node)) {
       menu.remove();
