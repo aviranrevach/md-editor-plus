@@ -643,9 +643,22 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       if (!f) return;
       e.preventDefault();
       e.stopPropagation();
-      th?.classList.add('bd-th-dragging');
+      // Apply the dragging style only AFTER the drag actually promotes past
+      // the 4px threshold — applying it on plain mousedown produced a flash
+      // when the user just clicked the handle.
+      let armed = false;
+      const onMoveOnce = (): void => {
+        if (armed) return;
+        armed = true;
+        th?.classList.add('bd-th-dragging');
+        document.removeEventListener('mousemove', onMoveOnce, true);
+      };
+      document.addEventListener('mousemove', onMoveOnce, true);
       startColumnDrag(e, f, lastVisibleFields, ctx);
-      document.addEventListener('mouseup', () => th?.classList.remove('bd-th-dragging'), { once: true });
+      document.addEventListener('mouseup', () => {
+        document.removeEventListener('mousemove', onMoveOnce, true);
+        th?.classList.remove('bd-th-dragging');
+      }, { once: true });
       return;
     }
 
@@ -742,6 +755,17 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); currentColumnMenuOutside = null; });
     menu.appendChild(btn);
   };
+  // Rename is the FIRST item — most-common reason to open this menu.
+  // Locked for system fields (Title / Status / Description).
+  const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
+  if (!isLockedName) {
+    mkItem('Rename', () => {
+      // Trigger inline-rename via the same path the chrome's "+" uses.
+      requestHeaderRename(f.name);
+      // Force a render so pendingHeaderRename is consumed and focus lands on the label.
+      ctx.mutate({ ...ctx.getBoard() });
+    });
+  }
   mkItem('Sort ascending', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };

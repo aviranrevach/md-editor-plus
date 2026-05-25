@@ -450,22 +450,44 @@ button.board-column-chip-dot:hover {
 /* ===== Tall "+ Add column" at the end of the columns row ===== */
 .board-add-column-big {
   flex: 0 0 44px;
-  /* Match the visual height of an empty column (chip header + body padding +
-     "+ New card" placeholder + bottom padding). Don't stretch to the tallest
-     column — that read as "way too tall" when sitting next to short columns. */
+  /* Height matches an empty column by mirroring its internal DOM (a real
+     .board-column-body with a spacer head + placeholder add-card lives inside
+     the button). align-self:flex-start keeps it from stretching to the
+     tallest column. */
   align-self: flex-start;
-  min-height: 96px;
-  background: var(--board-bg-col);
+  background: transparent;
   border: 0;
   border-radius: 10px;
   cursor: pointer;
   color: var(--board-text-muted);
+  padding: 0;
+  transition: color 0.12s, transform 0.08s;
+  opacity: 0.85;
+}
+/* The inner body uses the column's own rules; widen it to fill the 44px button
+   and center the + glyph in the middle of the body area. */
+.board-add-column-big .board-add-column-mirror {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.board-add-column-big .board-column-head {
+  /* Empty head — purely a spacer so the body offsets match a real column. */
+  visibility: hidden;
+}
+.board-add-column-glyph {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  transition: background 0.12s, color 0.12s, transform 0.08s;
-  opacity: 0.85;
+  min-height: 28px;
+}
+.board-add-column-big svg { width: 18px; height: 18px; }
+.board-add-column-spacer {
+  /* Invisible "+ New card" twin — sized identically so the bottom of the
+     button lines up with the bottom of a real column. */
+  visibility: hidden;
+  pointer-events: none;
 }
 .board-add-column-big:hover {
   /* Keep the background neutral; just darken the + icon so the affordance
@@ -475,7 +497,6 @@ button.board-column-chip-dot:hover {
   opacity: 1;
 }
 .board-add-column-big:active { transform: scale(0.97); }
-.board-add-column-big svg { width: 18px; height: 18px; }
 
 /* ===== Column menu (⋯) popover ===== */
 .board-column-menu {

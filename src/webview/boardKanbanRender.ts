@@ -53,16 +53,26 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
   }
 
   if (!readOnly) {
-    // Tall "+ Add column" button at the end of the row — same height as a
-    // column body, brighter fill so it reads as the primary creation affordance.
+    // Tall "+ Add column" button at the end of the row. To make its height
+    // match an empty new column EXACTLY, mirror the column's internal DOM
+    // structure (.board-column-body wrapping a spacer head + a placeholder
+    // add-card). That way the same CSS rules size both, so any change to
+    // column-head / column-body / add-card spacing applies to the + button
+    // too with no extra math.
     const addBig = document.createElement('button');
     addBig.type = 'button';
     addBig.className = 'board-add-column-big';
     addBig.title = 'Add column';
     addBig.innerHTML = `
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-        <path d="M8 3.5v9M3.5 8h9"/>
-      </svg>
+      <div class="board-column-body board-add-column-mirror">
+        <div class="board-column-head"></div>
+        <div class="board-add-column-glyph">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+            <path d="M8 3.5v9M3.5 8h9"/>
+          </svg>
+        </div>
+        <div class="board-add-card board-add-column-spacer" aria-hidden="true"></div>
+      </div>
     `;
     addBig.addEventListener('click', () => {
       const base = 'New';
