@@ -150,7 +150,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     zoomReadout?.update(viewport.scale);
     // Re-pick the dot grid spacing so dots stay at a comfortable on-screen
     // density (~14 px) regardless of zoom — snaps to powers of 2.
-    updateDotGrid(opts.previewPane, viewport.scale);
+    updateDotGrid(opts.previewPane, viewport.scale * naturalSvgScale(opts.previewPane));
     // Selection overlays use getBoundingClientRect which already accounts for
     // CSS transforms, so they follow automatically — just refresh.
     refreshSelectionUI();
@@ -3363,6 +3363,19 @@ const DOT_GRID_TARGET_SCREEN_PX = 22;   // ideal on-screen distance between dots
 const DOT_GRID_RADIUS_RATIO = 0.075;    // dot radius = ratio * spacing (visible but not chunky)
 const DOT_GRID_MAX_RADIUS = 1.6;        // ceiling so the biggest snap level doesn't look chunky
 
+/** Returns the SVG's natural user-units → screen-pixels ratio so the
+    dot grid can be sized to a consistent on-screen density. Returns 1
+    as a safe fallback when the SVG isn't ready yet. Callers pass the
+    outer .mb-preview host; the helper drills into .mb-svg-host > svg. */
+export function naturalSvgScale(host: HTMLElement): number {
+  const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (!svg) return 1;
+  const vb = svg.viewBox?.baseVal;
+  const hostWidth = svg.getBoundingClientRect().width;
+  if (!vb || vb.width <= 0 || hostWidth <= 0) return 1;
+  return hostWidth / vb.width;
+}
+
 function gridSpacingForScale(scale: number): number {
   // Snap unitSpacing to base * 2^level so spacing changes only at thresholds.
   const safe = Math.max(0.001, scale);
@@ -3392,7 +3405,7 @@ function installDotGrid(host: HTMLElement): void {
   }
 
   // Start at the baseline spacing — `updateDotGrid` will rescale on zoom.
-  const spacing = gridSpacingForScale(1);
+  const spacing = gridSpacingForScale(naturalSvgScale(host));
   const radius  = Math.min(DOT_GRID_MAX_RADIUS, Math.max(0.5, spacing * DOT_GRID_RADIUS_RATIO));
   const pattern = document.createElementNS(ns, 'pattern');
   pattern.setAttribute('id', 'mb-vDotGrid-pattern');
