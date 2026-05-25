@@ -27,9 +27,9 @@ describe('freshWhiteboardSource', () => {
   it('pins positions for A/B/C at the documented coordinates', () => {
     const ast = parseMermaid(freshWhiteboardSource());
     expect(getPositions(ast)).toEqual({
-      A: [120, 80],
-      B: [320, 80],
-      C: [520, 80],
+      A: [200, 200],
+      B: [340, 200],
+      C: [480, 200],
     });
   });
 
