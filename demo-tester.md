@@ -217,8 +217,9 @@ Local image (extension icon, from `media/`):
 
 ![Logo SVG](media/icon.svg)A reference-style image works too:
 
-![Claude icon](media/claude-icon.svg "Claude theme icon")&gt; \[!NOTE\] 💡
+![Claude icon](media/claude-icon.svg "Claude theme icon")
 
+> [!NOTE] 💡
 > Image paths render relative to the workspace root, so media/icon.png resolves the same way it does on GitHub.
 
 ---
