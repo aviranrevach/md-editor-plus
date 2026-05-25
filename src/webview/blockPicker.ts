@@ -604,6 +604,29 @@ export function freshWhiteboardSource(): string {
   ].join('\n');
 }
 
+export function insertWhiteboard(editor: Editor, pos: number): void {
+  const source = freshWhiteboardSource();
+  editor
+    .chain()
+    .focus()
+    .insertContentAt(pos, [
+      {
+        type: 'codeBlock',
+        attrs: { language: 'mermaid' },
+        content: [{ type: 'text', text: source }],
+      },
+      { type: 'paragraph' },
+    ])
+    .run();
+
+  requestAnimationFrame(() => {
+    const dom = (editor as unknown as {
+      view: { nodeDOM: (pos: number) => (HTMLElement & { __mbOpenVisualMode?: () => void }) | null };
+    }).view.nodeDOM(pos);
+    dom?.__mbOpenVisualMode?.();
+  });
+}
+
 function freshBoardSource(id: string, activeView?: 'kanban' | 'table'): string {
   const av = activeView === 'table' ? ' active-view="table"' : '';
   const parts: string[] = [
