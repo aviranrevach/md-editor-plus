@@ -465,7 +465,9 @@ button.board-column-chip-dot:hover {
   opacity: 0.85;
 }
 .board-add-column-big:hover {
-  background: var(--board-bg-card);
+  /* Keep the background neutral; just darken the + icon so the affordance
+     reads clearly (the previous rule turned background white in light mode,
+     which made the muted + nearly invisible). */
   color: var(--board-text);
   opacity: 1;
 }
