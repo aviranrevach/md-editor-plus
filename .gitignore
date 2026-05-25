@@ -4,8 +4,10 @@ dist-webview/
 *.vsix
 .superpowers/
 
-# OS junk + dev screenshots accidentally swept in once
+# OS junk + tooling artifacts
 .DS_Store
 **/.DS_Store
 .playwright-mcp/
-*.png
+
+# Dev-loop screenshots in the repo root (legit assets live in media/)
+/*.png
