@@ -144,57 +144,76 @@ sees no diff.
   - One new line inside `buildMermaidView`, just before the
     `return { dom, contentDOM, … }`, attaching
     `__mbOpenVisualMode` to `dom`.
+- `tests/mermaid/whiteboard-source.test.ts` *(new)*
+  - Pure-data tests for `freshWhiteboardSource()`. See Testing.
 - `tests/mermaid/whiteboard-insert.test.ts` *(new)*
-  - Three tests, jsdom environment. See Testing below.
+  - Mocked-editor tests for `insertWhiteboard()`. See Testing.
 
 No other files touched.
 
 ## Testing
 
-One new file, `tests/mermaid/whiteboard-insert.test.ts`, jsdom
-environment, mirroring `tests/mermaid/lines.test.ts` and
-`tests/board/drag-shared-dom.test.ts`.
+Jest setup notes that shape what's testable: the default test
+environment is `node`; the real `editor.ts` is stubbed via
+`tests/__mocks__/editorMock.js` because lowlight is ESM-only and
+jest can't parse it. So we can't mount the real tiptap editor in
+tests. Two new test files instead, each unit-style:
 
-### Test 1 — starter source parses + round-trips
+### File 1 — `tests/mermaid/whiteboard-source.test.ts` (node env)
 
-- Build source via `freshWhiteboardSource()`.
-- Run through `parseMermaid()`.
-- Assert: 3 node decls (`A`, `B`, `C`), 2 edge decls (`A→B`,
-  `B→C`), positions map present with the documented coordinates,
-  `canEdit()` returns `true`.
-- Re-serialize via `serializeMermaidAst()`; assert byte-for-byte
-  equality with the original. Locks down "insert + undo = clean."
+Pure data — same shape as `tests/mermaid/lines.test.ts`. Tests the
+exported `freshWhiteboardSource()` helper:
 
-### Test 2 — slash-menu insert builds the right tree
+- **Test 1a:** `parseMermaid(freshWhiteboardSource())` yields an AST
+  with 3 node decls (`A`, `B`, `C`) labelled `Idea` / `Next` /
+  `Done`, 2 edge decls (`A→B`, `B→C`), positions map equal to the
+  documented coordinates.
+- **Test 1b:** `canEdit(freshWhiteboardSource())` returns `true` —
+  guards against accidentally changing the starter to syntax the
+  visual editor can't drive.
+- **Test 1c:** `serializeMermaid(parseMermaid(src))` returns the
+  starter source byte-for-byte. Locks down "insert + undo = clean."
 
-- Spin up the tiptap editor in jsdom.
-- Call the Whiteboard `BlockDef.insert(editor, insertPos)`.
-- Assert: node at `insertPos` is a `codeBlock` with
-  `attrs.language === 'mermaid'`; its text content equals
-  `freshWhiteboardSource()`; the node immediately after is a
-  `paragraph`.
-- This is the test that nails Point 1 from the Architecture
-  section.
+### File 2 — `tests/mermaid/whiteboard-insert.test.ts` (node env)
 
-### Test 3 — auto-open hook is wired
+Tests the `insertWhiteboard(editor, pos)` flow with a hand-built
+mock editor — a spy that records chain calls. Asserts:
 
-- After insert, wait one `requestAnimationFrame`.
-- Assert `editor.view.nodeDOM(insertPos)` returns the `.mb`
-  element.
-- Assert `dom.__mbOpenVisualMode` is a function.
-- Invoke it; assert `dom.classList.contains('mb-visual')` — the
-  class `setVisualEditing(true)` adds at `mermaidBlock.ts:214`.
-  That's the externally observable signal that visual mode is on
-  (the `visualHandle` itself is closure-local).
+- **Test 2a:** `insertWhiteboard(mockEditor, 42)` invokes
+  `editor.chain().focus().insertContentAt(42, content).run()` exactly
+  once, where `content` is a two-element array:
+  - `{ type: 'codeBlock', attrs: { language: 'mermaid' },
+    content: [{ type: 'text', text: freshWhiteboardSource() }] }`
+  - `{ type: 'paragraph' }`
+- **Test 2b:** After the chain runs, exactly one
+  `requestAnimationFrame` is scheduled, and on that frame
+  `editor.view.nodeDOM(42)` is called.
+- **Test 2c:** If `nodeDOM` returns an element with a
+  `__mbOpenVisualMode` function, that function is invoked. If
+  `nodeDOM` returns `null`, no throw — the call is a safe no-op.
+
+To make File 2 testable, `insertWhiteboard` and
+`freshWhiteboardSource` are exported (named exports) from
+`blockPicker.ts`. This is a small change — `freshBoardSource` and
+`insertBoardWith` are currently private helpers; we promote the two
+new ones to exports for testability.
+
+### Hook attachment in `mermaidBlock.ts` — covered by manual smoke
+
+The line `(dom as …).__mbOpenVisualMode = () => …` lives inside a
+closure-heavy NodeView builder that's hard to unit-test without
+mocking mermaid, the theme system, and the entire visual editor.
+Cost/benefit doesn't justify the mocking. The manual smoke step
+below explicitly exercises the hook end-to-end, and Tests 2b/2c
+prove the *caller* side fires correctly into whatever the NodeView
+exposes. Together those cover the wiring without rebuilding the
+NodeView in jest.
 
 ### What we do not test here
 
 Visual-editor internals — drag, palette positioning, edge wiring,
 multi-select, copy/paste, align/distribute. Those are covered by
-the phase 1–8 specs and their existing tests. This file only proves
-the new wiring between the slash menu, the inserted node, and the
-hook. Mermaid SVG rendering stays mocked the same way
-`lines.test.ts` mocks it.
+the phase 1–8 specs and their existing tests.
 
 ## Manual verification
 
