@@ -347,6 +347,9 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
         // Sort click on the th — drag handle, menu btn, resizer all stop propagation.
         th.addEventListener('click', (e) => {
+          // Skip when the click is part of a double-click (rename) sequence;
+          // otherwise the two clicks fire sort twice before dblclick lands.
+          if (e.detail >= 2) return;
           const t = e.target as HTMLElement;
           if (t.closest('.bd-col-resizer, .bd-col-menu-btn, .bd-col-drag-handle')) return;
           const cur = ctx.getBoard();
@@ -746,58 +749,67 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
   existing?.remove();
   const menu = document.createElement('div');
   menu.className = 'bd-col-menu';
-  const mkItem = (label: string, fn: () => void) => {
+  const mkItem = (icon: string, label: string, fn: () => void, opts: { disabled?: boolean } = {}) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'bd-col-menu-item';
-    btn.textContent = label;
+    btn.disabled = !!opts.disabled;
+    btn.innerHTML = `<span class="bd-col-menu-icon">${icon}</span><span class="bd-col-menu-label">${label}</span>`;
     btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
-    btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); currentColumnMenuOutside = null; });
+    if (!opts.disabled) {
+      btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); currentColumnMenuOutside = null; });
+    }
     menu.appendChild(btn);
   };
   // Rename is the FIRST item — most-common reason to open this menu.
-  // Locked for system fields (Title / Status / Description).
+  // Shown but disabled for system fields (Title / Status / Description) so
+  // users can SEE the action exists, even if they can't use it on these fields.
   const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
-  if (!isLockedName) {
-    mkItem('Rename', () => {
-      // Trigger inline-rename via the same path the chrome's "+" uses.
-      requestHeaderRename(f.name);
-      // Force a render so pendingHeaderRename is consumed and focus lands on the label.
-      ctx.mutate({ ...ctx.getBoard() });
-    });
-  }
-  mkItem('Sort ascending', () => {
+  const ICON = {
+    rename: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-3 1 1-3 7.5-7.5z"/></svg>`,
+    sortAsc: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 12V4M2 6l2-2 2 2M8 5h6M8 9h4M8 13h2"/></svg>`,
+    sortDesc: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4v8M2 10l2 2 2-2M8 5h6M8 9h4M8 13h2"/></svg>`,
+    sortClear: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M5 8h6M7 12h2M14 3l-2 2-2-2"/></svg>`,
+    group: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="12" height="3" rx="1"/><rect x="2" y="8" width="12" height="2" rx="0.5"/><rect x="2" y="11" width="12" height="2" rx="0.5"/></svg>`,
+    resetWidth: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4v8M14 4v8M5 8h6M5 8l2-2M5 8l2 2M11 8l-2-2M11 8l-2 2"/></svg>`,
+    hide: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8c1.5 3 4 4 6 4s4.5-1 6-4-4-4-6-4-4.5 1-6 4z"/><line x1="2" y1="2" x2="14" y2="14"/></svg>`,
+  };
+  mkItem(ICON.rename, 'Rename', () => {
+    requestHeaderRename(f.name);
+    ctx.mutate({ ...ctx.getBoard() });
+  }, { disabled: isLockedName });
+  mkItem(ICON.sortAsc, 'Sort ascending', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
     setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
     ctx.mutate(b2);
   });
-  mkItem('Sort descending', () => {
+  mkItem(ICON.sortDesc, 'Sort descending', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
     setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
     ctx.mutate(b2);
   });
-  mkItem('Clear sort', () => {
+  mkItem(ICON.sortClear, 'Clear sort', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
     setViewSort(b2, 'table', null);
     ctx.mutate(b2);
   });
-  mkItem('Group by this', () => {
+  mkItem(ICON.group, 'Group by this', () => {
     collapsedGroups.clear();
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
     setViewGroup(b2, 'table', f.name);
     ctx.mutate(b2);
   });
-  mkItem('Reset column width', () => {
+  mkItem(ICON.resetWidth, 'Reset column width', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
     setViewWidth(b2, 'table', f.name, null);
     ctx.mutate(b2);
   });
-  mkItem('Hide column', () => {
+  mkItem(ICON.hide, 'Hide column', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
     hideFieldInView(b2, 'table', f.name);

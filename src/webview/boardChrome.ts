@@ -61,8 +61,8 @@ export function renderChrome(
     const addPropBtn = document.createElement('button');
     addPropBtn.type = 'button';
     addPropBtn.className = 'bd-more-btn bd-add-prop-btn';
-    addPropBtn.setAttribute('aria-label', 'Add property');
-    addPropBtn.title = 'Add property';
+    addPropBtn.setAttribute('aria-label', 'Add property (column)');
+    addPropBtn.title = 'Add property (column)';
     addPropBtn.innerHTML = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg>`;
     addPropBtn.addEventListener('click', () => {
       promptNewField(addPropBtn, ctx.getBoard(), (next, name) => {

@@ -1438,8 +1438,24 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table thead th:hover .bd-col-menu-btn { opacity: 1; }
 .bd-col-menu-btn:hover { background: var(--toolbar-btn-hover, var(--block-hover)); color: var(--text-primary); }
 .bd-col-menu { position: fixed; display: flex; flex-direction: column; gap: 1px; padding: 6px; background: var(--bg, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: 0 12px 28px rgba(0,0,0,0.12); z-index: 7; min-width: 180px; }
-.bd-col-menu-item { text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: 5px; cursor: pointer; font: 500 12.5px ui-sans-serif, sans-serif; color: var(--text-primary, #222); }
-.bd-col-menu-item:hover { background: var(--block-hover, rgba(0,0,0,0.05)); }
+.bd-col-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font: 500 12.5px ui-sans-serif, sans-serif;
+  color: var(--text-primary, #222);
+}
+.bd-col-menu-item:hover:not(:disabled) { background: var(--block-hover, rgba(0,0,0,0.05)); }
+.bd-col-menu-item:disabled { color: var(--text-secondary, #888); opacity: 0.5; cursor: not-allowed; }
+.bd-col-menu-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary, #888); flex-shrink: 0; }
+.bd-col-menu-item:disabled .bd-col-menu-icon { opacity: 0.7; }
+.bd-col-menu-label { flex: 1; }
 
 /* ── Column resizer handle ──────────────────────────────────────────────── */
 /* Always faintly visible so the user can find the hit area without hovering.
@@ -1464,25 +1480,22 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-col-resizer:hover::after { background: var(--link, #2563eb); }
 
 /* ── Column header drag handle ──────────────────────────────────────────── */
-/* Hidden + collapsed by default so the label sits flush left. On th hover the
-   handle reveals and pushes the label rightward. */
+/* Permanently in layout (so the label NEVER jumps on hover) but invisible
+   until the th is hovered. Only opacity transitions — no width change. */
 .bd-col-drag-handle {
   display: inline-flex;
   align-items: center;
   cursor: grab;
   opacity: 0;
-  width: 0;
-  margin-right: 0;
+  width: 8px;
+  margin-right: 4px;
   color: var(--text-secondary, #9b9b97);
   vertical-align: middle;
   flex-shrink: 0;
-  overflow: hidden;
-  transition: opacity 0.12s, width 0.12s, margin-right 0.12s;
+  transition: opacity 0.12s;
 }
 .bd-table thead th:hover .bd-col-drag-handle {
   opacity: 0.75;
-  width: 8px;
-  margin-right: 4px;
 }
 .bd-col-drag-handle:hover { opacity: 1 !important; }
 .bd-col-drag-handle:active { cursor: grabbing; }

@@ -380,7 +380,7 @@ export function renderPropertiesContent(
   add.className = 'board-properties-add';
   add.innerHTML = `
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
-    <span>Add a property</span>
+    <span>Add a property (column)</span>
   `;
   add.addEventListener('click', () => promptNewField(add, boardGetter(), wrappedOnChange));
   host.appendChild(add);
@@ -620,7 +620,7 @@ export function promptNewField(
 
   const sectionLabel = document.createElement('div');
   sectionLabel.className = 'board-add-field-section';
-  sectionLabel.textContent = 'Property type';
+  sectionLabel.textContent = 'Property (column) type';
   pop.appendChild(sectionLabel);
 
   const list = document.createElement('div');

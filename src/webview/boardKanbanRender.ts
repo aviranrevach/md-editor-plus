@@ -63,15 +63,21 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
     addBig.type = 'button';
     addBig.className = 'board-add-column-big';
     addBig.title = 'Add column';
+    // The hidden head + hidden add-card MUST contain real text content so
+    // their height matches a real column's children (line-height calculation
+    // depends on actual rendered text, not just padding). visibility:hidden
+    // keeps them invisible without removing them from layout.
     addBig.innerHTML = `
       <div class="board-column-body board-add-column-mirror">
-        <div class="board-column-head"></div>
+        <div class="board-column-head" aria-hidden="true">
+          <span class="board-column-chip"><span class="board-column-chip-dot"></span><span class="board-column-name">x</span></span>
+        </div>
         <div class="board-add-column-glyph">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
             <path d="M8 3.5v9M3.5 8h9"/>
           </svg>
         </div>
-        <div class="board-add-card board-add-column-spacer" aria-hidden="true"></div>
+        <div class="board-add-card board-add-column-spacer" aria-hidden="true">+ New card</div>
       </div>
     `;
     addBig.addEventListener('click', () => {
