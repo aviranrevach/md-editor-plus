@@ -1480,22 +1480,28 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-col-resizer:hover::after { background: var(--link, #2563eb); }
 
 /* ── Column header drag handle ──────────────────────────────────────────── */
-/* Permanently in layout (so the label NEVER jumps on hover) but invisible
-   until the th is hovered. Only opacity transitions — no width change. */
+/* Collapsed (width: 0) and invisible at rest so the label sits flush left.
+   On hover the handle reveals AND occupies layout — the label slides right.
+   This is a deliberate hover affordance; the alternative (handle always in
+   layout but invisible) leaves an empty slot that pushes the label right
+   permanently, which reads as a layout bug. */
 .bd-col-drag-handle {
   display: inline-flex;
   align-items: center;
   cursor: grab;
   opacity: 0;
-  width: 8px;
-  margin-right: 4px;
+  width: 0;
+  margin-right: 0;
   color: var(--text-secondary, #9b9b97);
   vertical-align: middle;
   flex-shrink: 0;
-  transition: opacity 0.12s;
+  overflow: hidden;
+  transition: opacity 0.12s, width 0.12s, margin-right 0.12s;
 }
 .bd-table thead th:hover .bd-col-drag-handle {
   opacity: 0.75;
+  width: 8px;
+  margin-right: 4px;
 }
 .bd-col-drag-handle:hover { opacity: 1 !important; }
 .bd-col-drag-handle:active { cursor: grabbing; }
