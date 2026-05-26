@@ -1957,10 +1957,21 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // Every subsequent mermaid re-render will get its viewBox stamped back to
   // this value, so structural mutations (adding nodes/edges/stickies) don't
   // cause mermaid's auto-layout to zoom or pan the canvas.
+  //
+  // If the SVG isn't rendered yet at this synchronous moment (common for
+  // a freshly inserted block — mermaid render is async), `lockedViewBox`
+  // stays null and we DO NOT set the data-mb-viewport-locked attribute
+  // yet. Setting it prematurely causes applyPositionsOverlay to skip its
+  // own viewBox fit on the first real render, leaving the SVG at
+  // mermaid's tight auto-layout size — which reads as "canvas inside a
+  // canvas." Instead, onMermaidRerender below captures the lock on the
+  // first re-render that has a real SVG with nodes.
   let lockedViewBox: string | null = null;
   const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
-  if (initialSvg) lockedViewBox = initialSvg.getAttribute('viewBox');
-  opts.block.dataset.mbViewportLocked = 'true';
+  if (initialSvg && initialSvg.querySelector('g.node')) {
+    lockedViewBox = initialSvg.getAttribute('viewBox');
+    opts.block.dataset.mbViewportLocked = 'true';
+  }
   toolbar.setViewportLocked(true);
 
   function restoreLockedViewBox(): void {
@@ -1980,10 +1991,24 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       // mermaidBlock already called applyPositionsOverlay for us before
       // this. We just refresh toolbar state and re-bind ring/tip to the
       // (possibly newly-positioned) selected nodes.
-      // When locked: stamp back the original viewBox so mermaid's
-      // auto-layout doesn't drift the canvas. When unlocked: re-fit.
-      if (viewportLocked) restoreLockedViewBox();
-      else                fitSvgViewBoxToNodes(opts.previewPane);
+      // When locked AND we have a captured viewBox: stamp it back so
+      // mermaid's auto-layout doesn't drift the canvas. Otherwise: re-fit,
+      // and on the first such re-fit where the SVG actually has nodes,
+      // lazily capture the lock (this is the path that runs for freshly
+      // inserted blocks where the SVG didn't exist at createVisualEditor
+      // construction time).
+      if (viewportLocked && lockedViewBox) {
+        restoreLockedViewBox();
+      } else {
+        fitSvgViewBoxToNodes(opts.previewPane);
+        if (viewportLocked && !lockedViewBox) {
+          const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+          if (svg && svg.querySelector('g.node')) {
+            lockedViewBox = svg.getAttribute('viewBox');
+            opts.block.dataset.mbViewportLocked = 'true';
+          }
+        }
+      }
       const ast = parseMermaid(opts.getSource());
       toolbar.setResetEnabled(getPositions(ast) !== null);
       // Drop any selectedIds that no longer have a node in the SVG.
