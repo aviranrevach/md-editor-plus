@@ -152,6 +152,65 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     // CSS transforms, so they follow automatically — just refresh.
     refreshSelectionUI();
   }
+
+  // ── Autopan during node drag ────────────────────────────────────────────
+  // Standard whiteboard behavior: when the cursor approaches the edge of the
+  // visible pane while dragging a node, the viewport pans automatically so
+  // the cursor (and the dragged node) stay in view. Keeps running on its own
+  // rAF loop while drag is active, so holding at the edge keeps panning even
+  // without further mouse movement.
+  let autopanRaf: number | null = null;
+  let lastDragClientX = 0;
+  let lastDragClientY = 0;
+  const AUTOPAN_EDGE = 60;     // px from pane edge where autopan kicks in
+  const AUTOPAN_MAX = 14;      // max screen-px pan per frame at the very edge
+  function autopanTick(): void {
+    autopanRaf = null;
+    if (!drag) return;
+    const paneRect = opts.previewPane.getBoundingClientRect();
+    const cx = lastDragClientX - paneRect.left;
+    const cy = lastDragClientY - paneRect.top;
+    let panDx = 0, panDy = 0;
+    if (cx < AUTOPAN_EDGE) {
+      panDx = AUTOPAN_MAX * (1 - Math.max(0, cx) / AUTOPAN_EDGE);
+    } else if (cx > paneRect.width - AUTOPAN_EDGE) {
+      panDx = -AUTOPAN_MAX * (1 - Math.max(0, paneRect.width - cx) / AUTOPAN_EDGE);
+    }
+    if (cy < AUTOPAN_EDGE) {
+      panDy = AUTOPAN_MAX * (1 - Math.max(0, cy) / AUTOPAN_EDGE);
+    } else if (cy > paneRect.height - AUTOPAN_EDGE) {
+      panDy = -AUTOPAN_MAX * (1 - Math.max(0, paneRect.height - cy) / AUTOPAN_EDGE);
+    }
+    if (panDx !== 0 || panDy !== 0) {
+      viewport.tx += panDx;
+      viewport.ty += panDy;
+      applyViewport();
+      // Shift drag.startX/Y by the pan amount so the existing drag math
+      // continues to place the node under the (now-shifted-in-content-space)
+      // cursor. Then re-run the node move with the adjusted start.
+      drag.startX -= panDx;
+      drag.startY -= panDy;
+      const ddx = lastDragClientX - drag.startX;
+      const ddy = lastDragClientY - drag.startY;
+      const svgDx = ddx * drag.scale;
+      const svgDy = ddy * drag.scale;
+      for (const m of drag.members) {
+        const nx = m.originX + svgDx;
+        const ny = m.originY + svgDy;
+        m.nodeEl.setAttribute('transform', `translate(${nx}, ${ny})`);
+        recomputeEdgesTouching(m.id, opts.previewPane);
+        recomputeLinesTouching(m.id, opts.previewPane);
+      }
+      refreshSelectionUI();
+    }
+    if (drag) autopanRaf = requestAnimationFrame(autopanTick);
+  }
+  function stopAutopan(): void {
+    if (autopanRaf !== null) {
+      cancelAnimationFrame(autopanRaf);
+      autopanRaf = null;
+    }
+  }
   function setZoom(next: number, anchor?: { x: number; y: number }): void {
     const clamped = Math.max(0.2, Math.min(4, next));
     if (anchor) {
@@ -630,7 +689,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
         lineDraft = null;
         didReset = true;
       }
-      if (drag)             { drag = null;             didReset = true; }
+      if (drag)             { drag = null; stopAutopan(); didReset = true; }
       if (lineHandleDrag)   { lineHandleDrag = null;   didReset = true; }
       if (lineBodyDrag)     { lineBodyDrag = null;     didReset = true; }
       if (pan)              {
@@ -1400,6 +1459,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     }
 
     if (!drag) return;
+    // Update last-known cursor pos for autopan + ensure the loop is running.
+    // autopanTick handles edge-detection; we just need to keep it ticking.
+    lastDragClientX = e.clientX;
+    lastDragClientY = e.clientY;
+    if (autopanRaf === null) autopanRaf = requestAnimationFrame(autopanTick);
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
@@ -1456,6 +1520,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       edgeDraft = null;
       lineDraft = null;
       drag = null;
+      stopAutopan();
       lineHandleDrag = null;
       lineBodyDrag = null;
       pan = null;
@@ -1635,6 +1700,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     const wasDrag = drag.moved;
     const movers = drag.members;
     drag = null;
+    stopAutopan();
     opts.previewPane.classList.remove('mb-dragging');
     guideLayer.hide();
     if (!wasDrag) return;
