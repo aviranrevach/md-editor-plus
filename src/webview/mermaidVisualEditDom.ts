@@ -1952,37 +1952,23 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   }
 
   // ── Cleanup + rebind ────────────────────────────────────────────────────
-  // Initial layout deferred until the mermaid SVG is actually painted
-  // (not just present in the DOM as a spinner). Two races are guarded:
-  //   1. The .mb-visual-active class must have applied to layout before
-  //      fitSvgViewBoxToNodes reads getBoundingClientRect — solved by
-  //      using requestAnimationFrame.
-  //   2. Mermaid's render is async; if rAF fires before render completes,
-  //      fitSvgViewBoxToNodes finds no g.node elements and returns
-  //      without expanding the viewBox, but the lock attribute getting
-  //      set anyway would cause applyPositionsOverlay's own fit call
-  //      (which would do the right thing) to be skipped on the next
-  //      render. We poll up to 5 frames waiting for the SVG's first
-  //      g.node to appear before setting the lock. If the diagram never
-  //      renders, the lock stays disengaged and applyPositionsOverlay
-  //      keeps re-fitting on each render — degraded but functional.
+  // Initial layout deferred one animation frame so the .mb-visual-active
+  // class added at the top of createVisualEditor has applied to layout —
+  // otherwise preview.getBoundingClientRect() inside fitSvgViewBoxToNodes
+  // returns stale (often zero) dimensions and the captured lockedViewBox
+  // is wrong forever. A `destroyed` flag guards against a torn-down block
+  // (rapid Esc within ~16ms).
   let destroyed = false;
   let lockedViewBox: string | null = null;
-  function tryInitialLayout(retries: number): void {
+  requestAnimationFrame(() => {
     if (destroyed) return;
-    const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
-    const ready = initialSvg !== null && initialSvg.querySelector('g.node') !== null;
-    if (!ready) {
-      if (retries > 0) requestAnimationFrame(() => tryInitialLayout(retries - 1));
-      return;
-    }
     fitSvgViewBoxToNodes(opts.previewPane);
     installDotGrid(opts.previewPane);
-    lockedViewBox = initialSvg.getAttribute('viewBox');
+    const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+    if (initialSvg) lockedViewBox = initialSvg.getAttribute('viewBox');
     opts.block.dataset.mbViewportLocked = 'true';
     toolbar.setViewportLocked(true);
-  }
-  requestAnimationFrame(() => tryInitialLayout(5));
+  });
 
   function restoreLockedViewBox(): void {
     if (!viewportLocked || !lockedViewBox) return;
