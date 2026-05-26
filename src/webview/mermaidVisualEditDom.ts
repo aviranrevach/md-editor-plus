@@ -148,9 +148,6 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     host.style.transformOrigin = '0 0';
     host.style.transform = `translate(${viewport.tx}px, ${viewport.ty}px) scale(${viewport.scale})`;
     zoomReadout?.update(viewport.scale);
-    // Re-pick the dot grid spacing so dots stay at a comfortable on-screen
-    // density (~14 px) regardless of zoom — snaps to powers of 2.
-    updateDotGrid(opts.previewPane, viewport.scale * naturalSvgScale(opts.previewPane));
     // Selection overlays use getBoundingClientRect which already accounts for
     // CSS transforms, so they follow automatically — just refresh.
     refreshSelectionUI();
@@ -1956,7 +1953,6 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // free canvas around the diagram for dropping new nodes. This runs BEFORE
   // the viewport gets locked, so the SVG has time to size itself once.
   fitSvgViewBoxToNodes(opts.previewPane);
-  installDotGrid(opts.previewPane);
   // Capture the viewBox we just settled on — this is what "locked" means.
   // Every subsequent mermaid re-render will get its viewBox stamped back to
   // this value, so structural mutations (adding nodes/edges/stickies) don't
@@ -1988,8 +1984,6 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       // auto-layout doesn't drift the canvas. When unlocked: re-fit.
       if (viewportLocked) restoreLockedViewBox();
       else                fitSvgViewBoxToNodes(opts.previewPane);
-      // Re-inject the dot grid; mermaid wiped the SVG and rebuilt it.
-      installDotGrid(opts.previewPane);
       const ast = parseMermaid(opts.getSource());
       toolbar.setResetEnabled(getPositions(ast) !== null);
       // Drop any selectedIds that no longer have a node in the SVG.
