@@ -3212,6 +3212,12 @@ html.theme-dark .ProseMirror .mb-visual-active .mb-preview {
   height: 100%;
   max-width: 100%;
   display: block;
+  /* Let SVG content extend past the viewBox bounds during drag — the
+     viewBox auto-fits on render (after release) but during the drag
+     itself the node is at its new position and would otherwise clip at
+     the SVG's CSS box edge. .mb still has overflow:hidden so content
+     never extends past the frame into surrounding markdown. */
+  overflow: visible;
 }
 
 /* Hide helper, reused across overlays. */
