@@ -209,17 +209,17 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     onToggleViewportLock: () => {
       viewportLocked = !viewportLocked;
       toolbar.setViewportLocked(viewportLocked);
-      opts.block.dataset.mbViewportLocked = viewportLocked ? 'true' : 'false';
       if (!viewportLocked) {
         // Unlocking: immediate fit so the diagram recenters now and
         // subsequent rerenders re-fit too.
+        commitLockedViewBox(null);
         fitSvgViewBoxToNodes(opts.previewPane);
       } else {
         // Re-locking: snapshot the current viewBox so future rerenders
         // restore THIS view (the user may have panned/zoomed since the
         // initial lock).
         const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
-        if (svg) lockedViewBox = svg.getAttribute('viewBox');
+        if (svg) commitLockedViewBox(svg.getAttribute('viewBox'));
       }
     },
   });
@@ -1967,10 +1967,25 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   // canvas." Instead, onMermaidRerender below captures the lock on the
   // first re-render that has a real SVG with nodes.
   let lockedViewBox: string | null = null;
+  // Helper that keeps the lockedViewBox closure variable AND the data
+  // attribute on the block in sync. The data attribute is what
+  // applyPositionsOverlay reads to stamp the viewBox synchronously when
+  // a fresh SVG arrives from mermaid — without it, there's a one-frame
+  // window where the browser paints the tight auto-layout viewBox before
+  // onMermaidRerender's rAF callback can restore the locked one.
+  function commitLockedViewBox(vb: string | null): void {
+    lockedViewBox = vb;
+    if (vb) {
+      opts.block.dataset.mbViewportLocked = 'true';
+      opts.block.dataset.mbLockedViewbox = vb;
+    } else {
+      delete opts.block.dataset.mbViewportLocked;
+      delete opts.block.dataset.mbLockedViewbox;
+    }
+  }
   const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
   if (initialSvg && initialSvg.querySelector('g.node')) {
-    lockedViewBox = initialSvg.getAttribute('viewBox');
-    opts.block.dataset.mbViewportLocked = 'true';
+    commitLockedViewBox(initialSvg.getAttribute('viewBox'));
   }
   toolbar.setViewportLocked(true);
 
@@ -2004,8 +2019,7 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
         if (viewportLocked && !lockedViewBox) {
           const svg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
           if (svg && svg.querySelector('g.node')) {
-            lockedViewBox = svg.getAttribute('viewBox');
-            opts.block.dataset.mbViewportLocked = 'true';
+            commitLockedViewBox(svg.getAttribute('viewBox'));
           }
         }
       }
@@ -3798,10 +3812,26 @@ export function applyPositionsOverlay(ast: Ast, host: HTMLElement): void {
 
   // 3) Expand SVG viewBox to enclose every (possibly-moved) node. Mermaid's
   // auto-layout sets a tight viewBox; if a user drags a node outside it,
-  // the node renders off-screen unless we widen. Skipped when the visual
-  // editor has the viewport locked — small edits shouldn't pan/zoom.
+  // the node renders off-screen unless we widen.
+  // When the visual editor has the viewport locked, we instead stamp the
+  // captured viewBox directly onto the freshly mounted SVG — this prevents
+  // a one-frame flicker where the user briefly sees mermaid's tight
+  // auto-layout viewBox before onMermaidRerender's rAF restores ours.
   const lockedBlock = host.closest<HTMLElement>('[data-mb-viewport-locked="true"]');
-  if (!lockedBlock) fitSvgViewBoxToNodes(host);
+  if (lockedBlock) {
+    const stashedVb = lockedBlock.dataset.mbLockedViewbox;
+    if (stashedVb) {
+      const svg = host.querySelector<SVGSVGElement>('.mb-svg-host svg');
+      if (svg) {
+        svg.setAttribute('viewBox', stashedVb);
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        svg.style.width  = '100%';
+        svg.style.height = '100%';
+      }
+    }
+  } else {
+    fitSvgViewBoxToNodes(host);
+  }
 
   // 4) Recompute edges. We do this for ALL edges, not just ones touching a
   // pinned node — keeps the pipeline simple and avoids partial weirdness.
