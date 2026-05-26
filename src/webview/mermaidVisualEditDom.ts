@@ -249,11 +249,13 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
     applyViewport();
   }
 
-  // Viewport lock: when true (the default), `fitSvgViewBoxToNodes` is
-  // suppressed so style/resize/structural mutations don't slide the canvas
-  // around. Users can unlock via the toolbar if they want the viewport to
-  // recenter automatically.
-  let viewportLocked = true;
+  // Viewport lock: when true, `fitSvgViewBoxToNodes` is suppressed so
+  // style/resize/structural mutations don't slide the canvas around.
+  // Default is FALSE — the viewBox auto-fits on every render so dragging
+  // a node toward the edge expands the canvas instead of clipping. Users
+  // can engage the lock from the toolbar after arranging things if they
+  // want to freeze the view.
+  let viewportLocked = false;
 
   const toolbar = buildToolbar({
     onPick: (tool) => setTool(tool),
@@ -2053,11 +2055,11 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       delete opts.block.dataset.mbLockedViewbox;
     }
   }
-  const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
-  if (initialSvg && initialSvg.querySelector('g.node')) {
-    commitLockedViewBox(initialSvg.getAttribute('viewBox'));
-  }
-  toolbar.setViewportLocked(true);
+  // Default: unlocked. applyPositionsOverlay re-fits the viewBox on every
+  // render so dragging a node past the current edge expands the canvas
+  // instead of clipping. The user can engage the lock from the toolbar
+  // after arranging things.
+  toolbar.setViewportLocked(false);
 
   function restoreLockedViewBox(): void {
     if (!viewportLocked || !lockedViewBox) return;
