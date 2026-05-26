@@ -1952,23 +1952,20 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
   }
 
   // ── Cleanup + rebind ────────────────────────────────────────────────────
-  // Initial layout deferred one animation frame so the .mb-visual-active
-  // class added at the top of createVisualEditor has applied to layout —
-  // otherwise preview.getBoundingClientRect() inside fitSvgViewBoxToNodes
-  // returns stale (often zero) dimensions and the captured lockedViewBox
-  // is wrong forever. A `destroyed` flag guards against a torn-down block
-  // (rapid Esc within ~16ms).
-  let destroyed = false;
+  // Initial layout: expand the SVG to fill the preview pane so users have
+  // free canvas around the diagram for dropping new nodes. This runs BEFORE
+  // the viewport gets locked, so the SVG has time to size itself once.
+  fitSvgViewBoxToNodes(opts.previewPane);
+  installDotGrid(opts.previewPane);
+  // Capture the viewBox we just settled on — this is what "locked" means.
+  // Every subsequent mermaid re-render will get its viewBox stamped back to
+  // this value, so structural mutations (adding nodes/edges/stickies) don't
+  // cause mermaid's auto-layout to zoom or pan the canvas.
   let lockedViewBox: string | null = null;
-  requestAnimationFrame(() => {
-    if (destroyed) return;
-    fitSvgViewBoxToNodes(opts.previewPane);
-    installDotGrid(opts.previewPane);
-    const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
-    if (initialSvg) lockedViewBox = initialSvg.getAttribute('viewBox');
-    opts.block.dataset.mbViewportLocked = 'true';
-    toolbar.setViewportLocked(true);
-  });
+  const initialSvg = opts.previewPane.querySelector<SVGSVGElement>('.mb-svg-host svg');
+  if (initialSvg) lockedViewBox = initialSvg.getAttribute('viewBox');
+  opts.block.dataset.mbViewportLocked = 'true';
+  toolbar.setViewportLocked(true);
 
   function restoreLockedViewBox(): void {
     if (!viewportLocked || !lockedViewBox) return;
@@ -2076,7 +2073,6 @@ export function createVisualEditor(opts: VisualEditorOptions): VisualEditorHandl
       }
     },
     destroy(): void {
-      destroyed = true;
       opts.block.classList.remove('mb-visual-active');
       delete opts.block.dataset.mbViewportLocked;
       // Strip the dot grid so the static preview doesn't keep it.
