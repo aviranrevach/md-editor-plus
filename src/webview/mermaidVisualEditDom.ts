@@ -5149,21 +5149,6 @@ function fitSvgViewBoxToNodes(host: HTMLElement): void {
         x = cx - newW / 2;
         w = newW;
       }
-      // Inflate the viewBox by a generous factor beyond the aspect-ratio
-      // fit so the user has drag room around the content. With the lock
-      // captured at this inflated size, nodes can be dragged well outside
-      // the initial content bounds without hitting the SVG's clip edge
-      // — the "frame" (the .mb element) stays the same size; only the
-      // diagram-relative empty space grows. Empirically 3× content size
-      // gives plenty of breathing room without making the initial render
-      // look tiny against the pane backdrop.
-      const VISUAL_CANVAS_INFLATE = 3;
-      const cxFinal = x + w / 2;
-      const cyFinal = y + h / 2;
-      w *= VISUAL_CANVAS_INFLATE;
-      h *= VISUAL_CANVAS_INFLATE;
-      x = cxFinal - w / 2;
-      y = cyFinal - h / 2;
     }
   }
 
