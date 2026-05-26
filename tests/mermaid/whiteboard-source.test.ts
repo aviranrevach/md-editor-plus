@@ -24,13 +24,9 @@ describe('freshWhiteboardSource', () => {
     expect(edges.map((e) => `${e.from}->${e.to}`)).toEqual(['A->B', 'B->C']);
   });
 
-  it('pins positions for A/B/C at the documented coordinates', () => {
+  it('does NOT pre-pin positions — lets mermaid auto-layout the diagram', () => {
     const ast = parseMermaid(freshWhiteboardSource());
-    expect(getPositions(ast)).toEqual({
-      A: [200, 200],
-      B: [340, 200],
-      C: [480, 200],
-    });
+    expect(getPositions(ast)).toBeNull();
   });
 
   it('canEdit returns true (visual editor accepts the starter)', () => {

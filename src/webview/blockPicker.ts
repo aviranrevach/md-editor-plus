@@ -605,7 +605,6 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 export function freshWhiteboardSource(): string {
   return [
     'flowchart LR',
-    '    %% mb-positions: {"A":[200,200],"B":[340,200],"C":[480,200]}',
     '    A[Idea]',
     '    B[Next]',
     '    C[Done]',
