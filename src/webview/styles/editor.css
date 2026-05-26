@@ -3171,6 +3171,21 @@ html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
 .ProseMirror .mb-preview { position: relative; }
 .ProseMirror .mb.mb-visual { outline: 2px solid var(--link); outline-offset: -2px; }
 
+/* In visual-edit mode, let SVG content extend past the block's bounds so
+   the user can drag nodes anywhere without hitting a clip wall. The frame
+   (.mb's outline) keeps its same size and position; only the items move.
+   Trade-off: content extending past the frame can overlap surrounding
+   markdown — accepted in exchange for unblocked dragging. */
+.ProseMirror .mb.mb-visual,
+.ProseMirror .mb.mb-visual-active {
+  overflow: visible;
+}
+.ProseMirror .mb.mb-visual .mb-preview,
+.ProseMirror .mb.mb-visual-active .mb-preview,
+.ProseMirror .mb-visual-active .mb-preview {
+  overflow: visible;
+}
+
 /* Visual-edit canvas: give the preview pane a fixed, generous height so the
    SVG can stretch to fill it and users have empty space around the diagram
    for dropping new nodes / drawing edges. Match either selector — the block
@@ -3208,6 +3223,7 @@ html.theme-dark .ProseMirror .mb-visual-active .mb-preview {
   height: 100%;
   max-width: 100%;
   display: block;
+  overflow: visible;
 }
 
 /* Hide helper, reused across overlays. */
