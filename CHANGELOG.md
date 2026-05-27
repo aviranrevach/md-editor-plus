@@ -4,6 +4,24 @@ All notable changes to **MD Editor Plus** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-27
+
+### Added
+
+- **Whiteboard slash-menu entry** — type `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart` / `/graph` / `/canvas`) to drop a freeform mermaid canvas onto the page with three starter nodes (Idea → Next → Done). Lives in **Media & blocks** with a Phosphor chalkboard icon. The visual-edit palette opens automatically on insert so you can drag, connect, and style immediately — no manual `/code` + language flip needed.
+
+### Changed
+
+- **Light-theme node fills** — diagram node fills bump from `#eef2ff` (Tailwind indigo-50) to `#dbeafe` (blue-100). Better contrast against the visual-edit backdrop and white previews; still well above WCAG AAA for text contrast. Applies to every mermaid block in light mode, not just whiteboard.
+- **Dot-grid pattern removed** from visual-edit mode — the bounded dotted region was reading as a hard canvas boundary. The pane is now a clean tinted backdrop.
+- **Visual-edit canvas behavior** — the viewport lock now defaults to OFF, so the SVG viewBox auto-grows as you drag nodes outward; the frame stays the same physical size. Inner SVG uses `overflow: visible` so dragged content extends to the frame edge during drag (clipped by the `.mb` frame so it never overlaps surrounding markdown). Pane height bumped to `70vh` in visual mode for substantially more drag room.
+- **Zoom step halved** (0.10 → 0.05) for in/out controls and Cmd+/`-`; wheel-zoom caps per-event delta so trackpad pinches and wheel mice both feel proportional instead of jumping.
+
+### Fixed
+
+- **Visual-edit first-paint canvas race** — `createVisualEditor` no longer engages the lock before the SVG has rendered. The lock is captured lazily on the first re-render that has real content. Eliminates the "canvas inside a canvas" frame users hit on whiteboard insert.
+- **Mermaid `style.maxWidth` override** — mermaid sets an inline `style="max-width: <natural>px"` on every render that was clamping the SVG to its natural-content width after every drag. The visual-edit fit and viewBox stamp now reset `style.maxWidth = '100%'` alongside width/height.
+
 ## [0.2.0] - 2026-05-10
 
 ### Added
