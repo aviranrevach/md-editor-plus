@@ -34,6 +34,8 @@ HTML, no schema changes.
 | | ≥ 900 px | < 900 px | < 640 px |
 |---|---|---|---|
 | Preview / Code labels | shown | **hidden** (icon-only) | hidden |
+| Preview / Code buttons | both icons shown | both icons shown | **only the inactive icon shown** (single-tap switch) |
+| Segmented pill background | shown | shown | **dropped** (looks like a single icon button) |
 | Filename `max-width` | `50vw` | `30vw` | `30vw` |
 | Outline panel        | toggleable | toggleable | **hidden** |
 | Outline button       | shown | shown | **hidden** |
@@ -47,6 +49,11 @@ HTML, no schema changes.
 - **640 px (very narrow):** the 240 px outline would leave under 400
   px for editor content — text becomes unreadable. Auto-collapse +
   hide the button. The labels are already gone from the 900 px tier.
+  The segmented Preview/Code pair also collapses to a single-icon
+  switch: only the inactive view's icon is shown, and clicking it
+  switches to that view (same pattern as a dark-mode toggle that
+  shows the sun if you're currently in dark mode). Icons naturally
+  swap on every toggle; no extra JS or HTML needed.
 
 ### Why CSS-only
 
@@ -74,10 +81,28 @@ The CSS lives next to the existing toolbar block at the top of
 }
 
 @media (max-width: 640px) {
+  /* Outline panel + its toolbar button: hide entirely. Editor reclaims
+     the 240px gutter the open-outline CSS reserved. */
   .outline-panel { display: none !important; }
   html.outline-visible #editor,
   html.outline-visible #source-view { padding-left: 0; }
   #toolbar #outline-btn { display: none; }
+
+  /* Preview/Code collapse to a single-icon switch: hide the active
+     button so only the inactive view's icon remains. Clicking it
+     switches to that view (the existing click handler on each .seg-btn
+     already does this). The pair effectively becomes a "tap to switch"
+     toggle that shows the OTHER view's icon, like a dark-mode toggle.
+     Drop the segmented pill background so it reads as a plain icon
+     button, not half of a pill. */
+  #toolbar #view-seg .seg-btn.active { display: none; }
+  #toolbar #view-seg,
+  #toolbar.cursor-near #view-seg,
+  #toolbar:focus-within #view-seg,
+  #toolbar.panel-open #view-seg {
+    background: transparent;
+    padding: 0;
+  }
 }
 ```
 
@@ -128,7 +153,11 @@ the only meaningful test.
 3. **Narrow to 640 px.** Drag further until under 640 px. Outline
    button vanishes from the toolbar. If the outline panel was open,
    it disappears AND the editor reclaims that 240 px gutter
-   (content shifts left to fill).
+   (content shifts left to fill). The Preview/Code segmented pair
+   collapses to a single icon — the one for the view you're NOT
+   currently in. Clicking it switches view; the icon updates to the
+   other view automatically. The segmented pill background drops so
+   it reads as a plain icon button.
 4. **Resize back up.** Drag the split back wide. Labels return at
    900 px. Outline returns at 640 px in its previous state.
 5. **Outline state preservation.** Open outline at wide width →
