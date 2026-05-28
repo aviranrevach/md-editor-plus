@@ -111,6 +111,37 @@ body {
   .toolbar-filename { max-width: 30vw; }
 }
 
+/* Tier 2 (≤ 640px): also auto-collapse the outline (its 240px gutter
+   would leave < 400px for content), and collapse the segmented
+   Preview/Code pair to a single-icon "tap to switch" — only the
+   inactive view's icon shows. */
+@media (max-width: 640px) {
+  /* Outline panel + button. `!important` so the media query wins when
+     the panel is in its open state (no .hidden class on it). */
+  .outline-panel { display: none !important; }
+  html.outline-visible #editor,
+  html.outline-visible #source-view { padding-left: 0; }
+  #toolbar #outline-btn { display: none; }
+
+  /* Preview/Code collapse to a single icon. Hide the active button so
+     only the OTHER view's icon stays visible. The remaining button's
+     existing click handler already switches to its own view, so the
+     visible icon naturally represents the action — like a dark-mode
+     toggle that shows the sun if you're in dark mode. */
+  #toolbar #view-seg .seg-btn.active { display: none; }
+
+  /* Drop the segmented pill background at this width so the lone icon
+     reads as a plain icon button, not half of a pill. Override the
+     focus / cursor-near / panel-open variants too so it stays flat. */
+  #toolbar #view-seg,
+  #toolbar.cursor-near #view-seg,
+  #toolbar:focus-within #view-seg,
+  #toolbar.panel-open #view-seg {
+    background: transparent;
+    padding: 0;
+  }
+}
+
 /* Segmented control — macOS style */
 .segmented {
   display: inline-flex;
