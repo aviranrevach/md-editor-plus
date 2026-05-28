@@ -35,6 +35,8 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 - **Code blocks** — syntax highlighting for \~50 languages, line-number gutter, drag lines to reorder, copy button, optional auto-collapse for long snippets
 - **Callouts** — GFM `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]` with colored backgrounds and icons
 - **Toggles** — collapsible `<details>` sections
+- **Boards** — `/board kanban` or `/board table` for project/task views with columns, cards, properties, drag-to-reorder, inline editing, hideable fields. Stored as a fenced HTML comment block so the file stays plain Markdown.
+- **Mermaid diagrams** — `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart` / `/graph` / `/canvas`) drops a freeform mermaid canvas with a starter `flowchart LR` (`Idea → Next → Done`). Visual edit opens automatically: drag nodes, draw arrows, add sticky notes, change shapes, zoom and pan. Persists as a normal `` ```mermaid `` code fence with optional position/style sidecars in mermaid comments. Code view shows raw mermaid source you can hand-edit.
 - **Media & misc** — images, blockquotes, dividers
 
 ### Display settings (Aa panel)
@@ -196,8 +198,8 @@ Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**.
 | Section | Blocks |
 | --- | --- |
 | **Text** | Paragraph, Heading 1, Heading 2, Heading 3 |
-| **Lists** | Bullet list, Numbered list, Task list |
-| **Media** | Image, Callout, Toggle |
+| **Lists** | Bullet list, Numbered list, Task list, Board: Kanban, Board: Table |
+| **Media & blocks** | Image, Callout, Toggle, **Whiteboard** |
 | **Other** | Blockquote, Code block, Divider |
 
 ### Task lists
@@ -229,6 +231,46 @@ GitHub-flavored `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, etc. Render with a colo
 ### Toggles
 
 Collapsible sections that hide their contents until clicked. Useful for FAQs, long answer keys, etc. Round-trip as HTML `<details>` blocks.
+
+### Whiteboard / Mermaid diagrams
+
+Type `/whiteboard` in the block picker (aliases: `/mermaid`, `/diagram`, `/flowchart`, `/graph`, `/canvas`) to drop a freeform mermaid canvas onto the page. Ships with a starter `flowchart LR` (`Idea → Next → Done`) so you can begin dragging immediately — visual edit opens automatically on insert.
+
+**In visual-edit mode** (eye icon in the block chrome, or double-click on the diagram):
+
+- **Drag nodes** anywhere — the canvas auto-grows to include them; the block frame stays the same physical size.
+- **Drag from a node hook (N/E/S/W)** to draw a new edge to another node.
+- **Shape palette** — pick rectangle, pill, circle, diamond, hexagon, cylinder, subroutine, trapezoid, parallelogram.
+- **Sticky notes**, free text, free lines, and arrows — add via the toolbar.
+- **Multi-select** with the marquee or `Shift+click`; align/distribute and bulk-style multiple nodes at once.
+- **Per-edge styling** — solid / dashed / dotted, thickness, color, marching-ants animation (slow / fast, forward / reverse), arrow / circle caps on either end.
+- **Zoom + pan** — `Cmd+wheel` to zoom (clamped to 20–400%), space-drag or the hand tool to pan, `Cmd +/-` from the keyboard, `Cmd+0` resets.
+- **Viewport lock** (lock icon in the toolbar) — engage after arranging things to freeze the view; toggle off to let the canvas auto-fit on every render.
+- **Undo / redo** across all visual-edit mutations.
+
+**Toggle to source** (`</>` icon) to see and edit the raw mermaid syntax. Pinned positions, per-node styles, free lines, and edge styles persist as mermaid comments (`%% mb-positions:`, `%% mb-styles:`, etc.) so the diagram round-trips losslessly as a normal `` ```mermaid `` code fence in your Markdown file.
+
+```markdown
+​```mermaid
+flowchart LR
+    A[Idea]
+    B[Next]
+    C[Done]
+    A --> B
+    B --> C
+​```
+```
+
+**Click the expand icon** (top-right of the block) for a fullscreen modal — useful for presenting a complex diagram. **Copy / Download** is available from the `⋯` menu: copy source, copy SVG, download SVG, download PNG.
+
+### Boards (Kanban / Table)
+
+Type `/board kanban` or `/board table` to drop a project board. Two views over the same data:
+
+- **Kanban view** — columns of cards. Drag cards between columns, drag columns to reorder. Add columns from the right edge, add cards from the bottom of any column. Double-click a column header to rename. Per-column color swatch (gray / amber / emerald / blue / etc.).
+- **Table view** — a true database table. Sort by column, resize columns, drag to reorder. Show / hide properties from the Properties popover. Inline-edit every cell. The Description column is a synthetic field that maps to the card body text.
+
+**Field types** — `text`, `status`, `date`, `tags`, with type-aware editors. **Locked columns** (gray pill) can be renamed but not moved. Boards round-trip as an HTML comment block + a fenced Markdown table, so the file stays plain text and works with any other Markdown tool.
 
 ### Drag handle
 

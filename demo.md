@@ -258,6 +258,37 @@ ToggleToggleCan I use this on .mdx files?Yes — .mdx is registered as a support
 </details>
 \\---
 
+## Whiteboard / Mermaid diagrams
+
+Type `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart`) to drop a freeform mermaid canvas. The visual-edit palette opens on insert — drag nodes, draw arrows, change shapes, add sticky notes. Round-trips as a plain `` ```mermaid `` code fence.
+
+```mermaid
+flowchart LR
+    A[Idea]
+    B[Next]
+    C[Done]
+    A --> B
+    B --> C
+```
+
+\\---
+
+## Boards (Kanban / Table)
+
+Type `/board kanban` or `/board table` for a project board. Two views over the same data, both round-tripping as an HTML comment block + Markdown table.
+
+<!-- board:start id="b-demo" name="Sprint" columns="Todo|Doing|Done" column-colors="gray|amber|emerald" field-types="Title=text,Status=status,id=text" hidden-fields="id" -->
+
+| Title              | Status | id |
+|--------------------|--------|----|
+| Draft release notes | Todo  | c1 |
+| Polish visual edit  | Doing | c2 |
+| Ship 0.5.0          | Done  | c3 |
+
+<!-- board:end -->
+
+\\---
+
 ## Horizontal rules
 
 The line below is a horizontal rule.
