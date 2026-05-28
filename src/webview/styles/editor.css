@@ -144,11 +144,12 @@ body {
     padding: 0;
   }
 
-  /* Logo: a touch smaller so the rest of the row fits more comfortably,
-     plus extra right-margin (2px → 8px) so it isn't cramped against the
-     view-toggle icon now that the segmented pill background is gone. */
+  /* Logo: a touch smaller so the rest of the row fits more comfortably.
+     Add a left margin so it doesn't sit flush against the toolbar edge,
+     and trim the right margin so it's not cramped *or* over-spaced. */
   .toolbar-logo {
-    margin-right: 8px;
+    margin-left: 6px;
+    margin-right: 2px;
   }
   .toolbar-logo svg { height: 26px; }
 
