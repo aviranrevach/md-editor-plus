@@ -117,10 +117,13 @@ body {
    inactive view's icon shows. */
 @media (max-width: 640px) {
   /* Outline panel + button. `!important` so the media query wins when
-     the panel is in its open state (no .hidden class on it). */
+     the panel is in its open state (no .hidden class on it). Reset
+     padding-left on the editor / source view AND the conflict banner
+     so neither leaves a 240px gap where the outline used to be. */
   .outline-panel { display: none !important; }
   html.outline-visible #editor,
   html.outline-visible #source-view { padding-left: 0; }
+  html.outline-visible .conflict-banner { left: 0; }
   #toolbar #outline-btn { display: none; }
 
   /* Preview/Code collapse to a single icon. Hide the active button so
