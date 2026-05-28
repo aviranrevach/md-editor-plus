@@ -144,7 +144,12 @@ body {
     padding: 0;
   }
 
-  /* Logo: a touch smaller so the rest of the row fits more comfortably. */
+  /* Logo: a touch smaller so the rest of the row fits more comfortably,
+     plus extra right-margin (2px → 8px) so it isn't cramped against the
+     view-toggle icon now that the segmented pill background is gone. */
+  .toolbar-logo {
+    margin-right: 8px;
+  }
   .toolbar-logo svg { height: 26px; }
 
   /* Filename: switch from absolute-centered to flow-positioned so it
