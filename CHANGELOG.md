@@ -4,6 +4,19 @@ All notable changes to **MD Editor Plus** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-28
+
+### Added
+
+- **Responsive header/chrome** — two media-query tiers keep the toolbar usable at narrow editor widths:
+  - **≤ 900px:** Preview/Code labels drop to icons-only inside the segmented pill; filename `max-width` tightens (50vw → 30vw) so it stops colliding with the right-side reload / Aa / ⋯ trio.
+  - **≤ 640px:** outline panel + its toolbar button auto-collapse (the 240px gutter would otherwise leave < 400px for content); the Preview/Code segmented pair collapses to a single "tap to switch" icon (only the *inactive* view's icon shows — like a dark-mode toggle that shows the sun when you're in dark mode); segmented pill background drops so the lone icon reads as a plain icon button; filename left-aligns (was absolute-centered) and the logo shrinks; dedicated refresh button hides and gains a **Reload from disk** entry in the ⋯ menu so the action stays reachable.
+- **`.conflict-banner` reset at ≤ 640px** — when the outline auto-collapses, the banner's `left: 240px` offset is reset to `0` so it doesn't leave a visible gap on the left.
+
+### Changed
+
+- **Logo margins at ≤ 640px** — small left margin added so the logo doesn't sit flush against the toolbar edge; right margin trimmed so it isn't over-spaced against the view-toggle icon.
+
 ## [0.5.0] - 2026-05-27
 
 ### Added
