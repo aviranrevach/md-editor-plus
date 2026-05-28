@@ -97,6 +97,20 @@ body {
   box-shadow: var(--seg-active-shadow);
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   Header / chrome responsiveness — see
+   docs/superpowers/specs/2026-05-28-header-responsiveness-design.md.
+   Tier 1 (≤ 900px): drop the Preview/Code text labels and tighten the
+   filename's max-width so neither runs into the right-side chrome.
+   ──────────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  /* Icon-only Preview/Code — same as the in-block mermaid view toggle. */
+  #toolbar #view-seg .seg-btn .seg-label { display: none; }
+
+  /* 50vw → 30vw — leaves room for the right-side reload / Aa / ⋯ trio. */
+  .toolbar-filename { max-width: 30vw; }
+}
+
 /* Segmented control — macOS style */
 .segmented {
   display: inline-flex;
