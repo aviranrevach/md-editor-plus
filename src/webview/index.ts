@@ -616,6 +616,10 @@ function init(): void {
       if (el === exportTrigger) return;
       el.addEventListener('mouseenter', scheduleSubmenuClose);
     });
+    panel.querySelector<HTMLElement>('.act-refresh')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'refresh' });
+      closeAllActionsPanels();
+    });
     panel.querySelector<HTMLElement>('.act-copy')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'copyContent' });
       closeAllActionsPanels();

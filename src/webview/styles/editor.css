@@ -143,6 +143,22 @@ body {
     background: transparent;
     padding: 0;
   }
+
+  /* Logo: a touch smaller so the rest of the row fits more comfortably. */
+  .toolbar-logo svg { height: 26px; }
+
+  /* Filename: switch from absolute-centered to flow-positioned so it
+     sits flush-left after the view-toggle, then tighten max-width so
+     the right-side buttons stay visible. */
+  .toolbar-filename {
+    position: static;
+    transform: none;
+    max-width: 40vw;
+  }
+
+  /* Hide the dedicated refresh button — the same action is in the
+     three-dots menu (actions-panel-dots). */
+  #toolbar #refresh-btn { display: none; }
 }
 
 /* Segmented control — macOS style */

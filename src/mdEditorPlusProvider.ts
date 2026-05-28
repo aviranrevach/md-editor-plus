@@ -520,6 +520,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   </div>
   <div class="actions-panel hidden" id="actions-panel-dots" data-anchor="dots">
     <button class="settings-action act-toggle-readonly" id="act-toggle-readonly" data-tip="Toggle read-only mode — when on, typing and structural edits are blocked">${iLock}<span class="settings-action-label">Read only</span></button>
+    <button class="settings-action act-refresh" data-tip="Reload the file from disk — discards unsaved in-editor changes">${iRefresh}<span class="settings-action-label">Reload from disk</span></button>
     <button class="settings-action act-copy" data-tip="Copy the entire markdown to clipboard">${iCopy}<span class="settings-action-label">Copy page content</span></button>
     <button class="settings-action act-copy-path" data-tip="Copy the absolute file path to clipboard">${iLink}<span class="settings-action-label">Copy file path</span></button>
     <button class="settings-action act-duplicate" data-tip="Save a copy of this file in the same folder">${iDuplicate}<span class="settings-action-label">Duplicate</span></button>
