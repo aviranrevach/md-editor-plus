@@ -4,6 +4,16 @@ All notable changes to **MD Editor Plus** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-05-31
+
+### Fixed
+
+- **Critical: board card data lost on file reopen** — boards in markdown files round-tripped through the editor were silently losing every card on the second open. Root cause: `preprocessMarkdownBoards` wrapped the board region in `<div data-board source="...">` without escaping newlines inside the attribute. markdown-it (used by tiptap-markdown) saw the multi-line attribute, terminated the HTML block at the blank line inside it, parsed the markdown table as a sibling, and the browser then dropped the entire malformed `<div>` from the DOM. With no `<div data-board>` in the DOM, TipTap had nothing to attach the source to, the board rendered empty, and the next autosave overwrote the file with the empty state. Fixed by escaping `\n` → `&#10;` in `htmlEscape` so the source attribute is single-line — markdown-it now sees a complete `<div>` and the browser parses it cleanly. `getAttribute('source')` decodes `&#10;` back to `\n`, so `parseBoardSource` sees the same string it always did.
+
+### Added
+
+- **End-to-end pipeline regression test** ([tests/board/pipeline.test.ts](tests/board/pipeline.test.ts)) — runs the full chain `preprocess → markdown-it → DOMParser → parseBoardSource` and asserts every card survives. Covers single board, multi-word column names ("Up Next", "In Progress"), two boards in one file, and boards with `board:body` blocks attached. Locks the fix in.
+
 ## [0.5.1] - 2026-05-28
 
 ### Added

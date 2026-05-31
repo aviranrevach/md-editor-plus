@@ -5,11 +5,17 @@ const REGION_RE =
   /<!--\s*board:start[\s\S]*?<!--\s*board:end\s*-->/gi;
 
 function htmlEscape(s: string): string {
+  // Newlines MUST be escaped as &#10; — otherwise the multi-line source attribute
+  // breaks markdown-it's HTML block detection (a blank line inside the attribute
+  // terminates the HTML block, the table is parsed as markdown, the <div> ends
+  // up malformed, and Chromium drops the whole element. getAttribute() decodes
+  // &#10; back to \n so parseBoardSource sees the same string it always did.
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, '&#10;');
 }
 
 export function preprocessMarkdownBoards(markdown: string): string {
