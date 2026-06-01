@@ -293,12 +293,14 @@ export function createBubbleMenu(editor: Editor): void {
     const nonEmpty = slice.split('\n').filter(l => l.trim().length > 0);
     const startRaw = nonEmpty[0] ?? '';
     const endRaw   = nonEmpty[nonEmpty.length - 1] ?? startRaw;
-    const startText = truncateAnchor(startRaw);
-    const endText   = truncateAnchor(endRaw);
     // Best-effort line numbers from the editor's own markdown (frontmatter
     // excluded; line numbers are a hint — the text anchor is the real locator).
+    // Locate from the RAW lines before truncation, so a long line (whose
+    // display anchor would end in "…") still matches the source.
     const md = editor.storage.markdown.getMarkdown() as string;
-    const { startLine, endLine } = locateAnchors(md, startText, endText);
+    const { startLine, endLine } = locateAnchors(md, startRaw, endRaw);
+    const startText = truncateAnchor(startRaw);
+    const endText   = truncateAnchor(endRaw);
     aiTransformPanel.open({
       target,
       targetLabel: label,
