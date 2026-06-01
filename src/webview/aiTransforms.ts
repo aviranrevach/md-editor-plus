@@ -144,6 +144,6 @@ export function buildPrompt(ctx: AiPromptContext): string {
     buildWhere(ctx),
     buildInstruction(ctx),
     FORMAT_SPECS[ctx.target],
-    `Rules:\n- ${CONTENT_RULE}\n- Edit the file directly; reply with nothing else.`,
+    `Rules:\n- ${CONTENT_RULE}\n- Actually perform the change now: edit \`${ctx.filePath}\` in place and save it. If you cannot edit files, output the complete new block as your entire reply so it can be pasted in. Do NOT reply with only an acknowledgement such as "done", "ok", or "sure" — either make the edit or output the block.`,
   ].join('\n\n');
 }

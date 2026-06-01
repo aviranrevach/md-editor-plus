@@ -45,10 +45,14 @@ describe('buildPrompt — shared parts', () => {
   it('uses add wording for add mode', () => {
     expect(buildPrompt({ ...base, mode: 'add' })).toMatch(/immediately after it, leaving the original/i);
   });
-  it('always carries the content-handling rule and the no-chatter rule', () => {
+  it('carries the content-handling rule and forbids a bare acknowledgement', () => {
     const p = buildPrompt(base);
     expect(p).toMatch(/Never silently drop content/i);
-    expect(p).toMatch(/reply with nothing else/i);
+    // Must instruct the agent to actually do the work, with a paste-back
+    // fallback, and explicitly forbid replying with only "done".
+    expect(p).toMatch(/Actually perform the change/i);
+    expect(p).toMatch(/if you cannot edit files, output the complete/i);
+    expect(p).toMatch(/Do NOT reply with only an acknowledgement/i);
   });
 });
 
