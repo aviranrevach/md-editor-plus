@@ -14,11 +14,11 @@ describe('AI_TRANSFORMS registry', () => {
   it('registers exactly the three phase-1 targets', () => {
     expect(AI_TRANSFORMS.map(t => t.id)).toEqual(['table', 'kanban', 'mermaid']);
   });
-  it('every entry has a label, iconHtml and target', () => {
+  it('every entry has a label, iconHtml and id', () => {
     for (const t of AI_TRANSFORMS) {
       expect(t.label.length).toBeGreaterThan(0);
       expect(t.iconHtml).toContain('<svg');
-      expect(['table', 'kanban', 'mermaid']).toContain(t.target);
+      expect(['table', 'kanban', 'mermaid']).toContain(t.id);
     }
   });
 });

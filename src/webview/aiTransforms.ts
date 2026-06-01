@@ -23,7 +23,6 @@ export interface AiTransform {
   id: AiTarget;
   label: string;
   iconHtml: string;
-  target: AiTarget;
 }
 
 // A simple 4-point sparkle (viewBox 0 0 256 256), fill currentColor.
@@ -35,9 +34,9 @@ const TABLE_ICON =
   '<path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16ZM40 56h64v40H40Zm80 0h96v40h-96ZM40 112h64v40H40Zm0 88v-32h64v32Zm80 0v-32h96v32Zm96-48h-96v-40h96Z"/></svg>';
 
 export const AI_TRANSFORMS: AiTransform[] = [
-  { id: 'table',   label: 'Table',         iconHtml: TABLE_ICON, target: 'table' },
-  { id: 'kanban',  label: 'Kanban board',  iconHtml: SPARKLE,    target: 'kanban' },
-  { id: 'mermaid', label: 'Mermaid diagram', iconHtml: SPARKLE,  target: 'mermaid' },
+  { id: 'table',   label: 'Table',           iconHtml: TABLE_ICON },
+  { id: 'kanban',  label: 'Kanban board',   iconHtml: SPARKLE },
+  { id: 'mermaid', label: 'Mermaid diagram', iconHtml: SPARKLE },
 ];
 
 const TARGET_PHRASE: Record<AiTarget, string> = {
