@@ -4552,7 +4552,7 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 
 /* ── Turn selection into… using AI ───────────────────────────────────── */
 .bubble-ai.hidden { display: none; }
-.bubble-ai { padding: 4px; }
+.bubble-ai { padding: 4px; max-height: 340px; overflow-y: auto; }
 .bm-ai-btn.active { color: var(--link); }
 
 .bm-into-divider {

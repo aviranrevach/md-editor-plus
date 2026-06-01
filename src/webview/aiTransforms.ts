@@ -1,7 +1,16 @@
 // Pure prompt-builder for "Turn selection into… (using AI)".
 // No editor/DOM imports — must stay unit-testable in the node jest env.
 
-export type AiTarget = 'table' | 'kanban' | 'board-table' | 'mermaid';
+export type AiTarget =
+  | 'table'
+  | 'kanban'
+  | 'board-table'
+  | 'mermaid'
+  // Phase 2 — "thinking" targets: plain markdown, no proprietary grammar.
+  | 'summary'
+  | 'action-items'
+  | 'outline'
+  | 'timeline';
 export type AiInsertMode = 'replace' | 'add';
 
 export interface AiPromptContext {
@@ -43,12 +52,43 @@ const BOARD_TABLE_ICON =
   '<rect x="32" y="104" width="192" height="28" rx="6" opacity="0.55"/>' +
   '<rect x="32" y="148" width="192" height="28" rx="6" opacity="0.55"/>' +
   '<rect x="32" y="192" width="192" height="28" rx="6" opacity="0.55"/></svg>';
+// Lines of decreasing width — a summary / prose block.
+const SUMMARY_ICON =
+  '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
+  '<rect x="40" y="72" width="176" height="20" rx="6"/>' +
+  '<rect x="40" y="118" width="176" height="20" rx="6"/>' +
+  '<rect x="40" y="164" width="110" height="20" rx="6"/></svg>';
+// Checkbox rows — an action-item checklist.
+const ACTION_ICON =
+  '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
+  '<rect x="36" y="52" width="56" height="56" rx="12"/><rect x="116" y="68" width="104" height="22" rx="6" opacity="0.55"/>' +
+  '<rect x="36" y="148" width="56" height="56" rx="12" opacity="0.55"/><rect x="116" y="164" width="104" height="22" rx="6" opacity="0.55"/></svg>';
+// Dots + indented lines — a nested outline.
+const OUTLINE_ICON =
+  '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
+  '<circle cx="52" cy="72" r="12"/><rect x="80" y="62" width="136" height="20" rx="6"/>' +
+  '<circle cx="96" cy="128" r="9" opacity="0.7"/><rect x="120" y="119" width="96" height="18" rx="6" opacity="0.7"/>' +
+  '<circle cx="96" cy="184" r="9" opacity="0.7"/><rect x="120" y="175" width="96" height="18" rx="6" opacity="0.7"/></svg>';
+// A spine with dots — a chronological timeline.
+const TIMELINE_ICON =
+  '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
+  '<rect x="58" y="36" width="8" height="184" rx="4" opacity="0.5"/>' +
+  '<circle cx="62" cy="72" r="16"/><circle cx="62" cy="128" r="16"/><circle cx="62" cy="184" r="16"/>' +
+  '<rect x="96" y="62" width="120" height="20" rx="6" opacity="0.55"/>' +
+  '<rect x="96" y="118" width="120" height="20" rx="6" opacity="0.55"/>' +
+  '<rect x="96" y="174" width="120" height="20" rx="6" opacity="0.55"/></svg>';
 
 export const AI_TRANSFORMS: AiTransform[] = [
-  { id: 'table',       label: 'Table',           iconHtml: TABLE_ICON },
-  { id: 'kanban',      label: 'Board: Kanban',   iconHtml: KANBAN_ICON },
-  { id: 'board-table', label: 'Board: Table',    iconHtml: BOARD_TABLE_ICON },
-  { id: 'mermaid',     label: 'Mermaid diagram', iconHtml: SPARKLE },
+  // Phase 1 — structural (proprietary grammar).
+  { id: 'table',        label: 'Table',           iconHtml: TABLE_ICON },
+  { id: 'kanban',       label: 'Board: Kanban',   iconHtml: KANBAN_ICON },
+  { id: 'board-table',  label: 'Board: Table',    iconHtml: BOARD_TABLE_ICON },
+  { id: 'mermaid',      label: 'Mermaid diagram', iconHtml: SPARKLE },
+  // Phase 2 — "thinking" (plain markdown).
+  { id: 'summary',      label: 'Summary',         iconHtml: SUMMARY_ICON },
+  { id: 'action-items', label: 'Action items',    iconHtml: ACTION_ICON },
+  { id: 'outline',      label: 'Outline',         iconHtml: OUTLINE_ICON },
+  { id: 'timeline',     label: 'Timeline',        iconHtml: TIMELINE_ICON },
 ];
 
 const TARGET_PHRASE: Record<AiTarget, string> = {
@@ -56,6 +96,10 @@ const TARGET_PHRASE: Record<AiTarget, string> = {
   kanban:        'a Kanban board',
   'board-table': 'a table-view board (a database-style table)',
   mermaid:       'a Mermaid diagram',
+  summary:       'a concise summary',
+  'action-items':'an action-item checklist',
+  outline:       'a structured outline',
+  timeline:      'a chronological timeline',
 };
 
 const CONTENT_RULE =
@@ -113,11 +157,37 @@ flowchart TB
 
 Pick the diagram type that best fits the content (flowchart, sequenceDiagram, stateDiagram-v2, gantt, etc.).`;
 
+const SUMMARY_SPEC = `Write a concise summary in plain markdown — 3 to 6 bullet points (or a short paragraph if the content is already brief). Capture the key points, any decisions, and any open risks. Do not add information that is not in the source.`;
+
+const ACTION_ITEMS_SPEC = `Extract the actionable tasks as a markdown task list — one checkbox per line:
+
+- [ ] Task description — owner (if stated) — due (if stated)
+
+Include only real action items implied by the content. If a task has no clear owner, append "(owner: ?)". Plain markdown only.`;
+
+const OUTLINE_SPEC = `Reorganize the content into a structured markdown outline using headings and nested bullet lists that reflect its hierarchy:
+
+## Section
+- point
+  - sub-point
+
+Group related items, preserve every piece of information, and keep it plain markdown.`;
+
+const TIMELINE_SPEC = `Arrange the content as a chronological timeline, earliest first, as a markdown list:
+
+- **YYYY-MM-DD** — what happened
+
+Use the dates/times present in the content. If an item has no explicit date, place it where it best fits and append "(date?)". Plain markdown only.`;
+
 const FORMAT_SPECS: Record<AiTarget, string> = {
-  table:         TABLE_SPEC,
-  kanban:        boardSpec('kanban'),
-  'board-table': boardSpec('table'),
-  mermaid:       MERMAID_SPEC,
+  table:          TABLE_SPEC,
+  kanban:         boardSpec('kanban'),
+  'board-table':  boardSpec('table'),
+  mermaid:        MERMAID_SPEC,
+  summary:        SUMMARY_SPEC,
+  'action-items': ACTION_ITEMS_SPEC,
+  outline:        OUTLINE_SPEC,
+  timeline:       TIMELINE_SPEC,
 };
 
 function buildWhere(ctx: AiPromptContext): string {

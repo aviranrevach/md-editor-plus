@@ -10,15 +10,17 @@ const base: AiPromptContext = {
   endText: 'Set up analytics — Dev, Thu',
 };
 
+const ALL_TARGETS = ['table', 'kanban', 'board-table', 'mermaid', 'summary', 'action-items', 'outline', 'timeline'];
+
 describe('AI_TRANSFORMS registry', () => {
-  it('registers the phase-1 targets incl. both board views', () => {
-    expect(AI_TRANSFORMS.map(t => t.id)).toEqual(['table', 'kanban', 'board-table', 'mermaid']);
+  it('registers the phase-1 structural targets and the phase-2 thinking targets in order', () => {
+    expect(AI_TRANSFORMS.map(t => t.id)).toEqual(ALL_TARGETS);
   });
   it('every entry has a label, iconHtml and id', () => {
     for (const t of AI_TRANSFORMS) {
       expect(t.label.length).toBeGreaterThan(0);
       expect(t.iconHtml).toContain('<svg');
-      expect(['table', 'kanban', 'board-table', 'mermaid']).toContain(t.id);
+      expect(ALL_TARGETS).toContain(t.id);
     }
   });
 });
@@ -82,5 +84,25 @@ describe('buildPrompt — per-target format spec', () => {
     const p = buildPrompt({ ...base, target: 'mermaid' });
     expect(p).toContain('```mermaid');
     expect(p).toContain('flowchart');
+  });
+  it('summary → concise plain-markdown summary spec', () => {
+    const p = buildPrompt({ ...base, target: 'summary' });
+    expect(p).toMatch(/concise summary/i);
+    expect(p).toMatch(/bullet points/i);
+  });
+  it('action-items → markdown task list spec', () => {
+    const p = buildPrompt({ ...base, target: 'action-items' });
+    expect(p).toContain('- [ ]');
+    expect(p).toMatch(/action item/i);
+  });
+  it('outline → nested headings/bullets spec', () => {
+    const p = buildPrompt({ ...base, target: 'outline' });
+    expect(p).toMatch(/structured (markdown )?outline/i);
+    expect(p).toContain('## Section');
+  });
+  it('timeline → chronological list spec', () => {
+    const p = buildPrompt({ ...base, target: 'timeline' });
+    expect(p).toMatch(/chronological/i);
+    expect(p).toContain('**YYYY-MM-DD**');
   });
 });
