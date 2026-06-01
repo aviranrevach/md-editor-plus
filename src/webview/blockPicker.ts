@@ -81,6 +81,8 @@ const ICO = {
   quote: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M100,52H40A20,20,0,0,0,20,72v64a20,20,0,0,0,20,20H96v4a28,28,0,0,1-28,28,12,12,0,0,0,0,24,52.06,52.06,0,0,0,52-52V72A20,20,0,0,0,100,52Zm-4,80H44V76H96ZM216,52H156a20,20,0,0,0-20,20v64a20,20,0,0,0,20,20h56v4a28,28,0,0,1-28,28,12,12,0,0,0,0,24,52.06,52.06,0,0,0,52-52V72A20,20,0,0,0,216,52Zm-4,80H160V76h52Z"/></svg>`,
   code: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M71.68,97.22,34.74,128l36.94,30.78a12,12,0,1,1-15.36,18.44l-48-40a12,12,0,0,1,0-18.44l48-40A12,12,0,0,1,71.68,97.22Zm176,21.56-48-40a12,12,0,1,0-15.36,18.44L221.26,128l-36.94,30.78a12,12,0,1,0,15.36,18.44l48-40a12,12,0,0,0,0-18.44ZM164.1,28.72a12,12,0,0,0-15.38,7.18l-64,176a12,12,0,0,0,7.18,15.37A11.79,11.79,0,0,0,96,228a12,12,0,0,0,11.28-7.9l64-176A12,12,0,0,0,164.1,28.72Z"/></svg>`,
   hr: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z"/></svg>`,
+  board: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM104,200H40V56h64Zm32-144v144H120V56Zm80,0V200H152V56Z"/></svg>`,
+  whiteboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M240,192h-8V56a16,16,0,0,0-16-16H40A16,16,0,0,0,24,56V192H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM40,56H216V192H200V168a8,8,0,0,0-8-8H120a8,8,0,0,0-8,8v24H72V88H184v48a8,8,0,0,0,16,0V80a8,8,0,0,0-8-8H64a8,8,0,0,0-8,8V192H40ZM184,192H128V176h56Z"/></svg>`,
 };
 
 export const BLOCK_DEFS: BlockDef[] = [
@@ -302,6 +304,33 @@ export const BLOCK_DEFS: BlockDef[] = [
     isActive: (t) => t === 'horizontalRule',
     insert: (editor, pos) =>
       editor.chain().focus().insertContentAt(pos, { type: 'horizontalRule' }).run(),
+  },
+  {
+    id: 'board-kanban',
+    label: 'Board: Kanban',
+    description: 'Kanban board with columns and cards',
+    iconHtml: ICO.board,
+    section: 'lists',
+    aliases: ['board', 'kanban', 'tasks', 'project', 'board kanban'],
+    insert: (editor, pos) => insertBoardWith('kanban', editor, pos),
+  },
+  {
+    id: 'board-table',
+    label: 'Board: Table',
+    description: 'Table board: rows, columns, inline editing',
+    iconHtml: ICO.board,
+    section: 'lists',
+    aliases: ['board', 'table', 'database', 'grid', 'board table'],
+    insert: (editor, pos) => insertBoardWith('table', editor, pos),
+  },
+  {
+    id: 'whiteboard',
+    label: 'Whiteboard',
+    description: 'Freeform diagram canvas — drag, connect, style',
+    iconHtml: ICO.whiteboard,
+    section: 'media',
+    aliases: ['mermaid', 'diagram', 'flowchart', 'graph', 'canvas'],
+    insert: (editor, pos) => insertWhiteboard(editor, pos),
   },
 ];
 
@@ -571,4 +600,92 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }, { capture: true, passive: true });
 
   return { open, close };
+}
+
+export function freshWhiteboardSource(): string {
+  return [
+    'flowchart LR',
+    '    A[Idea]',
+    '    B[Next]',
+    '    C[Done]',
+    '    A --> B',
+    '    B --> C',
+  ].join('\n');
+}
+
+export function insertWhiteboard(editor: Editor, pos: number): void {
+  const source = freshWhiteboardSource();
+  editor
+    .chain()
+    .focus()
+    .insertContentAt(pos, [
+      {
+        type: 'codeBlock',
+        attrs: { language: 'mermaid' },
+        content: [{ type: 'text', text: source }],
+      },
+      { type: 'paragraph' },
+    ])
+    .run();
+
+  requestAnimationFrame(() => {
+    const dom = (editor as unknown as {
+      view: { nodeDOM: (pos: number) => (HTMLElement & { __mbOpenVisualMode?: () => void }) | null };
+    }).view.nodeDOM(pos);
+    dom?.__mbOpenVisualMode?.();
+  });
+}
+
+function freshBoardSource(id: string, activeView?: 'kanban' | 'table'): string {
+  const av = activeView === 'table' ? ' active-view="table"' : '';
+  const parts: string[] = [
+    `<!-- board:start id="${id}" name="" columns="Todo|Doing|Done" column-colors="gray|amber|emerald" field-types="Title=text,Status=status,id=text" hidden-fields="id"${av} -->`,
+    ``,
+  ];
+  if (activeView === 'table') {
+    parts.push(`<!-- board:view name="table" -->`, ``);
+  }
+  parts.push(
+    `| Title    | Status | id |`,
+    `|----------|--------|----|`,
+    `| New card | Todo   | c1 |`,
+    ``,
+    `<!-- board:end -->`,
+  );
+  return parts.join('\n');
+}
+
+function insertBoardWith(
+  activeView: 'kanban' | 'table',
+  editor: Editor,
+  pos: number,
+): void {
+  const id = `b-${Math.random().toString(36).slice(2, 6)}`;
+  const source = freshBoardSource(id, activeView);
+  // Insert the board followed by an empty paragraph so the cursor has
+  // somewhere to land below the (atom) board.
+  editor
+    .chain()
+    .focus()
+    .insertContentAt(pos, [
+      { type: 'board', attrs: { source } },
+      { type: 'paragraph' },
+    ])
+    .run();
+  // Focus the NEW board specifically by its id — querySelector('.board-name')
+  // alone would return the first board on the page and steal focus when
+  // adding a second/third board to the same doc.
+  requestAnimationFrame(() => {
+    const board = document.querySelector(
+      `.board-block[data-board-id="${id}"]`,
+    ) as HTMLElement | null;
+    const name = board?.querySelector('.board-name') as HTMLElement | null;
+    if (!name) return;
+    name.focus();
+    const range = document.createRange();
+    range.selectNodeContents(name);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  });
 }

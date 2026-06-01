@@ -10,6 +10,7 @@ import Image from '@tiptap/extension-image';
 import { mergeAttributes } from '@tiptap/core';
 import Link from '@tiptap/extension-link';
 import CodeBlock from './extensions/codeBlock';
+import MermaidBlock from './extensions/mermaidBlock';
 import Underline from '@tiptap/extension-underline';
 import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
@@ -18,6 +19,7 @@ import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
 import { common, createLowlight } from 'lowlight';
 import { Markdown } from 'tiptap-markdown';
 import Callout, { preprocessMarkdownCallouts } from './extensions/callout';
+import Board, { preprocessMarkdownBoards } from './extensions/board';
 import Toggle from './extensions/toggle';
 import BlockDirection from './extensions/blockDirection';
 import BlockOutline from './extensions/outline';
@@ -86,7 +88,7 @@ export function createEditor(
   _frontmatter = split.frontmatter;
   let body: string;
   try {
-    body = preprocessMarkdownCallouts(split.body);
+    body = preprocessMarkdownBoards(preprocessMarkdownCallouts(split.body));
   } catch (err) {
     console.error('[md-editor-plus] callout preprocess failed', err);
     body = split.body;
@@ -99,7 +101,7 @@ export function createEditor(
         codeBlock: false,
         dropcursor: { color: '#2383e2', width: 3 },
       }),
-      CodeBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
+      MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Table.configure({ resizable: false }),
@@ -114,6 +116,7 @@ export function createEditor(
       Highlight.configure({ multicolor: true }),
       Markdown.configure({ transformCopiedText: true }),
       Callout,
+      Board,
       Toggle,
       BlockDirection,
       BlockOutline,
@@ -144,7 +147,7 @@ export function updateContent(markdown: string): void {
   _frontmatter = split.frontmatter;
   let next: string;
   try {
-    next = preprocessMarkdownCallouts(split.body);
+    next = preprocessMarkdownBoards(preprocessMarkdownCallouts(split.body));
   } catch (err) {
     console.error('[md-editor-plus] callout preprocess failed', err);
     next = split.body;

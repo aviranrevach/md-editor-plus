@@ -108,6 +108,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         type: 'init',
         markdown: document.getText(),
         mediaBaseUri,
+        documentPath: vscode.workspace.asRelativePath(document.uri),
         defaults: {
           theme:               cfg.get<string>('theme', 'light'),
           font:                cfg.get<string>('font', 'sans'),
@@ -115,6 +116,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           pageWidth:           cfg.get<number>('pageWidth', 800),
           fullWidth:           cfg.get<boolean>('fullWidth', false),
           alwaysDarkCode:      cfg.get<boolean>('alwaysDarkCode', false),
+          alwaysDarkDiagram:   cfg.get<boolean>('alwaysDarkDiagram', false),
           alwaysDarkSource:    cfg.get<boolean>('alwaysDarkSource', false),
           sourceFullWidth:     cfg.get<boolean>('sourceFullWidth', false),
           shortenCodeSnippets: cfg.get<boolean>('shortenCodeSnippets', false),
@@ -144,6 +146,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         pageWidth?: number;
         fullWidth?: boolean;
         alwaysDarkCode?: boolean;
+        alwaysDarkDiagram?: boolean;
         alwaysDarkSource?: boolean;
         sourceFullWidth?: boolean;
         shortenCodeSnippets?: boolean;
@@ -163,6 +166,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           cfg.update('pageWidth',           d.pageWidth,           target),
           cfg.update('fullWidth',           d.fullWidth,           target),
           cfg.update('alwaysDarkCode',      d.alwaysDarkCode,      target),
+          cfg.update('alwaysDarkDiagram',   d.alwaysDarkDiagram,   target),
           cfg.update('alwaysDarkSource',    d.alwaysDarkSource,    target),
           cfg.update('sourceFullWidth',     d.sourceFullWidth,     target),
           cfg.update('shortenCodeSnippets', d.shortenCodeSnippets, target),
@@ -171,7 +175,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       }
       if (msg.type === 'resetDefaults') {
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
-        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets'];
+        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkDiagram','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets'];
         for (const k of keys) {
           // Clear at all scopes so the package.json defaults take over.
           await cfg.update(k, undefined, vscode.ConfigurationTarget.Global).then(() => {}, () => {});
@@ -196,6 +200,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       if (msg.type === 'copyFilePath') {
         await vscode.env.clipboard.writeText(document.uri.fsPath);
         await vscode.window.showInformationMessage('File path copied to clipboard');
+      }
+      if (msg.type === 'copyText') {
+        const text = (msg as unknown as { text?: unknown }).text;
+        if (typeof text !== 'string') return;
+        await vscode.env.clipboard.writeText(text);
+        await vscode.window.showInformationMessage('AI prompt copied to clipboard');
+        return;
       }
       if (msg.type === 'saveOutlineVisible') {
         const value = (msg as unknown as { value?: unknown }).value;
@@ -470,11 +481,16 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     </div>
     <div class="settings-divider"></div>
     <div class="settings-section">
-      <div class="settings-label">Code blocks</div>
+      <div class="settings-label">Code &amp; diagrams</div>
       <div class="settings-row" data-tip="Force fenced code blocks to use a dark theme even on light pages">
         <span class="settings-row-icon">${iCode}</span>
         <span class="settings-row-label">Always dark: Code Snippets</span>
         <button class="toggle-switch" id="always-dark-code-toggle" role="switch" aria-checked="false"></button>
+      </div>
+      <div class="settings-row" data-tip="Force mermaid diagrams to use a dark theme regardless of the page theme">
+        <span class="settings-row-icon">${iCode}</span>
+        <span class="settings-row-label">Always dark: Mermaid diagrams</span>
+        <button class="toggle-switch" id="always-dark-diagram-toggle" role="switch" aria-checked="false"></button>
       </div>
       <div class="settings-row" data-tip="Force the raw source view to use a dark theme even on light pages">
         <span class="settings-row-icon">${iCode}</span>
@@ -512,6 +528,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   </div>
   <div class="actions-panel hidden" id="actions-panel-dots" data-anchor="dots">
     <button class="settings-action act-toggle-readonly" id="act-toggle-readonly" data-tip="Toggle read-only mode — when on, typing and structural edits are blocked">${iLock}<span class="settings-action-label">Read only</span></button>
+    <button class="settings-action act-refresh" data-tip="Reload the file from disk — discards unsaved in-editor changes">${iRefresh}<span class="settings-action-label">Reload from disk</span></button>
     <button class="settings-action act-copy" data-tip="Copy the entire markdown to clipboard">${iCopy}<span class="settings-action-label">Copy page content</span></button>
     <button class="settings-action act-copy-path" data-tip="Copy the absolute file path to clipboard">${iLink}<span class="settings-action-label">Copy file path</span></button>
     <button class="settings-action act-duplicate" data-tip="Save a copy of this file in the same folder">${iDuplicate}<span class="settings-action-label">Duplicate</span></button>

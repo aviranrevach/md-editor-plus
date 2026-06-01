@@ -1,6 +1,10 @@
 import { Editor } from '@tiptap/core';
 import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import { PluginKey } from '@tiptap/pm/state';
+import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
+import { createAiTransformPanel } from './aiTransformPanel';
+import { summarizeSelection, locateAnchors, truncateAnchor } from './aiSelection';
+import { getDocumentPath } from './docContext';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -165,6 +169,15 @@ function turnIntoHtml(): string {
   ).join('');
 }
 
+function aiListHtml(attr = 'ai'): string {
+  return AI_TRANSFORMS.map(t =>
+    `<button class="bm-into-item" data-${attr}="${t.id}">
+      <span class="bm-into-icon">${t.iconHtml}</span>
+      <span class="bm-into-label">${t.label}</span>
+    </button>`
+  ).join('');
+}
+
 function buildEl(): HTMLElement {
   const el = document.createElement('div');
   el.className = 'bubble-menu';
@@ -189,13 +202,18 @@ function buildEl(): HTMLElement {
       <button class="bm-btn" data-action="emoji" data-tip="Insert emoji">${svg(P.smiley)}</button>
       ${DIV}
       <button class="bm-btn" data-action="more" data-tip="Turn into another block">${svg(P.dotsThree, 22)}</button>
+      <button class="bm-btn bm-ai-btn" data-action="ai" data-tip="Turn into… using AI">${svg('M128 24 L150 106 L232 128 L150 150 L128 232 L106 150 L24 128 L106 106 Z', 20)}</button>
     </div>
     <div class="bubble-into hidden" id="bm-into">
       <div class="bubble-into-search">
         <input type="text" class="bubble-into-input" placeholder="Filter…" autocomplete="off" spellcheck="false" />
       </div>
       <div class="bubble-into-title">Turn row into</div>
-      <div class="bubble-into-list">${turnIntoHtml()}</div>
+      <div class="bubble-into-list">${turnIntoHtml()}<div class="bm-into-divider"></div><div class="bm-into-sublabel">✨ Using AI</div>${aiListHtml('ai-into')}</div>
+    </div>
+    <div class="bubble-ai hidden" id="bm-ai">
+      <div class="bubble-into-title">Turn selection into — using AI</div>
+      <div class="bubble-into-list">${aiListHtml()}</div>
     </div>
     <div class="bm-swatch-panel" id="bm-color-swatch">
       ${swatchHtml(TEXT_COLORS, 'color')}
@@ -222,6 +240,9 @@ export function createBubbleMenu(editor: Editor): void {
   const hlSwatch     = el.querySelector<HTMLElement>('#bm-hl-swatch')!;
   const emojiSwatch  = el.querySelector<HTMLElement>('#bm-emoji-swatch')!;
   const intoPanel    = el.querySelector<HTMLElement>('#bm-into')!;
+  const aiPanel      = el.querySelector<HTMLElement>('#bm-ai')!;
+  const aiBtn        = el.querySelector<HTMLElement>('[data-action="ai"]')!;
+  const aiTransformPanel = createAiTransformPanel();
   const intoInput    = el.querySelector<HTMLInputElement>('.bubble-into-input')!;
   const moreBtn      = el.querySelector<HTMLElement>('[data-action="more"]')!;
   const colorBar     = el.querySelector<SVGRectElement>('#bm-color-bar');
@@ -266,6 +287,34 @@ export function createBubbleMenu(editor: Editor): void {
     }
   }
 
+  function openAiPanel(target: AiTarget, label: string): void {
+    const { from, to } = editor.state.selection;
+    const slice = editor.state.doc.textBetween(from, to, '\n', '\n');
+    const nonEmpty = slice.split('\n').filter(l => l.trim().length > 0);
+    const startRaw = nonEmpty[0] ?? '';
+    const endRaw   = nonEmpty[nonEmpty.length - 1] ?? startRaw;
+    // Best-effort line numbers from the editor's own markdown (frontmatter
+    // excluded; line numbers are a hint — the text anchor is the real locator).
+    // Locate from the RAW lines before truncation, so a long line (whose
+    // display anchor would end in "…") still matches the source.
+    const md = editor.storage.markdown.getMarkdown() as string;
+    const { startLine, endLine } = locateAnchors(md, startRaw, endRaw);
+    const startText = truncateAnchor(startRaw);
+    const endText   = truncateAnchor(endRaw);
+    aiTransformPanel.open({
+      target,
+      targetLabel: label,
+      filePath: getDocumentPath() || 'this file',
+      startText,
+      endText,
+      startLine,
+      endLine,
+      summary: summarizeSelection(slice),
+    });
+    closeAi();
+    closeInto();
+  }
+
   editor.registerPlugin(
     BubbleMenuPlugin({
       pluginKey:    new PluginKey('bubbleMenu'),
@@ -292,6 +341,11 @@ export function createBubbleMenu(editor: Editor): void {
     intoPanel.classList.add('hidden');
     moreBtn.classList.remove('active');
     unhighlightBlock();
+  }
+
+  function closeAi(): void {
+    aiPanel.classList.add('hidden');
+    aiBtn.classList.remove('active');
   }
 
   function openLinkRow(): void {
@@ -598,6 +652,16 @@ export function createBubbleMenu(editor: Editor): void {
   el.addEventListener('click', e => {
     const target = e.target as HTMLElement;
 
+    // AI turn-into item clicked? (from either the ✨ panel or the "Using AI" group)
+    const aiItem = target.closest<HTMLElement>('[data-ai], [data-ai-into]');
+    if (aiItem) {
+      e.stopPropagation();
+      const tgt = (aiItem.dataset.ai ?? aiItem.dataset.aiInto) as AiTarget;
+      const def = AI_TRANSFORMS.find(t => t.id === tgt);
+      if (def) openAiPanel(def.id, def.label);
+      return;
+    }
+
     // Turn-into item clicked?
     const intoItem = target.closest<HTMLElement>('[data-into]');
     if (intoItem) {
@@ -631,11 +695,20 @@ export function createBubbleMenu(editor: Editor): void {
         }
         break;
       }
-      case 'color':     colorSwatch.classList.toggle('open'); hlSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); break;
-      case 'highlight': hlSwatch.classList.toggle('open');    colorSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); break;
-      case 'emoji':     emojiSwatch.classList.toggle('open'); colorSwatch.classList.remove('open'); hlSwatch.classList.remove('open'); closeInto(); break;
+      case 'color':     colorSwatch.classList.toggle('open'); hlSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); break;
+      case 'highlight': hlSwatch.classList.toggle('open');    colorSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); break;
+      case 'emoji':     emojiSwatch.classList.toggle('open'); colorSwatch.classList.remove('open'); hlSwatch.classList.remove('open'); closeInto(); closeAi(); break;
+      case 'ai': {
+        closeSwatch();
+        closeInto();
+        const open = !aiPanel.classList.contains('hidden');
+        if (!open) { aiPanel.classList.remove('hidden'); aiBtn.classList.add('active'); }
+        else closeAi();
+        break;
+      }
       case 'more': {
         closeSwatch();
+        closeAi();
         const isOpen = !intoPanel.classList.contains('hidden');
         if (!isOpen) {
           // Opening: highlight the target block, reset filter, focus input
@@ -712,6 +785,7 @@ export function createBubbleMenu(editor: Editor): void {
     if (e.state.selection.empty) {
       closeSwatch();
       closeInto();
+      closeAi();
     }
   });
 

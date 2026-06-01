@@ -97,6 +97,76 @@ body {
   box-shadow: var(--seg-active-shadow);
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   Header / chrome responsiveness — see
+   docs/superpowers/specs/2026-05-28-header-responsiveness-design.md.
+   Tier 1 (≤ 900px): drop the Preview/Code text labels and tighten the
+   filename's max-width so neither runs into the right-side chrome.
+   ──────────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  /* Icon-only Preview/Code — same as the in-block mermaid view toggle. */
+  #toolbar #view-seg .seg-btn .seg-label { display: none; }
+
+  /* 50vw → 30vw — leaves room for the right-side reload / Aa / ⋯ trio. */
+  .toolbar-filename { max-width: 30vw; }
+}
+
+/* Tier 2 (≤ 640px): also auto-collapse the outline (its 240px gutter
+   would leave < 400px for content), and collapse the segmented
+   Preview/Code pair to a single-icon "tap to switch" — only the
+   inactive view's icon shows. */
+@media (max-width: 640px) {
+  /* Outline panel + button. `!important` so the media query wins when
+     the panel is in its open state (no .hidden class on it). Reset
+     padding-left on the editor / source view AND the conflict banner
+     so neither leaves a 240px gap where the outline used to be. */
+  .outline-panel { display: none !important; }
+  html.outline-visible #editor,
+  html.outline-visible #source-view { padding-left: 0; }
+  html.outline-visible .conflict-banner { left: 0; }
+  #toolbar #outline-btn { display: none; }
+
+  /* Preview/Code collapse to a single icon. Hide the active button so
+     only the OTHER view's icon stays visible. The remaining button's
+     existing click handler already switches to its own view, so the
+     visible icon naturally represents the action — like a dark-mode
+     toggle that shows the sun if you're in dark mode. */
+  #toolbar #view-seg .seg-btn.active { display: none; }
+
+  /* Drop the segmented pill background at this width so the lone icon
+     reads as a plain icon button, not half of a pill. Override the
+     focus / cursor-near / panel-open variants too so it stays flat. */
+  #toolbar #view-seg,
+  #toolbar.cursor-near #view-seg,
+  #toolbar:focus-within #view-seg,
+  #toolbar.panel-open #view-seg {
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Logo: a touch smaller so the rest of the row fits more comfortably.
+     Add a left margin so it doesn't sit flush against the toolbar edge,
+     and trim the right margin so it's not cramped *or* over-spaced. */
+  .toolbar-logo {
+    margin-left: 6px;
+    margin-right: 2px;
+  }
+  .toolbar-logo svg { height: 26px; }
+
+  /* Filename: switch from absolute-centered to flow-positioned so it
+     sits flush-left after the view-toggle, then tighten max-width so
+     the right-side buttons stay visible. */
+  .toolbar-filename {
+    position: static;
+    transform: none;
+    max-width: 40vw;
+  }
+
+  /* Hide the dedicated refresh button — the same action is in the
+     three-dots menu (actions-panel-dots). */
+  #toolbar #refresh-btn { display: none; }
+}
+
 /* Segmented control — macOS style */
 .segmented {
   display: inline-flex;
@@ -2647,4 +2717,1930 @@ html.source-word-wrap #source-view .cb-content {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-x: hidden;
+}
+
+/* ===========================================================================
+   Mermaid block (.mb-*)
+   Preview-first rendered diagram blocks with edit toggle, error placeholder,
+   copy/export menu, and fullscreen modal.
+   =========================================================================== */
+
+.ProseMirror .mb {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0.75em 0;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.ProseMirror .mb-header {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-body);
+  user-select: none;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+}
+.ProseMirror .mb-header-left,
+.ProseMirror .mb-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Hovering the block reveals the chrome in view mode. */
+.ProseMirror .mb:hover > .mb-header { opacity: 1; pointer-events: auto; }
+/* While editing source OR in visual-edit, the chrome is always shown. */
+.ProseMirror .mb.mb-editing > .mb-header,
+.ProseMirror .mb.mb-visual > .mb-header,
+.ProseMirror .mb.mb-visual-active > .mb-header {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* The block needs to be a positioning context so the absolute header
+   anchors to its corner, and we need it to stretch over the preview. */
+.ProseMirror .mb { position: relative; }
+
+/* Floating header icon buttons — top-right of the block. */
+.ProseMirror .mb-header .mb-iconbtn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.ProseMirror .mb-header .mb-iconbtn:hover {
+  background: var(--block-hover);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.ProseMirror .mb-header .mb-iconbtn svg { width: 14px; height: 14px; }
+/* Buttons used to wrap "<svg/><span>Expand</span>" — keep only the icon. */
+.ProseMirror .mb-header .mb-iconbtn > span { display: none; }
+
+/* "More" dropdown menu — three-dots opens a popover with Edit toggle +
+   copy / download actions. Matches the rest of our white popover design. */
+.ProseMirror .mb-more { position: relative; display: inline-flex; }
+.ProseMirror .mb-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 1px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  z-index: 5;
+}
+.ProseMirror .mb-more-menu.mb-hidden { display: none; }
+.ProseMirror .mb-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+  text-align: left;
+  width: 100%;
+}
+.ProseMirror .mb-more-row:hover { background: var(--block-hover); }
+.ProseMirror .mb-more-row-toggle { justify-content: space-between; }
+.ProseMirror .mb-more-row-label { color: var(--text-primary); }
+.ProseMirror .mb-more-row-toggle .mb-toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Eye/Code segmented toggle (left side of the block header). Mirrors the
+   plugin's top-of-app .segmented control: soft tray background, the
+   active pill gets the page background + a subtle shadow. */
+.ProseMirror .mb-view-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px;
+  background: var(--seg-bg);
+  border-radius: 8px;
+}
+.ProseMirror .mb-view-seg-btn {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.ProseMirror .mb-view-seg-btn:hover { color: var(--text-primary); }
+.ProseMirror .mb-view-seg-btn.mb-view-seg-active {
+  background: var(--seg-active-bg);
+  color: var(--text-primary);
+  box-shadow: var(--seg-active-shadow);
+}
+.ProseMirror .mb-view-seg-btn svg { width: 14px; height: 14px; }
+
+.ProseMirror .mb-lang {
+  font: 500 11px var(--font-mono);
+  color: var(--text-secondary);
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.ProseMirror .mb-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Toggle switch ───────────────────────────────────────────────────── */
+.ProseMirror .mb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+}
+.ProseMirror .mb-toggle:hover { background: var(--block-hover); color: var(--text-primary); }
+
+.ProseMirror .mb-toggle-label { font-size: 11px; font-weight: 500; }
+
+.ProseMirror .mb-toggle-track {
+  width: 26px;
+  height: 14px;
+  background: var(--border);
+  border-radius: 999px;
+  position: relative;
+  transition: background 120ms ease;
+}
+.ProseMirror .mb-toggle-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 120ms ease;
+}
+.ProseMirror .mb-toggle.mb-toggle-on .mb-toggle-track { background: var(--link); }
+.ProseMirror .mb-toggle.mb-toggle-on .mb-toggle-thumb { transform: translateX(12px); }
+.ProseMirror .mb-toggle.mb-toggle-on .mb-toggle-label { color: var(--link); }
+
+/* ── Icon button (Expand) ────────────────────────────────────────────── */
+.ProseMirror .mb-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-body);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
+}
+.ProseMirror .mb-iconbtn:hover { background: var(--block-hover); color: var(--text-primary); }
+.ProseMirror .mb-iconbtn svg { width: 12px; height: 12px; }
+.ProseMirror .mb-iconbtn.mb-disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+
+/* ── Copy split-button ───────────────────────────────────────────────── */
+.ProseMirror .mb-copy {
+  position: relative;
+  display: inline-flex;
+  border-radius: 5px;
+  overflow: visible;
+}
+.ProseMirror .mb-copy-main,
+.ProseMirror .mb-copy-caret {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-body);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.ProseMirror .mb-copy-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 5px 0 0 5px;
+}
+.ProseMirror .mb-copy-main svg { width: 11px; height: 11px; }
+.ProseMirror .mb-copy-caret {
+  padding: 3px 4px;
+  border-radius: 0 5px 5px 0;
+  border-left: 1px solid var(--border);
+}
+.ProseMirror .mb-copy-caret svg { width: 12px; height: 12px; }
+.ProseMirror .mb-copy:hover .mb-copy-main,
+.ProseMirror .mb-copy:hover .mb-copy-caret { background: var(--block-hover); color: var(--text-primary); }
+
+.ProseMirror .mb-copy-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 5px;
+  min-width: 180px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+}
+.ProseMirror .mb-copy-menu.mb-hidden { display: none; }
+.ProseMirror .mb-copy-menu button {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 7px 10px;
+  font: 500 12px var(--font-body);
+  color: var(--text-primary);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ProseMirror .mb-copy-menu button:hover { background: var(--block-hover); }
+.ProseMirror .mb-copy-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}
+
+/* ── Preview pane ────────────────────────────────────────────────────── */
+.ProseMirror .mb-preview {
+  padding: 22px 18px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  background: var(--bg);
+}
+.ProseMirror .mb-preview > svg { max-width: 100%; height: auto; }
+.ProseMirror .mb-empty {
+  font: 400 13px var(--font-body);
+  color: var(--text-secondary);
+  text-align: center;
+}
+.ProseMirror .mb-empty strong { color: var(--text-primary); font-weight: 600; }
+
+.ProseMirror .mb-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: mb-spin 800ms linear infinite;
+}
+@keyframes mb-spin { to { transform: rotate(360deg); } }
+
+/* ── Error placeholder ───────────────────────────────────────────────── */
+.ProseMirror .mb-err {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 8px;
+  max-width: 360px;
+}
+.ProseMirror .mb-err-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--callout-caution-bg);
+  color: var(--callout-caution-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.ProseMirror .mb-err-icon svg { width: 16px; height: 16px; }
+.ProseMirror .mb-err-title {
+  font: 600 13px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-err-meta {
+  font: 500 12px var(--font-mono);
+  color: var(--callout-caution-accent);
+}
+.ProseMirror .mb-err-msg {
+  font: 400 12px var(--font-mono);
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.ProseMirror .mb-err-fix {
+  margin-top: 6px;
+  padding: 5px 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font: 500 12px var(--font-body);
+  cursor: pointer;
+}
+.ProseMirror .mb-err-fix:hover { background: var(--block-hover); }
+
+/* ── Source pane ─────────────────────────────────────────────────────── */
+.ProseMirror .mb-source { display: none; }
+.ProseMirror .mb-source-pre {
+  margin: 0;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  background: var(--bg);
+  white-space: pre;
+  overflow-x: auto;
+}
+.ProseMirror .mb-source-code {
+  font-family: inherit;
+  outline: none;
+  display: block;
+}
+
+/* Editing state: hide preview, show source (with subtle accent outline) */
+.ProseMirror .mb.mb-editing .mb-preview { display: none; }
+.ProseMirror .mb.mb-editing .mb-source  { display: block; }
+.ProseMirror .mb.mb-editing { outline: 2px solid var(--link); outline-offset: -2px; }
+
+/* ── Snackbar ────────────────────────────────────────────────────────── */
+.ProseMirror .mb-snackbar {
+  position: absolute;
+  top: 38px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  background: #1f1f23;
+  color: #ffffff;
+  border-radius: 7px;
+  font: 500 12px var(--font-body);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 20;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.ProseMirror .mb-snackbar.mb-snackbar-show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ProseMirror .mb-snackbar svg { width: 13px; height: 13px; }
+.ProseMirror .mb-snackbar kbd {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+  padding: 0 5px;
+  font: 500 10.5px var(--font-mono);
+}
+
+/* ── Fullscreen modal ────────────────────────────────────────────────── */
+.mmd-fs {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 21, 25, 0.78);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+.mmd-fs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #e5e7eb;
+  margin-bottom: 14px;
+  font-family: var(--font-body);
+}
+.mmd-fs-title { font: 500 12px var(--font-body); opacity: 0.85; }
+.mmd-fs-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px;
+}
+.mmd-fs-tool, .mmd-fs-close {
+  background: transparent;
+  border: none;
+  color: #e5e7eb;
+  font: 500 12px var(--font-body);
+  padding: 4px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mmd-fs-tool:hover, .mmd-fs-close:hover { background: rgba(255, 255, 255, 0.12); }
+.mmd-fs-zoom {
+  color: #ffffff;
+  font: 500 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  padding: 4px 6px;
+}
+.mmd-fs-stage {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  outline: none;
+}
+.mmd-fs-stage.mmd-fs-dragging { cursor: grabbing; }
+.mmd-fs-canvas {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  transition: transform 60ms ease-out;
+  will-change: transform;
+}
+.mmd-fs-canvas > svg { max-width: 90%; max-height: 90%; }
+
+/* ── Theme-specific tweaks ───────────────────────────────────────────── */
+html.theme-dark .ProseMirror .mb-toggle-thumb { background: #fafafa; }
+html.theme-dark .ProseMirror .mb { background: var(--code-bg); }
+html.theme-dark .ProseMirror .mb-header { background: rgba(255, 255, 255, 0.03); }
+html.theme-dark .ProseMirror .mb-preview { background: var(--code-bg); }
+html.theme-dark .ProseMirror .mb-source-pre { background: var(--code-bg); }
+
+/* RTL: mermaid blocks always stay LTR. */
+.ProseMirror .mb, .ProseMirror .mb * { direction: ltr; }
+
+/* ===========================================================================
+   Visual edit (Phase 1) — toolbar, selection, context tip, rename overlay.
+   These overlays are siblings of .mb-svg-host inside .mb-preview, so they
+   survive svgHost.innerHTML rewrites on every mermaid render.
+   =========================================================================== */
+
+/* SVG host — child of .mb-preview that gets innerHTML replaced on each render. */
+.ProseMirror .mb-svg-host {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+.ProseMirror .mb-svg-host > svg { max-width: 100%; height: auto; }
+
+/* When visual edit is active, the preview must be position:relative so
+   absolute overlays anchor to it, and we give the block a soft accent ring. */
+.ProseMirror .mb-preview { position: relative; }
+.ProseMirror .mb.mb-visual { outline: 2px solid var(--link); outline-offset: -2px; }
+
+/* Visual-edit canvas: give the preview pane a fixed, generous height so the
+   SVG can stretch to fill it and users have empty space around the diagram
+   for dropping new nodes / drawing edges. Match either selector — the block
+   extension sets .mb-visual; createVisualEditor sets .mb-visual-active.
+   Light grey + dotted background mimics Miro's infinite-canvas feel. */
+.ProseMirror .mb.mb-visual .mb-preview,
+.ProseMirror .mb.mb-visual-active .mb-preview,
+.ProseMirror .mb-visual-active .mb-preview {
+  /* Much taller in visual mode so the user has real room to drag nodes
+     around inside the frame (the frame clips content at its edge, so the
+     bigger the frame the more drag room). 70vh fills most of the viewport
+     height without pushing surrounding markdown completely out of view. */
+  min-height: 70vh;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background-color: #f6f7f9;
+}
+html.theme-dark .ProseMirror .mb.mb-visual .mb-preview,
+html.theme-dark .ProseMirror .mb.mb-visual-active .mb-preview,
+html.theme-dark .ProseMirror .mb-visual-active .mb-preview {
+  background-color: #1a1b1e;
+}
+/* Dot pattern lives inside the SVG (see mermaidVisualEditDom.ts) so it pans
+   and zooms with the viewport. The base preview just gives it a tinted
+   backdrop. */
+.ProseMirror .mb.mb-visual .mb-svg-host,
+.ProseMirror .mb.mb-visual-active .mb-svg-host,
+.ProseMirror .mb-visual-active .mb-svg-host {
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: stretch;
+}
+.ProseMirror .mb.mb-visual .mb-svg-host > svg,
+.ProseMirror .mb.mb-visual-active .mb-svg-host > svg,
+.ProseMirror .mb-visual-active .mb-svg-host > svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  display: block;
+  /* Let SVG content extend past the viewBox bounds during drag — the
+     viewBox auto-fits on render (after release) but during the drag
+     itself the node is at its new position and would otherwise clip at
+     the SVG's CSS box edge. .mb still has overflow:hidden so content
+     never extends past the frame into surrounding markdown. */
+  overflow: visible;
+}
+
+/* Hide helper, reused across overlays. */
+.ProseMirror .mb-hidden { display: none !important; }
+
+/* ── Floating shape toolbar (Phase 6: bottom-center) ──────────────────── */
+.ProseMirror .mb-vTb {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 5px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  z-index: 30;
+}
+.ProseMirror .mb-vTb-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  padding: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.ProseMirror .mb-vTb-btn svg { width: 14px; height: 14px; }
+.ProseMirror .mb-vTb-btn:hover { background: var(--block-hover); color: var(--text-primary); }
+.ProseMirror .mb-vTb-btn.mb-vTb-active {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+.ProseMirror .mb-vTb-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  align-self: center;
+  margin: 0 3px;
+}
+
+/* ── Selection ring ─────────────────────────────────────────────────────── */
+.ProseMirror .mb-vSel {
+  position: absolute;
+  border: 1.5px dashed var(--link);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 20;
+  box-sizing: border-box;
+}
+
+/* ── Context tip ────────────────────────────────────────────────────────── */
+.ProseMirror .mb-vCtx {
+  position: absolute;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px;
+  background: #1f1f23;
+  color: #fff;
+  border-radius: 6px;
+  font: 500 11px var(--font-body);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  z-index: 25;
+}
+.ProseMirror .mb-vCtx-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.ProseMirror .mb-vCtx-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.ProseMirror .mb-vCtx-danger { color: #fda4af; font-size: 14px; line-height: 1; padding: 0 6px; }
+.ProseMirror .mb-vCtx-danger:hover { background: rgba(244, 63, 94, 0.18); color: #fff; }
+.ProseMirror .mb-vCtx-sep {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 2px;
+}
+.ProseMirror .mb-vCtx-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  background: #1f1f23;
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.20);
+  min-width: 110px;
+  z-index: 26;
+}
+.ProseMirror .mb-vCtx-menu-item {
+  background: transparent;
+  border: none;
+  color: #fff;
+  text-align: left;
+  padding: 5px 9px;
+  border-radius: 4px;
+  font: 500 11px var(--font-body);
+  cursor: pointer;
+}
+.ProseMirror .mb-vCtx-menu-item:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ── Rename overlay (inline contenteditable input over the node label) ─── */
+.ProseMirror .mb-vRename {
+  position: absolute;
+  border: 1.5px solid var(--link);
+  background: var(--bg);
+  color: var(--text-primary);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font: 500 13px var(--font-body);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.20);
+  outline: none;
+  z-index: 28;
+  box-sizing: border-box;
+}
+
+/* ── "Click another node to connect" pin (Arrow tool) ───────────────────── */
+.ProseMirror .mb-vPin {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+  border: 1px solid var(--callout-note-border);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font: 500 11.5px var(--font-body);
+  z-index: 22;
+}
+
+/* Dark theme tweaks for the toolbar — the active button reads better against
+   a slightly higher contrast surface when the whole editor is dark. */
+html.theme-dark .ProseMirror .mb-vTb { background: var(--bg-secondary); }
+html.theme-dark .ProseMirror .mb-vTb-btn.mb-vTb-active {
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
+}
+
+/* ── Phase 2: drag-to-reposition ───────────────────────────────────────── */
+
+/* Cursor states. The grab cursor only shows on selected (hoverable) nodes;
+   while dragging, the entire preview pane shows grabbing. */
+.ProseMirror .mb-visual .mb-preview g.node { cursor: default; }
+.ProseMirror .mb-visual .mb-preview g.node:hover { cursor: grab; }
+.ProseMirror .mb-visual .mb-preview.mb-dragging,
+.ProseMirror .mb-visual .mb-preview.mb-dragging g.node,
+.ProseMirror .mb-visual .mb-preview.mb-dragging * { cursor: grabbing !important; }
+
+/* Reset Layout toolbar button — same chrome as a tool button but disabled
+   state is much more obvious so users know it's contextual. */
+.ProseMirror .mb-vTb-reset.mb-vTb-disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ProseMirror .mb-vTb-reset:not(.mb-vTb-disabled):hover {
+  background: var(--callout-caution-bg);
+  color: var(--callout-caution-accent);
+}
+
+/* Shapes group: a single toolbar button that opens a popover with all shape
+   options, like Miro / Whimsical. Avoids a long row of look-alike icons. */
+.ProseMirror .mb-vTb-shapes {
+  position: relative;
+  display: inline-flex;
+}
+.ProseMirror .mb-vTb-shapespop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  gap: 2px;
+  padding: 5px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.10);
+  z-index: 32;
+}
+.ProseMirror .mb-vTb-shapespop.mb-hidden { display: none; }
+
+/* Phase 3: snap-to-grid toggle (uses the same mb-vTb-active class as tools). */
+.ProseMirror .mb-vTb-grid.mb-vTb-active {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
+}
+
+/* Phase 3: alignment guide overlay (its own SVG inside .mb-preview). */
+.ProseMirror .mb-vGuides {
+  pointer-events: none;
+}
+
+/* ===========================================================================
+   Phase 4: multi-select, connection points, marquee, lock UI
+   =========================================================================== */
+
+/* Polished selection ring — solid light-blue. */
+.ProseMirror .mb-vSel {
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--link);
+  background: rgba(99, 102, 241, 0.04);
+  border-radius: 5px;
+}
+
+/* Connection-point layer wraps the primary selected node; the 4 dots sit at
+   the midpoints of its bbox. */
+.ProseMirror .mb-vConn {
+  position: absolute;
+  pointer-events: none;
+  z-index: 24;
+}
+.ProseMirror .mb-vConn-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid var(--link);
+  pointer-events: auto;
+  cursor: crosshair;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.ProseMirror .mb-vConn-dot:hover {
+  background: var(--link);
+}
+.ProseMirror .mb-vConn-n { left: 50%; top:    0;    transform: translate(-50%, -50%); }
+.ProseMirror .mb-vConn-s { left: 50%; bottom: 0;    transform: translate(-50%,  50%); }
+.ProseMirror .mb-vConn-e { right: 0;  top:   50%;   transform: translate( 50%, -50%); }
+.ProseMirror .mb-vConn-w { left: 0;   top:   50%;   transform: translate(-50%, -50%); }
+
+/* Marquee rect during drag-select. */
+.ProseMirror .mb-vMarquee {
+  position: absolute;
+  border: 1px dashed var(--link);
+  background: rgba(99, 102, 241, 0.08);
+  pointer-events: none;
+  z-index: 23;
+  border-radius: 2px;
+}
+
+/* Lock badge intentionally not rendered any more — the toolbar's Lock
+   button is the single source of truth. Keeping the selector here as a
+   harmless no-op in case any cached DOM has the class. */
+.ProseMirror .mb-vLockBadge { display: none !important; }
+
+/* Phase 9: edges become first-class selectable objects. */
+.ProseMirror .mb-visual g.edgePaths > path,
+.ProseMirror .mb-visual path.flowchart-link {
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+/* Phase 9: edge animation + edge selection + target hooks. */
+/* Marching ants — two speeds and a reverse-direction modifier. */
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-anim-slow,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-anim-slow {
+  animation: mb-edge-march 1400ms linear infinite;
+}
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-anim-fast,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-anim-fast {
+  animation: mb-edge-march 450ms linear infinite;
+}
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdge-anim-reverse,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdge-anim-reverse {
+  animation-direction: reverse;
+}
+@keyframes mb-edge-march {
+  to { stroke-dashoffset: -20; }
+}
+
+.ProseMirror .mb-visual g.edgePaths > path.mb-vEdgeSelected,
+.ProseMirror .mb-visual path.flowchart-link.mb-vEdgeSelected {
+  stroke: #6366f1 !important;
+  stroke-width: 3 !important;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.4));
+}
+
+/* Edge context tip v2 — theme-aware, two-tier (mini-bar + expanded panel) */
+.ProseMirror .mb-vEdgeCtx2 {
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 26;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.ProseMirror .mb-vEdgeCtx2.mb-hidden { display: none; }
+
+.ProseMirror .mb-vEdgeCtx2-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  font-family: var(--font-body);
+}
+.ProseMirror .mb-vEdgeCtx2-line {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vEdgeCtx2-line:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vEdgeCtx2-icon:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-danger { color: var(--callout-caution-accent); }
+.ProseMirror .mb-vEdgeCtx2-danger:hover { background: var(--callout-caution-bg); }
+.ProseMirror .mb-vEdgeCtx2-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+}
+
+.ProseMirror .mb-vEdgeCtx2-cap { position: relative; display: inline-flex; }
+.ProseMirror .mb-vEdgeCtx2-cappop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  min-width: 120px;
+  z-index: 28;
+}
+.ProseMirror .mb-vEdgeCtx2-cappop.mb-hidden { display: none; }
+.ProseMirror .mb-vEdgeCtx2-capitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+  text-align: left;
+}
+.ProseMirror .mb-vEdgeCtx2-capitem:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-capitem.mb-vEdgeCtx2-capitem-on {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+
+/* Animate button: when an animation is active the play icon gets a soft
+   highlight so users can tell at a glance. Cap toolbar buttons stay neutral
+   on purpose — the active pick shows in the dropdown, not on the chip. */
+.ProseMirror .mb-vEdgeCtx2-anim-btn.mb-vEdgeCtx2-anim-on {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+
+/* Animate popover: a two-row menu with Speed and Direction segmented
+   controls. Reuses the cap-popover container styling for consistency. */
+.ProseMirror .mb-vEdgeCtx2-animpop {
+  /* Anchor from the right so the menu stays inside the tip bar when the
+     animate button is near the right edge. */
+  left: auto;
+  right: 0;
+  min-width: 200px;
+  padding: 10px;
+  gap: 10px;
+}
+.ProseMirror .mb-vEdgeCtx2-animrow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ProseMirror .mb-vEdgeCtx2-animlabel {
+  font: 600 11px var(--font-body);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ProseMirror .mb-vEdgeCtx2-animseg {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.ProseMirror .mb-vEdgeCtx2-animseg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font: 500 12px var(--font-body);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.ProseMirror .mb-vEdgeCtx2-animseg-btn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-animseg-btn.mb-vEdgeCtx2-animseg-on {
+  background: var(--bg);
+  color: var(--callout-note-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.ProseMirror .mb-vEdgeCtx2-panel {
+  width: 260px;
+  padding: 12px 14px;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  font-family: var(--font-body);
+}
+.ProseMirror .mb-vEdgeCtx2-panel.mb-hidden { display: none; }
+.ProseMirror .mb-vEdgeCtx2-colorpanel { width: 240px; }
+
+/* Color button in the top mini-bar: shows the current line color. */
+.ProseMirror .mb-vEdgeCtx2-color {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ProseMirror .mb-vEdgeCtx2-color:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-colorswatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  display: inline-block;
+}
+
+.ProseMirror .mb-vEdgeCtx2-types {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+.ProseMirror .mb-vEdgeCtx2-type {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 6px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vEdgeCtx2-type:hover { background: var(--block-hover); }
+.ProseMirror .mb-vEdgeCtx2-type.mb-vEdgeCtx2-type-on {
+  background: var(--bg);
+  border-color: var(--link);
+}
+
+.ProseMirror .mb-vEdgeCtx2-slider {
+  margin-top: 14px;
+}
+.ProseMirror .mb-vEdgeCtx2-slider input[type="range"] {
+  width: 100%;
+}
+.ProseMirror .mb-vEdgeCtx2-sliderlabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 500 13px var(--font-body);
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+.ProseMirror .mb-vEdgeCtx2-sliderval { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+.ProseMirror .mb-vEdgeCtx2-nocolor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  margin-top: 14px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font: 500 14px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vEdgeCtx2-nocolor:hover { background: var(--block-hover); }
+
+.ProseMirror .mb-vEdgeCtx2-grouplabel {
+  margin-top: 14px;
+  margin-bottom: 8px;
+  font: 600 13px var(--font-body);
+  color: var(--text-secondary);
+}
+.ProseMirror .mb-vEdgeCtx2-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.ProseMirror .mb-vEdgeCtx2-swatch {
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto;
+}
+.ProseMirror .mb-vEdgeCtx2-swatch:hover { transform: scale(1.1); }
+
+/* Target hooks layer — same chrome as the source connection layer. */
+.ProseMirror .mb-vTargetHooks .mb-vConn-dot {
+  background: #22c55e;
+  border-color: #16a34a;
+  pointer-events: none;
+}
+
+/* Edge-draft target highlight: when dragging a new edge over a candidate
+   destination, the node's outer shape gets a green glow so the user knows
+   "release here". */
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget > rect,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget > circle,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget > ellipse,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget > polygon,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget > path,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget .basic > rect,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget .basic > polygon,
+.ProseMirror .mb-visual g.node.mb-vEdgeTarget .basic > path {
+  stroke: #22c55e !important;
+  stroke-width: 2.5 !important;
+  filter: drop-shadow(0 0 6px rgba(34, 197, 94, 0.45));
+}
+
+/* Context-tip lock button — visually toggled when state is on. */
+.ProseMirror .mb-vCtx-lock { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px; }
+.ProseMirror .mb-vCtx-lock.mb-vCtx-lock-on { background: rgba(255, 255, 255, 0.16); color: #fde68a; }
+.ProseMirror .mb-vCtx-multi {
+  display: inline-block;
+  padding: 0 7px;
+  font: 500 11px var(--font-body);
+  color: #ffffff;
+  opacity: 0.85;
+}
+.ProseMirror .mb-vCtx-multi.mb-hidden { display: none; }
+
+/* ===========================================================================
+   Phase 5: rich style context bar
+   =========================================================================== */
+
+.ProseMirror .mb-vCtx-num {
+  width: 36px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 1px 3px;
+  font: 500 11px var(--font-body);
+}
+.ProseMirror .mb-vCtx-num::-webkit-inner-spin-button { opacity: 0.4; }
+
+.ProseMirror .mb-vCtx-bold { font-weight: 700; }
+.ProseMirror .mb-vCtx-bold.mb-vCtx-bold-on { background: rgba(255, 255, 255, 0.18); }
+
+.ProseMirror .mb-vCtx-color { position: relative; display: inline-flex; }
+.ProseMirror .mb-vCtx-colorbtn { font: 600 12px ui-sans-serif, system-ui; }
+.ProseMirror .mb-vCtx-colorpop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  width: 102px;
+  padding: 6px;
+  background: #1f1f23;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  z-index: 27;
+}
+.ProseMirror .mb-vCtx-colorpop.mb-hidden { display: none; }
+.ProseMirror .mb-vCtx-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  padding: 0;
+}
+.ProseMirror .mb-vCtx-swatch:hover { transform: scale(1.1); }
+.ProseMirror .mb-vCtx-dup svg { width: 11px; height: 11px; }
+
+.ProseMirror .mb-vCtx-more { font-weight: 700; font-size: 13px; }
+.ProseMirror .mb-vCtx-morepop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  background: #1f1f23;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  z-index: 27;
+}
+.ProseMirror .mb-vCtx-morepop.mb-hidden { display: none; }
+
+/* Node style popover: two sliders for border thickness + opacity.
+   Wider than the color popover so the slider has room. */
+.ProseMirror .mb-vCtx-stylepop {
+  width: 200px;
+  padding: 10px;
+  flex-wrap: nowrap;
+  flex-direction: column;
+  gap: 10px;
+}
+.ProseMirror .mb-vCtx-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+.ProseMirror .mb-vCtx-slider input[type="range"] {
+  width: 100%;
+  accent-color: #ddd6fe;
+}
+.ProseMirror .mb-vCtx-sliderlabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 500 11px ui-sans-serif, sans-serif;
+  color: #ffffff;
+}
+.ProseMirror .mb-vCtx-sliderval {
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+.ProseMirror .mb-vCtx-styleBtn svg { vertical-align: -1px; }
+
+/* ===========================================================================
+   Phase 11: Node context tip v2 (white design — three popover groups:
+   Fill, Stroke, Type style + Alignment)
+   =========================================================================== */
+
+/* Override the dark base for v2 contexts. */
+.ProseMirror .mb-vCtx.mb-vCtx2 {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 8px;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  font: 500 13px var(--font-body);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-btn {
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-btn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-sep {
+  background: var(--border);
+  height: 18px;
+  margin: 0 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-num {
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  width: 36px;
+  font: 500 13px var(--font-body);
+  -moz-appearance: textfield;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-multi { color: var(--text-primary); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-danger:hover { background: var(--callout-caution-bg); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-danger { color: var(--callout-caution-accent); }
+
+/* The popwrap is the anchor for popovers. */
+.ProseMirror .mb-vCtx-popwrap { position: relative; display: inline-flex; }
+
+/* Pill button used for Fill / Stroke / Text — boxed icon with a blue
+   selection ring when its popover is open. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-pillbtn {
+  position: relative;
+  padding: 4px 6px;
+  border: 1.5px solid transparent;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-bigpop:not(.mb-hidden)) > .mb-vCtx-pillbtn,
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-bigpop:not(.mb-hidden)) > .mb-vCtx-typetrigger,
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-bigpop:not(.mb-hidden)) > .mb-vCtx-aligntrigger {
+  border-color: var(--link);
+  border-radius: 8px;
+  background: transparent;
+}
+
+/* Color underline strip on Fill / Stroke / Text icons. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-colorstrip {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-textbtn .mb-vCtx-colorstrip { left: 6px; right: 6px; bottom: 4px; }
+
+/* Large popover used by Fill / Stroke / Text-color / Type-style /
+   Alignment. White card matching the edge tip design. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  z-index: 28;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop.mb-hidden { display: none; }
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-tight { min-width: 0; padding: 8px; }
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-align { min-width: 0; padding: 10px; }
+
+/* Line-type row (stroke popover). */
+.ProseMirror .mb-vCtx2 .mb-vCtx-types {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typebtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-typebtn.mb-vCtx-typebtn-on {
+  background: var(--bg);
+  border-color: var(--link);
+}
+
+/* Slider rows (light variant). */
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderwrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderwrap input[type="range"] {
+  width: 100%;
+  accent-color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderrow {
+  display: flex;
+  justify-content: space-between;
+  font: 500 13px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-sliderval { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* No-color button. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-nocolor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font: 500 14px var(--font-body);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-nocolor:hover { background: var(--block-hover); }
+
+/* Color grid (brand + all). Six columns, generous swatches. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-grouplabel {
+  font: 600 13px var(--font-body);
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop .mb-vCtx-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  padding: 0;
+  margin: 0 auto;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop .mb-vCtx-swatch:hover { transform: scale(1.06); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop .mb-vCtx-swatch.mb-vCtx-swatch-on {
+  border-color: var(--link);
+  border-width: 2px;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.18);
+}
+
+/* Type-style popover (B I U S) — small horizontal row. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-tight .mb-vCtx-types {
+  grid-template-columns: repeat(4, 1fr);
+  background: transparent;
+  padding: 0;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typeglyph {
+  font: 600 15px var(--font-body);
+  min-width: 40px;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-typeglyph.mb-vCtx-typebtn-on {
+  background: var(--text-primary);
+  color: var(--bg);
+  border-color: transparent;
+}
+
+/* Alignment popover — two rows (horizontal then vertical), thin divider. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-bigpop-align {
+  flex-direction: column;
+  gap: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignrow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignbtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-alignbtn.mb-vCtx-alignbtn-on {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-aligndivider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Segmented controls inside the alignment popover (padding + line height). */
+.ProseMirror .mb-vCtx2 .mb-vCtx-segLabel {
+  font: 600 11px var(--font-body);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-segrow {
+  display: inline-flex;
+  width: 100%;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-segbtn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font: 500 12px var(--font-body);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-segbtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-segbtn.mb-vCtx-segbtn-on {
+  background: var(--text-primary);
+  color: var(--bg);
+}
+
+/* Light variant of the shape / more menus. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-popLight {
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.10);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 28;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popLight .mb-vCtx-menu-item {
+  color: var(--text-primary);
+  font: 500 13px var(--font-body);
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popLight .mb-vCtx-menu-item:hover { background: var(--block-hover); }
+
+.ProseMirror .mb-vCtx2 .mb-vCtx-morepop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Shape picker — trigger icon + popover icon grid. */
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapetrigger {
+  padding: 4px 6px;
+  border: 1.5px solid transparent;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-popwrap:has(> .mb-vCtx-shapegrid:not(.mb-hidden)) > .mb-vCtx-shapetrigger {
+  border-color: var(--link);
+  border-radius: 8px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapegrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 8px;
+  min-width: 200px;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapebtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  padding: 0;
+}
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapebtn:hover { background: var(--block-hover); }
+.ProseMirror .mb-vCtx2 .mb-vCtx-shapebtn.mb-vCtx-shapebtn-on {
+  background: var(--block-hover);
+  border-color: var(--link);
+}
+
+/* ===========================================================================
+   Phase 12: Left-side vertical toolbar v2 — matches context-tip white
+   design, bolder phosphor-style icons. ~15% smaller than the bottom
+   version it replaced.
+   =========================================================================== */
+.ProseMirror .mb-vTb.mb-vTb2 {
+  /* Override the base .mb-vTb position (bottom-center) → left-center. */
+  top: 50%;
+  bottom: auto;
+  left: 14px;
+  transform: translateY(-50%);
+  flex-direction: column;
+  padding: 6px;
+  gap: 2px;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  font: 500 12px var(--font-body);
+}
+.ProseMirror .mb-vTb2 .mb-vTb-btn {
+  width: 31px;
+  height: 31px;
+  border-radius: 7px;
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vTb2 .mb-vTb-btn svg {
+  width: 17px;
+  height: 17px;
+}
+.ProseMirror .mb-vTb2 .mb-vTb-btn:hover {
+  background: var(--block-hover);
+  color: var(--text-primary);
+}
+.ProseMirror .mb-vTb2 .mb-vTb-btn.mb-vTb-active {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+/* Separators run horizontal now that the bar is vertical. */
+.ProseMirror .mb-vTb2 .mb-vTb-sep {
+  width: 22px;
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Shapes popover to the RIGHT of the (now left-side) toolbar — same
+   white card as the context-tip popovers. 5×2 grid for the 10 shapes. */
+.ProseMirror .mb-vTb2 .mb-vTb-shapespop {
+  left: calc(100% + 8px);
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  z-index: 31;
+}
+.ProseMirror .mb-vTb2 .mb-vTb-shapespop-item {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+}
+.ProseMirror .mb-vTb2 .mb-vTb-shapespop-item svg {
+  width: 18px;
+  height: 18px;
+}
+.ProseMirror .mb-vTb2 .mb-vTb-reset.mb-vTb-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ProseMirror .mb-vTb2 .mb-vTb-grid.mb-vTb-active {
+  background: var(--callout-note-bg);
+  color: var(--callout-note-accent);
+}
+
+/* Resize handles around a single-selected, unlocked node. */
+.ProseMirror .mb-vResize {
+  position: absolute;
+  pointer-events: none;
+  z-index: 21;
+}
+.ProseMirror .mb-vResize.mb-hidden { display: none; }
+.ProseMirror .mb-vResize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border: 1.5px solid #6366f1;
+  border-radius: 2px;
+  pointer-events: auto;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.ProseMirror .mb-vResize-handle[data-pos="nw"],
+.ProseMirror .mb-vResize-handle[data-pos="se"] { cursor: nwse-resize; }
+.ProseMirror .mb-vResize-handle[data-pos="ne"],
+.ProseMirror .mb-vResize-handle[data-pos="sw"] { cursor: nesw-resize; }
+.ProseMirror .mb-vResize-handle[data-pos="n"],
+.ProseMirror .mb-vResize-handle[data-pos="s"]  { cursor: ns-resize; }
+.ProseMirror .mb-vResize-handle[data-pos="e"],
+.ProseMirror .mb-vResize-handle[data-pos="w"]  { cursor: ew-resize; }
+
+/* ===========================================================================
+   Phase 7: zoom + pan viewport
+   =========================================================================== */
+
+/* Zoom controls bottom-right. */
+.ProseMirror .mb-vZoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  z-index: 31;
+  font-family: var(--font-body);
+}
+.ProseMirror .mb-vZoom-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+}
+.ProseMirror .mb-vZoom-btn:hover { background: var(--block-hover); color: var(--text-primary); }
+.ProseMirror .mb-vZoom-readout {
+  font: 500 11px var(--font-mono);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: center;
+}
+.ProseMirror .mb-vZoom-fit { font-size: 14px; }
+
+/* Pan cursors. */
+.ProseMirror .mb-pan-temp,
+.ProseMirror .mb-pan-temp * { cursor: grab !important; }
+.ProseMirror .mb-panning,
+.ProseMirror .mb-panning * { cursor: grabbing !important; }
+
+/* When Pan tool is active in toolbar, .mb-svg-host area shows grab cursor. */
+.ProseMirror .mb-visual .mb-vTb-btn[data-tool="pan"].mb-vTb-active ~ * { /* no-op selector */ }
+
+/* ===========================================================================
+   Phase 10: Standalone "free" lines
+   ===========================================================================
+   Lines live in their own <g class="mb-vLines"> group inside the rendered
+   mermaid SVG. We only style hit-test behavior + hover/selected feedback —
+   the actual stroke/dash/width is set as SVG attributes by the overlay
+   render so dynamic styles "just work" without per-line CSS classes. */
+.ProseMirror .mb-vLines line.mb-vLine {
+  /* Only the stroke catches clicks. Without this the giant invisible
+     bounding box of a long line would shadow nearby nodes. */
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.ProseMirror .mb-vLines line.mb-vLine:hover {
+  stroke-opacity: 0.85;
+}
+.ProseMirror .mb-vLines line.mb-vLine.mb-vLine-selected {
+  /* Force a 3px blue stroke override regardless of the saved color, so the
+     selected line is visually unambiguous. The line's own color shows on
+     deselect. !important is necessary because the stroke attr is set
+     directly on the element. */
+  stroke: #6366f1 !important;
+  stroke-width: 3 !important;
+}
+/* Transient draft line while the user is dragging out a new one. */
+.ProseMirror line.mb-vLineDraft {
+  pointer-events: none;
+}
+/* Endpoint handles on the selected line — small white circles with a blue
+   ring, matching the connection-point dots' visual language. They paint
+   above the line so users can grab them precisely. */
+.ProseMirror g.mb-vLineHandles circle.mb-vLine-handle {
+  fill: #ffffff;
+  stroke: #6366f1;
+  stroke-width: 1.5;
+  cursor: grab;
+  pointer-events: all;
+}
+.ProseMirror g.mb-vLineHandles circle.mb-vLine-handle:hover {
+  fill: #6366f1;
+}
+.ProseMirror.mb-line-drag-active g.mb-vLineHandles circle.mb-vLine-handle {
+  cursor: grabbing;
+}
+/* When the user is dragging an endpoint or body, hide our line tip so it
+   doesn't follow the cursor into a frenzy. */
+.ProseMirror.mb-line-drag-active .mb-vLineTip {
+  display: none !important;
+}
+/* Show a crosshair cursor over the canvas when the Line tool is active. */
+.ProseMirror .mb-tool-line,
+.ProseMirror .mb-tool-line .mb-svg-host,
+.ProseMirror .mb-tool-line .mb-svg-host * { cursor: crosshair !important; }
+/* Don't override cursor on toolbar buttons — they should still look clickable. */
+.ProseMirror .mb-tool-line .mb-vTb,
+.ProseMirror .mb-tool-line .mb-vTb *,
+.ProseMirror .mb-tool-line .mb-vLineTip,
+.ProseMirror .mb-tool-line .mb-vLineTip *,
+.ProseMirror .mb-tool-line .mb-vZoom,
+.ProseMirror .mb-tool-line .mb-vZoom * { cursor: pointer !important; }
+
+/* ── Turn selection into… using AI ───────────────────────────────────── */
+.bubble-ai.hidden { display: none; }
+.bubble-ai { padding: 4px; }
+.bm-ai-btn.active { color: var(--link); }
+
+.bm-into-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 4px;
+}
+.bm-into-sublabel {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 4px 8px 2px;
+}
+
+.ai-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.28);
+  z-index: 9999;
+}
+.ai-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-panel-title { font-size: 14px; font-weight: 700; }
+.ai-panel-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  opacity: 0.5;
+  color: inherit;
+}
+.ai-panel-close:hover { opacity: 1; }
+.ai-panel-summary { padding: 12px 16px 4px; font-size: 12px; color: var(--text-secondary); }
+.ai-panel-mode { display: flex; gap: 8px; padding: 8px 16px; }
+.ai-mode-btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.ai-mode-btn.active {
+  border-color: #2f9f5f;
+  background: rgba(47,159,95,0.12);
+  font-weight: 600;
+}
+.ai-panel-prompt-wrap { padding: 4px 16px; }
+.ai-panel-prompt-wrap > summary {
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 6px 0;
+}
+.ai-panel-prompt {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--block-hover);
+  color: inherit;
+  resize: vertical;
+}
+.ai-panel-steps {
+  margin: 8px 16px;
+  padding-left: 20px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.ai-panel-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.ai-panel-btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.ai-panel-btn-primary {
+  background: #2f9f5f;
+  border-color: #2f9f5f;
+  color: #fff;
+  font-weight: 600;
 }

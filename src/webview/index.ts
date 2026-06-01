@@ -1,11 +1,15 @@
 import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
+import boardCss from './styles/board.css';
 import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly } from './editor';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
+import { setAlwaysDarkDiagram } from './mermaidRenderer';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
+import { initBoardSidePanel } from './boardSidePanel';
+import { setDocumentPath } from './docContext';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -64,6 +68,7 @@ interface SavedDefaults {
   pageWidth?: number;
   fullWidth?: boolean;
   alwaysDarkCode?: boolean;
+  alwaysDarkDiagram?: boolean;
   alwaysDarkSource?: boolean;
   sourceFullWidth?: boolean;
   shortenCodeSnippets?: boolean;
@@ -71,7 +76,7 @@ interface SavedDefaults {
   readOnly?: boolean;
   sourceWordWrap?: boolean;
 }
-interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; }
+interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
 type HostMessage = InitMessage | UpdateMessage;
 
@@ -94,6 +99,7 @@ const FACTORY_DEFAULTS = {
   pageWidth:           DEFAULT_WIDTH_PX,
   fullWidth:           false,
   alwaysDarkCode:      false,
+  alwaysDarkDiagram:   false,
   alwaysDarkSource:    false,
   sourceFullWidth:     false,
   shortenCodeSnippets: false,
@@ -101,12 +107,12 @@ const FACTORY_DEFAULTS = {
 
 const DEFAULT_KEYS = [
   'theme', 'font', 'textSize', 'pageWidth', 'fullWidth',
-  'alwaysDarkCode', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets',
+  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets',
 ] as const;
 
 function injectStyles(): void {
   const style = document.createElement('style');
-  style.textContent = lightCss + darkCss + editorCss;
+  style.textContent = lightCss + darkCss + editorCss + boardCss;
   document.head.appendChild(style);
 }
 
@@ -163,6 +169,7 @@ function init(): void {
   const pageWidthRow  = document.getElementById('page-width-row') as HTMLElement;
 
   const alwaysDarkCodeToggle = document.getElementById('always-dark-code-toggle') as HTMLElement;
+  const alwaysDarkDiagramToggle = document.getElementById('always-dark-diagram-toggle') as HTMLElement;
   const alwaysDarkSourceToggle = document.getElementById('always-dark-source-toggle') as HTMLElement;
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
@@ -174,6 +181,14 @@ function init(): void {
     document.documentElement.classList.toggle('code-always-dark', on);
     alwaysDarkCodeToggle.classList.toggle('on', on);
     alwaysDarkCodeToggle.setAttribute('aria-checked', String(on));
+    refreshDefaultsButtons();
+  }
+
+  function setAlwaysDarkDiagramState(on: boolean): void {
+    document.documentElement.classList.toggle('diagram-always-dark', on);
+    alwaysDarkDiagramToggle.classList.toggle('on', on);
+    alwaysDarkDiagramToggle.setAttribute('aria-checked', String(on));
+    setAlwaysDarkDiagram(on);
     refreshDefaultsButtons();
   }
 
@@ -203,6 +218,9 @@ function init(): void {
 
   alwaysDarkCodeToggle.addEventListener('click', () => {
     setAlwaysDarkCode(!alwaysDarkCodeToggle.classList.contains('on'));
+  });
+  alwaysDarkDiagramToggle.addEventListener('click', () => {
+    setAlwaysDarkDiagramState(!alwaysDarkDiagramToggle.classList.contains('on'));
   });
   alwaysDarkSourceToggle.addEventListener('click', () => {
     setAlwaysDarkSource(!alwaysDarkSourceToggle.classList.contains('on'));
@@ -599,6 +617,10 @@ function init(): void {
       if (el === exportTrigger) return;
       el.addEventListener('mouseenter', scheduleSubmenuClose);
     });
+    panel.querySelector<HTMLElement>('.act-refresh')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'refresh' });
+      closeAllActionsPanels();
+    });
     panel.querySelector<HTMLElement>('.act-copy')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'copyContent' });
       closeAllActionsPanels();
@@ -746,6 +768,7 @@ function init(): void {
     applyPageWidth();
     setWidth(d.fullWidth ? 'full' : 'normal');
     setAlwaysDarkCode(Boolean(d.alwaysDarkCode));
+    setAlwaysDarkDiagramState(Boolean(d.alwaysDarkDiagram));
     setAlwaysDarkSource(Boolean(d.alwaysDarkSource));
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
@@ -803,6 +826,7 @@ function init(): void {
       pageWidth:           parseInt(widthSlider.value, 10) || DEFAULT_WIDTH_PX,
       fullWidth:           widthMode === 'full',
       alwaysDarkCode:      alwaysDarkCodeToggle.classList.contains('on'),
+      alwaysDarkDiagram:   alwaysDarkDiagramToggle.classList.contains('on'),
       alwaysDarkSource:    alwaysDarkSourceToggle.classList.contains('on'),
       sourceFullWidth:     sourceFullWidthToggle.classList.contains('on'),
       shortenCodeSnippets: shortenSnippetsToggle.classList.contains('on'),
@@ -831,6 +855,7 @@ function init(): void {
       try {
       currentMarkdown = msg.markdown;
       if (msg.mediaBaseUri) setMediaBaseUri(msg.mediaBaseUri);
+      setDocumentPath(msg.documentPath ?? '');
       savedDefaults = { ...FACTORY_DEFAULTS, ...(msg.defaults ?? {}) };
       applyDefaults(msg.defaults ?? {});
       refreshDefaultsButtons();
@@ -841,6 +866,7 @@ function init(): void {
         vscode.postMessage({ type: 'edit', markdown });
       });
       editorReady = true;
+      initBoardSidePanel();
 
       try {
         const outlineBtn   = document.getElementById('outline-btn') as HTMLElement | null;

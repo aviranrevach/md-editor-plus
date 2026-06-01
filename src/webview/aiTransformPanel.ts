@@ -1,0 +1,129 @@
+import {
+  buildPrompt,
+  type AiTarget,
+  type AiInsertMode,
+  type AiPromptContext,
+} from './aiTransforms';
+import { formatSummary, type SelectionSummary } from './aiSelection';
+import { copyToClipboard } from './docContext';
+
+export interface AiPanelInput {
+  target: AiTarget;
+  targetLabel: string;
+  filePath: string;
+  startText: string;
+  endText: string;
+  startLine: number | null;
+  endLine: number | null;
+  summary: SelectionSummary;
+}
+
+export interface AiTransformPanel {
+  open(input: AiPanelInput): void;
+}
+
+export function createAiTransformPanel(): AiTransformPanel {
+  const el = document.createElement('div');
+  el.className = 'ai-panel';
+  el.style.display = 'none';
+  el.innerHTML = `
+    <div class="ai-panel-head">
+      <span class="ai-panel-title"></span>
+      <button class="ai-panel-close" data-ai-act="close" aria-label="Close">✕</button>
+    </div>
+    <div class="ai-panel-summary"></div>
+    <div class="ai-panel-mode">
+      <button class="ai-mode-btn" data-ai-mode="replace">↻ Replace selection</button>
+      <button class="ai-mode-btn" data-ai-mode="add">＋ Add below (keep original)</button>
+    </div>
+    <details class="ai-panel-prompt-wrap">
+      <summary>Prompt (format spec + file reference)</summary>
+      <textarea class="ai-panel-prompt" spellcheck="false"></textarea>
+    </details>
+    <ol class="ai-panel-steps">
+      <li><b>Copy</b> the prompt.</li>
+      <li><b>Paste it into your file-aware AI</b> (Claude Code, Cursor, the VS Code AI).</li>
+      <li>It <b>edits the file</b> — your viewer re-renders with the result.</li>
+    </ol>
+    <div class="ai-panel-foot">
+      <button class="ai-panel-btn" data-ai-act="edit">Edit prompt</button>
+      <button class="ai-panel-btn ai-panel-btn-primary" data-ai-act="copy">📋 Copy prompt</button>
+    </div>
+  `;
+  document.body.appendChild(el);
+
+  const titleEl   = el.querySelector<HTMLElement>('.ai-panel-title')!;
+  const summaryEl = el.querySelector<HTMLElement>('.ai-panel-summary')!;
+  const promptEl  = el.querySelector<HTMLTextAreaElement>('.ai-panel-prompt')!;
+  const copyBtn   = el.querySelector<HTMLElement>('[data-ai-act="copy"]')!;
+  const modeBtns  = Array.from(el.querySelectorAll<HTMLElement>('[data-ai-mode]'));
+
+  let current: AiPanelInput | null = null;
+  let mode: AiInsertMode = 'replace';
+
+  function ctx(): AiPromptContext {
+    return {
+      filePath: current!.filePath,
+      target:   current!.target,
+      mode,
+      startLine: current!.startLine,
+      endLine:   current!.endLine,
+      startText: current!.startText,
+      endText:   current!.endText,
+    };
+  }
+
+  function render(): void {
+    if (!current) return;
+    titleEl.textContent = `✨ Turn selection into ${current.targetLabel} — using AI`;
+    summaryEl.textContent = formatSummary(current.summary);
+    promptEl.value = buildPrompt(ctx());
+    modeBtns.forEach(b =>
+      b.classList.toggle('active', b.dataset.aiMode === mode),
+    );
+  }
+
+  function close(): void {
+    el.style.display = 'none';
+    current = null;
+  }
+
+  el.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const modeBtn = target.closest<HTMLElement>('[data-ai-mode]');
+    if (modeBtn) {
+      mode = modeBtn.dataset.aiMode as AiInsertMode;
+      render();
+      return;
+    }
+    const actBtn = target.closest<HTMLElement>('[data-ai-act]');
+    if (!actBtn) return;
+    switch (actBtn.dataset.aiAct) {
+      case 'close': close(); break;
+      case 'edit':
+        (el.querySelector('.ai-panel-prompt-wrap') as HTMLDetailsElement).open = true;
+        promptEl.focus();
+        break;
+      case 'copy': {
+        copyToClipboard(promptEl.value);
+        const prev = copyBtn.textContent;
+        copyBtn.textContent = '✓ Copied';
+        setTimeout(() => { copyBtn.textContent = prev; }, 1500);
+        break;
+      }
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && el.style.display !== 'none') close();
+  });
+
+  return {
+    open(input: AiPanelInput): void {
+      current = input;
+      mode = 'replace';
+      render();
+      el.style.display = 'block';
+    },
+  };
+}
