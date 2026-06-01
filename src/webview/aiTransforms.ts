@@ -2,6 +2,8 @@
 // No editor/DOM imports — must stay unit-testable in the node jest env.
 
 export type AiTarget =
+  // Open-ended discussion — a free-text request, not a format conversion.
+  | 'ask'
   | 'table'
   | 'kanban'
   | 'board-table'
@@ -26,6 +28,8 @@ export interface AiPromptContext {
   startText: string;
   /** Plain text of the last selected line. */
   endText: string;
+  /** Freestyle request — only used by the 'ask' target. */
+  request?: string;
 }
 
 export interface AiTransform {
@@ -38,6 +42,10 @@ export interface AiTransform {
 const SPARKLE =
   '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
   '<path d="M128 24 L150 106 L232 128 L150 150 L128 232 L106 150 L24 128 L106 106 Z"/></svg>';
+// A chat bubble — the open-ended "Ask AI" target.
+const ASK_ICON =
+  '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
+  '<path d="M128 32C70.6 32 24 72.2 24 122c0 21.7 8.8 41.5 23.4 57L36 207a12 12 0 0 0 13.7 16.6L92 213a116 116 0 0 0 36 6c57.4 0 104-40.2 104-90S185.4 32 128 32Zm-40 102a14 14 0 1 1 14-14 14 14 0 0 1-14 14Zm40 0a14 14 0 1 1 14-14 14 14 0 0 1-14 14Zm40 0a14 14 0 1 1 14-14 14 14 0 0 1-14 14Z"/></svg>';
 const TABLE_ICON =
   '<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor">' +
   '<path d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16ZM40 56h64v40H40Zm80 0h96v40h-96ZM40 112h64v40H40Zm0 88v-32h64v32Zm80 0v-32h96v32Zm96-48h-96v-40h96Z"/></svg>';
@@ -79,6 +87,8 @@ const TIMELINE_ICON =
   '<rect x="96" y="174" width="120" height="20" rx="6" opacity="0.55"/></svg>';
 
 export const AI_TRANSFORMS: AiTransform[] = [
+  // Open-ended — a free-text request rather than a format conversion.
+  { id: 'ask',          label: 'Ask AI…',         iconHtml: ASK_ICON },
   // Phase 1 — structural (proprietary grammar).
   { id: 'table',        label: 'Table',           iconHtml: TABLE_ICON },
   { id: 'kanban',       label: 'Board: Kanban',   iconHtml: KANBAN_ICON },
@@ -91,7 +101,7 @@ export const AI_TRANSFORMS: AiTransform[] = [
   { id: 'timeline',     label: 'Timeline',        iconHtml: TIMELINE_ICON },
 ];
 
-const TARGET_PHRASE: Record<AiTarget, string> = {
+const TARGET_PHRASE: Record<Exclude<AiTarget, 'ask'>, string> = {
   table:         'a markdown table',
   kanban:        'a Kanban board',
   'board-table': 'a table-view board (a database-style table)',
@@ -179,7 +189,7 @@ const TIMELINE_SPEC = `Arrange the content as a chronological timeline, earliest
 
 Use the dates/times present in the content. If an item has no explicit date, place it where it best fits and append "(date?)". Plain markdown only.`;
 
-const FORMAT_SPECS: Record<AiTarget, string> = {
+const FORMAT_SPECS: Record<Exclude<AiTarget, 'ask'>, string> = {
   table:          TABLE_SPEC,
   kanban:         boardSpec('kanban'),
   'board-table':  boardSpec('table'),
@@ -190,26 +200,43 @@ const FORMAT_SPECS: Record<AiTarget, string> = {
   timeline:       TIMELINE_SPEC,
 };
 
-function buildWhere(ctx: AiPromptContext): string {
+function anchorClause(ctx: AiPromptContext): string {
   const anchor = (line: number | null, text: string, edge: 'starts' | 'ends') =>
     line != null
       ? `${edge} at about line ${line} (\`${text}\`)`
       : `${edge} at the line \`${text}\``;
+  return `${anchor(ctx.startLine, ctx.startText, 'starts')} and ${anchor(ctx.endLine, ctx.endText, 'ends')}`;
+}
+
+function buildWhere(ctx: AiPromptContext): string {
   return (
     `You are editing the file \`${ctx.filePath}\` in this workspace.\n` +
-    `In that file, find the section that ${anchor(ctx.startLine, ctx.startText, 'starts')} ` +
-    `and ${anchor(ctx.endLine, ctx.endText, 'ends')}.`
+    `In that file, find the section that ${anchorClause(ctx)}.`
   );
 }
 
 function buildInstruction(ctx: AiPromptContext): string {
-  const phrase = TARGET_PHRASE[ctx.target];
+  const phrase = TARGET_PHRASE[ctx.target as Exclude<AiTarget, 'ask'>];
   return ctx.mode === 'replace'
     ? `Replace that entire section with ${phrase} built from its content.`
     : `Insert ${phrase} built from that section's content immediately after it, leaving the original text in place.`;
 }
 
+// Open-ended discussion prompt — no Replace/Add, no "edit the file" rule. The
+// request is optional: when empty, the prompt simply opens the conversation so
+// the user can type their ask in the AI tool after pasting.
+function buildAskPrompt(ctx: AiPromptContext): string {
+  const lines = [
+    `Let's talk about a section of the file \`${ctx.filePath}\` in this workspace — the section that ${anchorClause(ctx)}.`,
+  ];
+  const req = (ctx.request ?? '').trim();
+  lines.push(req || "I'll tell you what I'd like to do with it next.");
+  lines.push(`Rules:\n- ${CONTENT_RULE}`);
+  return lines.join('\n\n');
+}
+
 export function buildPrompt(ctx: AiPromptContext): string {
+  if (ctx.target === 'ask') return buildAskPrompt(ctx);
   return [
     buildWhere(ctx),
     buildInstruction(ctx),

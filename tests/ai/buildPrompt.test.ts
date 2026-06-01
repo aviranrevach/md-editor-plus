@@ -10,10 +10,10 @@ const base: AiPromptContext = {
   endText: 'Set up analytics — Dev, Thu',
 };
 
-const ALL_TARGETS = ['table', 'kanban', 'board-table', 'mermaid', 'summary', 'action-items', 'outline', 'timeline'];
+const ALL_TARGETS = ['ask', 'table', 'kanban', 'board-table', 'mermaid', 'summary', 'action-items', 'outline', 'timeline'];
 
 describe('AI_TRANSFORMS registry', () => {
-  it('registers the phase-1 structural targets and the phase-2 thinking targets in order', () => {
+  it('registers Ask AI first, then the structural and thinking targets', () => {
     expect(AI_TRANSFORMS.map(t => t.id)).toEqual(ALL_TARGETS);
   });
   it('every entry has a label, iconHtml and id', () => {
@@ -104,5 +104,29 @@ describe('buildPrompt — per-target format spec', () => {
     const p = buildPrompt({ ...base, target: 'timeline' });
     expect(p).toMatch(/chronological/i);
     expect(p).toContain('**YYYY-MM-DD**');
+  });
+});
+
+describe('buildPrompt — ask (custom prompt)', () => {
+  it('opens a discussion referencing the file + anchors', () => {
+    const p = buildPrompt({ ...base, target: 'ask' });
+    expect(p).toMatch(/Let's talk about a section/i);
+    expect(p).toContain('notes/q2-launch.md');
+    expect(p).toContain('Draft press release — Maya, Fri');
+  });
+  it('includes the freestyle request when provided', () => {
+    const p = buildPrompt({ ...base, target: 'ask', request: 'find the riskiest assumption here' });
+    expect(p).toContain('find the riskiest assumption here');
+  });
+  it('falls back to an opener when no request is given', () => {
+    const p = buildPrompt({ ...base, target: 'ask', request: '   ' });
+    expect(p).toMatch(/what I'd like to do with it next/i);
+  });
+  it('does NOT carry the edit-the-file / no-acknowledgement rule', () => {
+    const p = buildPrompt({ ...base, target: 'ask', request: 'explain this' });
+    expect(p).not.toMatch(/reply with only an acknowledgement/i);
+    expect(p).not.toMatch(/Replace that entire section/i);
+    // but the content-handling rule still applies
+    expect(p).toMatch(/Never silently drop content/i);
   });
 });

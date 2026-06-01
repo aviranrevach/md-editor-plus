@@ -4606,6 +4606,24 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   background: rgba(47,159,95,0.12);
   font-weight: 600;
 }
+.ai-panel-ask { padding: 4px 16px 8px; }
+.ai-panel-ask-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.ai-panel-ask-hint { opacity: 0.7; font-weight: 400; }
+.ai-panel-ask-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 64px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text-primary);
+  resize: vertical;
+}
+.ai-panel-ask-input:focus { outline: none; border-color: var(--link); }
+
 .ai-panel-prompt-wrap { padding: 4px 16px; }
 .ai-panel-prompt-wrap > summary {
   font-size: 12px;
