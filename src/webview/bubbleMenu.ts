@@ -693,9 +693,9 @@ export function createBubbleMenu(editor: Editor): void {
         }
         break;
       }
-      case 'color':     colorSwatch.classList.toggle('open'); hlSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); break;
-      case 'highlight': hlSwatch.classList.toggle('open');    colorSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); break;
-      case 'emoji':     emojiSwatch.classList.toggle('open'); colorSwatch.classList.remove('open'); hlSwatch.classList.remove('open'); closeInto(); break;
+      case 'color':     colorSwatch.classList.toggle('open'); hlSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); break;
+      case 'highlight': hlSwatch.classList.toggle('open');    colorSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); break;
+      case 'emoji':     emojiSwatch.classList.toggle('open'); colorSwatch.classList.remove('open'); hlSwatch.classList.remove('open'); closeInto(); closeAi(); break;
       case 'ai': {
         closeSwatch();
         closeInto();
