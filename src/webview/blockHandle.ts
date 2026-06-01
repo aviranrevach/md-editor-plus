@@ -153,6 +153,30 @@ export function createBlockHandle(editor: Editor): void {
     });
     dragIcon.addEventListener('mouseleave', () => hideTooltip(tooltip));
 
+    // Delete (trash) button — removes the whole block under the handle by its
+    // position, so it works for every block type including atom nodes (boards,
+    // mermaid) that can't easily be selected and deleted by keyboard.
+    const delBtn = document.createElement('button');
+    delBtn.className = 'block-handle-delete';
+    delBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor">' +
+      '<path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16ZM96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm16 152a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Zm48 0a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Z"/></svg>';
+    handleEl.appendChild(delBtn);
+
+    delBtn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const block = getBlockAtHandle(editor, handleEl);
+      if (!block) return;
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: block.blockPos, to: block.blockEnd })
+        .run();
+    });
+    delBtn.addEventListener('mouseenter', () => showTooltip(tooltip, delBtn, 'Delete block'));
+    delBtn.addEventListener('mouseleave', () => hideTooltip(tooltip));
+
     // Hide the global block handle when the cursor is over a code block —
     // code blocks have their own per-line drag in the gutter. Use mousemove
     // (not a mutation observer on the handle's style) so we never get stuck
