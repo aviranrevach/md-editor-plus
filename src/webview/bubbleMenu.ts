@@ -1,9 +1,10 @@
 import { Editor } from '@tiptap/core';
 import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import { PluginKey } from '@tiptap/pm/state';
-import { AI_TRANSFORMS, buildPrompt, type AiTarget } from './aiTransforms';
-import { locateAnchors, truncateAnchor } from './aiSelection';
-import { getDocumentPath, copyToClipboard } from './docContext';
+import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
+import { createAiTransformPanel } from './aiTransformPanel';
+import { summarizeSelection, locateAnchors, truncateAnchor } from './aiSelection';
+import { getDocumentPath } from './docContext';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -241,6 +242,7 @@ export function createBubbleMenu(editor: Editor): void {
   const intoPanel    = el.querySelector<HTMLElement>('#bm-into')!;
   const aiPanel      = el.querySelector<HTMLElement>('#bm-ai')!;
   const aiBtn        = el.querySelector<HTMLElement>('[data-action="ai"]')!;
+  const aiTransformPanel = createAiTransformPanel();
   const intoInput    = el.querySelector<HTMLInputElement>('.bubble-into-input')!;
   const moreBtn      = el.querySelector<HTMLElement>('[data-action="more"]')!;
   const colorBar     = el.querySelector<SVGRectElement>('#bm-color-bar');
@@ -285,10 +287,7 @@ export function createBubbleMenu(editor: Editor): void {
     }
   }
 
-  // Build the AI prompt for the current selection + target and copy it straight
-  // to the clipboard (the host shows an "AI prompt copied" notification). No
-  // modal — paste it into your AI chat and refine there.
-  function runAiTarget(target: AiTarget): void {
+  function openAiPanel(target: AiTarget, label: string): void {
     const { from, to } = editor.state.selection;
     const slice = editor.state.doc.textBetween(from, to, '\n', '\n');
     const nonEmpty = slice.split('\n').filter(l => l.trim().length > 0);
@@ -300,15 +299,18 @@ export function createBubbleMenu(editor: Editor): void {
     // display anchor would end in "…") still matches the source.
     const md = editor.storage.markdown.getMarkdown() as string;
     const { startLine, endLine } = locateAnchors(md, startRaw, endRaw);
-    const prompt = buildPrompt({
+    const startText = truncateAnchor(startRaw);
+    const endText   = truncateAnchor(endRaw);
+    aiTransformPanel.open({
       target,
+      targetLabel: label,
       filePath: getDocumentPath() || 'this file',
-      startText: truncateAnchor(startRaw),
-      endText:   truncateAnchor(endRaw),
+      startText,
+      endText,
       startLine,
       endLine,
+      summary: summarizeSelection(slice),
     });
-    copyToClipboard(prompt);
     closeAi();
     closeInto();
   }
@@ -656,7 +658,7 @@ export function createBubbleMenu(editor: Editor): void {
       e.stopPropagation();
       const tgt = (aiItem.dataset.ai ?? aiItem.dataset.aiInto) as AiTarget;
       const def = AI_TRANSFORMS.find(t => t.id === tgt);
-      if (def) runAiTarget(def.id);
+      if (def) openAiPanel(def.id, def.label);
       return;
     }
 

@@ -41,10 +41,11 @@ describe('buildPrompt — shared parts', () => {
     expect(p).toContain('Draft press release — Maya, Fri');
     expect(p).not.toMatch(/about line null/);
   });
-  it('the instruction offers both replace and add-below placement', () => {
-    const p = buildPrompt({ ...base, target: 'table' });
-    expect(p).toMatch(/Replace that section/i);
-    expect(p).toMatch(/add the .+ below it/i);
+  it('uses replace wording for replace mode', () => {
+    expect(buildPrompt(base)).toMatch(/Replace that entire section/i);
+  });
+  it('uses add wording for add mode', () => {
+    expect(buildPrompt({ ...base, mode: 'add' })).toMatch(/immediately after it, leaving the original/i);
   });
   it('carries the content-handling rule and forbids a bare acknowledgement', () => {
     const p = buildPrompt(base);
