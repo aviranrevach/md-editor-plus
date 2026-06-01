@@ -704,7 +704,7 @@ Then add this helper near `turnIntoHtml()`:
 ```typescript
 function aiListHtml(attr = 'ai'): string {
   return AI_TRANSFORMS.map(t =>
-    `<button class="bm-into-item" data-${attr}="${t.target}">
+    `<button class="bm-into-item" data-${attr}="${t.id}">
       <span class="bm-into-icon">${t.iconHtml}</span>
       <span class="bm-into-label">${t.label}</span>
     </button>`
@@ -771,8 +771,8 @@ In the `el.addEventListener('click', e => { … })` handler, at the very top (be
     if (aiItem) {
       e.stopPropagation();
       const tgt = (aiItem.dataset.ai ?? aiItem.dataset.aiInto) as AiTarget;
-      const def = AI_TRANSFORMS.find(t => t.target === tgt);
-      if (def) openAiPanel(def.target, def.label);
+      const def = AI_TRANSFORMS.find(t => t.id === tgt);
+      if (def) openAiPanel(def.id, def.label);
       return;
     }
 ```
