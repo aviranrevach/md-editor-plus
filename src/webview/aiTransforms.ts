@@ -19,7 +19,8 @@ export interface AiPromptContext {
   /** Workspace-relative path of the file being edited. */
   filePath: string;
   target: AiTarget;
-  mode: AiInsertMode;
+  /** @deprecated kept for back-compat; placement is now offered inside the prompt text. */
+  mode?: AiInsertMode;
   /** 1-based source line of the first selected line; null when unknown. */
   startLine: number | null;
   /** 1-based source line of the last selected line; null when unknown. */
@@ -217,9 +218,7 @@ function buildWhere(ctx: AiPromptContext): string {
 
 function buildInstruction(ctx: AiPromptContext): string {
   const phrase = TARGET_PHRASE[ctx.target as Exclude<AiTarget, 'ask'>];
-  return ctx.mode === 'replace'
-    ? `Replace that entire section with ${phrase} built from its content.`
-    : `Insert ${phrase} built from that section's content immediately after it, leaving the original text in place.`;
+  return `Replace that section with ${phrase} built from its content — or, if I'd rather keep the original, add the ${phrase} right below it instead.`;
 }
 
 // Open-ended discussion prompt — no Replace/Add, no "edit the file" rule. The
