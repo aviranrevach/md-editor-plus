@@ -83,6 +83,7 @@ const ICO = {
   hr: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z"/></svg>`,
   board: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM104,200H40V56h64Zm32-144v144H120V56Zm80,0V200H152V56Z"/></svg>`,
   whiteboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M240,192h-8V56a16,16,0,0,0-16-16H40A16,16,0,0,0,24,56V192H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM40,56H216V192H200V168a8,8,0,0,0-8-8H120a8,8,0,0,0-8,8v24H72V88H184v48a8,8,0,0,0,16,0V80a8,8,0,0,0-8-8H64a8,8,0,0,0-8,8V192H40ZM184,192H128V176h56Z"/></svg>`,
+  trash: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16ZM96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm16 152a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Zm48 0a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Z"/></svg>`,
 };
 
 export const BLOCK_DEFS: BlockDef[] = [
@@ -446,8 +447,37 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       });
     }
 
+    // Convert mode (dragger opened over an existing block): offer a Delete
+    // action at the bottom. It targets the block captured when the picker was
+    // opened (context.activeBlock.blockPos) — reliable for atom nodes like
+    // boards, unlike re-sampling coordinates at click time.
+    if (!drillParent && context.activeBlock) {
+      const sep = document.createElement('div');
+      sep.className = 'block-picker-sep';
+      list.appendChild(sep);
+      const del = document.createElement('div');
+      del.className = 'block-picker-item block-picker-delete';
+      del.innerHTML = `<span class="block-picker-icon">${ICO.trash}</span><span class="block-picker-label">Delete</span>`;
+      del.addEventListener('mousedown', (e) => { e.preventDefault(); deleteActiveBlock(); });
+      list.appendChild(del);
+    }
+
     activeIdx = 0;
     updateActive();
+  }
+
+  function deleteActiveBlock(): void {
+    const ab = context.activeBlock;
+    if (!ab) { close(); return; }
+    editor.chain().focus().command(({ tr, dispatch }) => {
+      // Re-read the node at the captured position to get its current size,
+      // then delete exactly that one block.
+      const node = tr.doc.nodeAt(ab.blockPos);
+      if (!node) return false;
+      if (dispatch) tr.delete(ab.blockPos, ab.blockPos + node.nodeSize);
+      return true;
+    }).run();
+    close();
   }
 
   function renderRow(block: BlockDef, idx: number): HTMLElement {

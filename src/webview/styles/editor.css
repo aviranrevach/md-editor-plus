@@ -1998,6 +1998,15 @@ html.source-full-width #source-view {
   color: var(--link);
 }
 
+/* Destructive "Delete" action at the bottom of the dragger menu (convert mode) */
+.block-picker-item.block-picker-delete { color: #e5484d; }
+.block-picker-item.block-picker-delete .block-picker-icon { color: #e5484d; }
+.block-picker-item.block-picker-delete:hover,
+.block-picker-item.block-picker-delete.active {
+  background: rgba(229,72,77,0.12);
+  color: #e5484d;
+}
+
 .block-picker-icon {
   width: 36px;
   height: 36px;
@@ -2833,6 +2842,8 @@ html.source-word-wrap #source-view .cb-content {
   width: 100%;
 }
 .ProseMirror .mb-more-row:hover { background: var(--block-hover); }
+.ProseMirror .mb-more-row-delete { color: #e5484d; }
+.ProseMirror .mb-more-row-delete:hover { background: rgba(229,72,77,0.12); }
 .ProseMirror .mb-more-row-toggle { justify-content: space-between; }
 .ProseMirror .mb-more-row-label { color: var(--text-primary); }
 .ProseMirror .mb-more-row-toggle .mb-toggle {
@@ -4530,7 +4541,7 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 
 /* ── Turn selection into… using AI ───────────────────────────────────── */
 .bubble-ai.hidden { display: none; }
-.bubble-ai { padding: 4px; }
+.bubble-ai { padding: 4px; max-height: 340px; overflow-y: auto; }
 .bm-ai-btn.active { color: var(--link); }
 
 .bm-into-divider {
@@ -4595,6 +4606,24 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   background: rgba(47,159,95,0.12);
   font-weight: 600;
 }
+.ai-panel-ask { padding: 4px 16px 8px; }
+.ai-panel-ask-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.ai-panel-ask-hint { opacity: 0.7; font-weight: 400; }
+.ai-panel-ask-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 64px;
+  font: inherit;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text-primary);
+  resize: vertical;
+}
+.ai-panel-ask-input:focus { outline: none; border-color: var(--link); }
+
 .ai-panel-prompt-wrap { padding: 4px 16px; }
 .ai-panel-prompt-wrap > summary {
   font-size: 12px;

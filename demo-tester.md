@@ -71,6 +71,40 @@ Keyboard shortcuts that work right now:
 3. Pick a formatting option
 4. Continue typing — focus stays where you left it
 
+<!-- board:start id="b-fmt1" name="Bubble menu workflow" columns="Todo|Doing|Done" column-colors="blue|amber|emerald" field-types="Title=text,Status=status,Step=text,id=text" hidden-fields="id" active-view="kanban" -->
+
+| Title | Status | Step | id |
+|---|---|---|---|
+| Select some text | Done | 1 | c1 |
+| The bubble menu appears above the selection | Done | 2 | c2 |
+| Pick a formatting option | Doing | 3 | c3 |
+| Continue typing — focus stays where you left it | Todo | 4 | c4 |
+
+<!-- board:body id="c1" -->
+
+Highlight any run of text in the editor to begin.
+
+<!-- board:body id="c2" -->
+
+A floating toolbar surfaces just above the selection — no clicking into a menu.
+
+<!-- board:body id="c3" -->
+
+Choose bold, italic, link, or any other inline option from the bubble menu.
+
+<!-- board:body id="c4" -->
+
+The bubble menu dismisses and your cursor stays exactly where you left it.
+
+<!-- board:end -->
+
+|  | Action |
+| --- | --- |
+| 1 | Select some text |
+| 2 | The bubble menu appears above the selection |
+| 3 | Pick a formatting option |
+| 4 | Continue typing — focus stays where you left it |
+
 ---
 
 ## Blockquotes
@@ -87,20 +121,104 @@ GitHub-flavored callouts render with a colored background and an icon.
 
 > [!NOTE] 💡
 > Use Note for general context, links to related docs, or anything informational. [!TIP] ✅ Use Tip for shortcuts, optimizations, or the "you probably also want…" hint. [!IMPORTANT] 📌 Use Important when the reader needs to know this before they act on the rest of the doc. [!WARNING] ⚠️ Use Warning for things that will surprise people: breaking changes, side effects, footguns. [!CAUTION] 🛑 Use Caution for the dangerous stuff. Data loss, irreversible operations, security gotchas.
+
 ---
 
 ## Tables
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| Inline editing | ✅ | Click any block |
-| Bubble menu | ✅ | Appears on text select |
-| Block picker | ✅ | `⌘/` or `+` icon |
-| Drag to reorder | ✅ | Grab the `⠿` handle |
-| Frontmatter (YAML / TOML) | ✅ | Preserved, hidden, jumps to Code view |
-| Themes | ✅ | Light · Claude · Sepia · Dark |
-| Sync with VS Code theme | ✅ | Toggle in settings panel |
-| Page width | ✅ | 600 → 1400 px slider with magnetic stops |
+<!-- board:start id="b-tbl1" name="Editor features" columns="Todo|Doing|Done" column-colors="blue|amber|emerald" field-types="Title=text,Status=status,Notes=text,id=text" hidden-fields="id" active-view="kanban" -->
+
+| Title | Status | Notes | id |
+|---|---|---|---|
+| Inline editing | Done | Click any block | c1 |
+| Bubble menu | Done | Appears on text select | c2 |
+| Block picker | Done | `⌘/` or `+` icon | c3 |
+| Drag to reorder | Done | Grab the `⠿` handle | c4 |
+| Frontmatter (YAML / TOML) | Done | Preserved, hidden, jumps to Code view | c5 |
+| Themes | Done | Light · Claude · Sepia · Dark | c6 |
+| Sync with VS Code theme | Done | Toggle in settings panel | c7 |
+| Page width | Done | 600 → 1400 px slider with magnetic stops | c8 |
+
+<!-- board:body id="c1" -->
+
+Click any block to edit it inline.
+
+<!-- board:body id="c2" -->
+
+The bubble menu appears whenever you select text.
+
+<!-- board:body id="c3" -->
+
+Open the block picker with `⌘/` or the `+` icon.
+
+<!-- board:body id="c4" -->
+
+Grab the `⠿` handle to drag blocks into a new order.
+
+<!-- board:body id="c5" -->
+
+Frontmatter in YAML or TOML is preserved, hidden, and jumps to the Code view.
+
+<!-- board:body id="c6" -->
+
+Switch between Light, Claude, Sepia, and Dark themes.
+
+<!-- board:body id="c7" -->
+
+Sync with the VS Code theme via the toggle in the settings panel.
+
+<!-- board:body id="c8" -->
+
+Adjust page width with a 600 → 1400 px slider that has magnetic stops.
+
+<!-- board:end -->
+
+<!-- board:start id="b-feat1" name="Feature status" columns="Todo|Doing|Done" column-colors="blue|amber|emerald" field-types="Title=text,Status=status,Notes=text,id=text" hidden-fields="id" active-view="kanban" -->
+
+| Title | Status | Notes | id |
+|---|---|---|---|
+| Inline editing | Done | Click any block | c1 |
+| Bubble menu | Done | Appears on text select | c2 |
+| Block picker | Done | `⌘/` or `+` icon | c3 |
+| Drag to reorder | Done | Grab the `⠿` handle | c4 |
+| Frontmatter (YAML / TOML) | Done | Preserved, hidden, jumps to Code view | c5 |
+| Themes | Done | Light · Claude · Sepia · Dark | c6 |
+| Sync with VS Code theme | Done | Toggle in settings panel | c7 |
+| Page width | Done | 600 → 1400 px slider with magnetic stops | c8 |
+
+<!-- board:body id="c1" -->
+
+Click any block to edit it inline.
+
+<!-- board:body id="c2" -->
+
+The bubble menu appears whenever you select text.
+
+<!-- board:body id="c3" -->
+
+Open the block picker with `⌘/` or the `+` icon.
+
+<!-- board:body id="c4" -->
+
+Grab the `⠿` handle to drag blocks into a new order.
+
+<!-- board:body id="c5" -->
+
+Frontmatter in YAML or TOML is preserved, hidden, and jumps to the Code view.
+
+<!-- board:body id="c6" -->
+
+Switch between Light, Claude, Sepia, and Dark themes.
+
+<!-- board:body id="c7" -->
+
+Sync with the VS Code theme via the toggle in the settings panel.
+
+<!-- board:body id="c8" -->
+
+Adjust page width with a 600 → 1400 px slider that has magnetic stops.
+
+<!-- board:end -->
 
 ---
 
@@ -217,9 +335,7 @@ Local image (extension icon, from `media/`):
 
 ![Logo SVG](media/icon.svg)A reference-style image works too:
 
-![Claude icon](media/claude-icon.svg "Claude theme icon")
-
-> [!NOTE] 💡
+![Claude icon](media/claude-icon.svg "Claude theme icon")> [!NOTE] 💡
 > Image paths render relative to the workspace root, so media/icon.png resolves the same way it does on GitHub.
 
 ---
@@ -241,22 +357,22 @@ Toggles round-trip as HTML `<details>` blocks. Click to expand.
 <details>
 <summary>Toggle</summary>
 
-ToggleToggleHow does the bubble menu decide where to appear?It listens to TipTap's selectionUpdate event, measures the selection's bounding rect, then flips above or below depending on viewport space. There's a 350 ms debounce so it doesn't flicker mid-drag.
+ToggleToggleToggleHow does the bubble menu decide where to appear?It listens to TipTap's selectionUpdate event, measures the selection's bounding rect, then flips above or below depending on viewport space. There's a 350 ms debounce so it doesn't flicker mid-drag.
 
 </details>
 <details>
 <summary>Toggle</summary>
 
-ToggleToggleWhat happens to my YAML frontmatter?It's stripped out before the editor parses the document, kept in a side buffer, and re-attached on save. When a file has frontmatter, a small numeric badge appears on the Code view-toggle button showing the line count — click it to jump to Code view and edit the YAML directly.
+ToggleToggleToggleWhat happens to my YAML frontmatter?It's stripped out before the editor parses the document, kept in a side buffer, and re-attached on save. When a file has frontmatter, a small numeric badge appears on the Code view-toggle button showing the line count — click it to jump to Code view and edit the YAML directly.
 
 </details>
 <details>
 <summary>Toggle</summary>
 
-ToggleToggleCan I use this on .mdx files?Yes — .mdx is registered as a supported extension. JSX expressions render as raw text in Preview; switch to Code view to edit them as Markdown source.
+ToggleToggleToggleCan I use this on .mdx files?Yes — .mdx is registered as a supported extension. JSX expressions render as raw text in Preview; switch to Code view to edit them as Markdown source.
 
 </details>
-\\---
+\\\\---
 
 ## Horizontal rules
 

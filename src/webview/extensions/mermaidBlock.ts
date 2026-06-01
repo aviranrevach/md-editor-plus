@@ -351,6 +351,15 @@ function buildMermaidView(props: unknown) {
     if (!lastSvg) return;
     void rasterizeAndDownload(lastSvg, filenameStem(currentSource()) + '.png');
   });
+  copySplit.onMenu('delete', () => {
+    if (typeof getPos !== 'function') return;
+    const pos = (getPos as () => number)();
+    if (typeof pos !== 'number') return;
+    const cbNode = editor.state.doc.nodeAt(pos);
+    if (!cbNode) return;
+    const tr = editor.state.tr as unknown as { delete: (a: number, b: number) => unknown };
+    editor.view.dispatch(tr.delete(pos, pos + cbNode.nodeSize));
+  });
 
   // ── Esc / outside click exit edit ──────────────────────────────────────
   function onKey(e: KeyboardEvent): void {
@@ -553,6 +562,19 @@ function buildMoreMenu(): MoreMenuHandle {
     it.textContent = label;
     menu.appendChild(it);
   }
+
+  // Delete — destructive, at the bottom under its own separator.
+  const delSep = document.createElement('div');
+  delSep.className = 'mb-copy-sep';
+  delSep.setAttribute('role', 'separator');
+  menu.appendChild(delSep);
+  const delIt = document.createElement('button');
+  delIt.type = 'button';
+  delIt.className = 'mb-more-row mb-more-row-delete';
+  delIt.setAttribute('role', 'menuitem');
+  delIt.dataset.action = 'delete';
+  delIt.textContent = 'Delete';
+  menu.appendChild(delIt);
 
   // Place toggle row + separator at the top.
   menu.prepend(sep1);

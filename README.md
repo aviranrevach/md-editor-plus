@@ -24,8 +24,9 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 - **Drag-handle reordering** — hover any block for a `⠿` handle and move it anywhere
 - **Slash / block picker** — `⌘/` (`Ctrl+/`) opens an inline picker; type to filter
-- **Bubble menu** — select text for inline formatting, links, color, highlight, emoji, and a "Turn into" converter
+- **Bubble menu** — select text for inline formatting, links, color, highlight, emoji, a "Turn into" converter, and a ✨ **AI** button ([see below](#turn-selection-into-ai))
 - **Click-to-edit** — every block is editable in place; no mode switching
+- **Delete any block** — from the `⠿` dragger menu, a block's own `⋯` menu (boards, diagrams), or select it and press <kbd>Delete</kbd> / <kbd>Backspace</kbd>
 
 ### Block types
 
@@ -38,6 +39,20 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 - **Boards** — `/board kanban` or `/board table` for project/task views with columns, cards, properties, drag-to-reorder, inline editing, hideable fields. Stored as a fenced HTML comment block so the file stays plain Markdown.
 - **Mermaid diagrams** — `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart` / `/graph` / `/canvas`) drops a freeform mermaid canvas with a starter `flowchart LR` (`Idea → Next → Done`). Visual edit opens automatically: drag nodes, draw arrows, add sticky notes, change shapes, zoom and pan. Persists as a normal `` ```mermaid `` code fence with optional position/style sidecars in mermaid comments. Code view shows raw mermaid source you can hand-edit.
 - **Media & misc** — images, blockquotes, dividers
+
+### Turn selection into… (AI)
+
+Select any run of blocks, click the ✨ button in the bubble menu (or the **Using AI** group inside *Turn into*), and MD Editor Plus builds a ready-to-paste prompt for your **file-aware AI** (Claude Code, Cursor, the VS Code AI). Paste it in — the AI edits the file, and the viewer re-renders. **No network, no API keys, no accounts: the prompt travels through your clipboard, nothing else.**
+
+The prompt carries the file path, the selection's location (line + text anchors), and — crucially — the app's *exact* block grammar, so the AI's output round-trips into a real board/table/diagram instead of a near-miss. Targets:
+
+- **Ask AI…** — a free-text request ("explain this", "find the risks", "rewrite for clarity"); opens a conversation about the selected section (optional — you can also continue in your AI after pasting)
+- **Table** — a GFM pipe table from loose notes
+- **Board: Kanban** / **Board: Table** — a full board, in either of its two views
+- **Mermaid diagram** — a diagram from a process description
+- **Summary** · **Action items** · **Outline** · **Timeline** — plain-markdown "thinking" transforms
+
+For the structural targets you choose **Replace selection** or **Add below**, and the panel previews the exact prompt before you copy it.
 
 ### Display settings (Aa panel)
 
@@ -66,7 +81,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 ### Privacy & footprint
 
-- **100% local** — no telemetry, no network calls, no accounts
+- **100% local** — no telemetry, no network calls, no accounts (even the ✨ AI assist works purely through your clipboard — it never calls out)
 - **Works on any folder** — no database, no cloud, no migration
 
 ---

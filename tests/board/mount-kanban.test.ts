@@ -47,6 +47,7 @@ function makeCtx(
     getBoard: () => board,
     mutate: (_next: Board) => { /* no-op for read-only smoke tests */ },
     openSidePanel: (_id: string) => { /* no-op */ },
+    requestDelete: () => { /* no-op */ },
     readonly: false,
     ...overrides,
   };

@@ -145,6 +145,19 @@ export function buildHeaderMore(
   propsHost.className = 'bd-more-props';
   menu.appendChild(propsHost);
 
+  const delSep = document.createElement('div');
+  delSep.className = 'bd-more-sep';
+  menu.appendChild(delSep);
+
+  const delRow = document.createElement('button');
+  delRow.type = 'button';
+  delRow.className = 'bd-more-delete';
+  delRow.setAttribute('role', 'menuitem');
+  delRow.innerHTML =
+    '<svg viewBox="0 0 256 256" width="14" height="14" fill="currentColor"><path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16ZM96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm16 152a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Zm48 0a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Z"/></svg><span>Delete board</span>';
+  delRow.addEventListener('click', () => { closeMenu(); ctx.requestDelete(); });
+  menu.appendChild(delRow);
+
   wrap.append(btn, menu);
 
   function refreshViewSeg(): void {

@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
-import { createBoardView } from '../boardBlock';
+import { NodeSelection } from '@tiptap/pm/state';
+import { createBoardView, BOARD_INTERACTIVE_SELECTOR } from '../boardBlock';
 
 const REGION_RE =
   /<!--\s*board:start[\s\S]*?<!--\s*board:end\s*-->/gi;
@@ -56,6 +57,24 @@ const Board = Node.create({
     ];
   },
 
+  addKeyboardShortcuts() {
+    // When the whole board is node-selected (see the chrome click handler in
+    // addNodeView), Backspace/Delete removes it. PM's base keymap usually does
+    // this already, but the board's stopEvent guard makes that fragile — so we
+    // handle it explicitly and unambiguously.
+    const deleteSelectedBoard = () => {
+      const sel = this.editor.state.selection;
+      if (sel instanceof NodeSelection && sel.node.type.name === this.name) {
+        return this.editor.commands.deleteSelection();
+      }
+      return false;
+    };
+    return {
+      Backspace: deleteSelectedBoard,
+      Delete:    deleteSelectedBoard,
+    };
+  },
+
   addNodeView() {
     return ({ node, editor, getPos }) => {
       let lastSource = node.attrs.source as string;
@@ -74,6 +93,35 @@ const Board = Node.create({
         isReadOnly() {
           return !editor.isEditable;
         },
+        onDelete() {
+          const pos = typeof getPos === 'function' ? getPos() : null;
+          if (pos == null) return;
+          editor.chain().focus().command(({ tr, dispatch }) => {
+            const n = tr.doc.nodeAt(pos);
+            if (!n || n.type.name !== 'board') return false;
+            if (dispatch) tr.delete(pos, pos + n.nodeSize);
+            return true;
+          }).run();
+        },
+      });
+      // Clicking the board's own chrome / background (not a card, column,
+      // button, input, or editable text) selects the whole board node, so the
+      // user can then press Backspace/Delete to remove it — and gets a visible
+      // selected outline. Interactive children are descendants of view.dom, so
+      // boardBlock's capture-phase mousedown stops their events before this
+      // bubble listener; only chrome/background clicks reach here.
+      view.dom.addEventListener('mousedown', (e) => {
+        if (!editor.isEditable) return;
+        const t = e.target as HTMLElement | null;
+        if (!t) return;
+        if (t.closest(BOARD_INTERACTIVE_SELECTOR)) {
+          return;
+        }
+        const pos = typeof getPos === 'function' ? getPos() : null;
+        if (pos == null) return;
+        const { state } = editor.view;
+        editor.view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)));
+        editor.view.focus();
       });
       return {
         dom: view.dom,

@@ -77,15 +77,17 @@
   border: 0;
   padding: 0;
 }
-/* Suppress ProseMirror's atom-selection outline / hover bg.
-   Tiptap can apply .ProseMirror-selectednode either on the NodeView root
-   (the .board-block itself) or on a wrapping container. Also kill any
-   block-handle hover styling the editor's global drag-handle gutter
-   might apply for atom blocks. */
+/* Deliberate selected state — when the board node is selected (click its
+   chrome/background, then Backspace/Delete removes it) show a clean accent
+   outline so the selection is visible. Tiptap can apply .ProseMirror-selectednode
+   either on the NodeView root (the .board-block itself) or on a wrapping
+   container, so cover all three. */
 .board-block.ProseMirror-selectednode,
 .ProseMirror-selectednode > .board-block,
 .ProseMirror-selectednode .board-block {
-  outline: none !important;
+  outline: 2px solid var(--link, #2383e2);
+  outline-offset: 6px;
+  border-radius: 8px;
   background: transparent !important;
 }
 /* Defensive: kill any hover fill set by the editor's outer rendering
@@ -1301,6 +1303,22 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 }
 .bd-more-menu.bd-hidden { display: none; }
 .bd-more-sep { height: 1px; background: var(--border); margin: 8px 0; }
+/* Destructive "Delete board" row at the bottom of the ⋯ menu */
+.bd-more-delete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font: 500 13px ui-sans-serif, sans-serif;
+  color: #e5484d;
+  cursor: pointer;
+  text-align: left;
+}
+.bd-more-delete:hover { background: rgba(229,72,77,0.12); }
 .bd-more-view { padding: 4px 6px 8px 6px; }
 .bd-view-seg {
   display: inline-flex; gap: 1px; padding: 3px;

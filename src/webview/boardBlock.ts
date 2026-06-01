@@ -10,9 +10,20 @@ export interface BoardView {
   update(source: string): void;
 }
 
+/**
+ * Elements inside a board that own their own interaction (editing, clicks,
+ * drags). Events on these must NOT bubble up to ProseMirror as a "select the
+ * board node" gesture. Shared by boardBlock's mousedown guard and the board
+ * NodeView's click-to-select handler so the two lists can never drift apart.
+ */
+export const BOARD_INTERACTIVE_SELECTOR =
+  '[contenteditable="true"], button, input, select, textarea, .board-card, .board-column, [data-board-drag]';
+
 export interface BoardViewOptions {
   onMutate(nextSource: string): void;
   isReadOnly(): boolean;
+  /** Remove the whole board node from the document (wired via the NodeView's getPos). */
+  onDelete?(): void;
 }
 
 /** Context object passed from the controller to a board renderer. */
@@ -22,6 +33,8 @@ export interface BoardRendererCtx {
   mutate:         (next: Board) => void;
   /** Open the card side-panel for the given card id. */
   openSidePanel:  (cardId: string) => void;
+  /** Delete the entire board block from the document. */
+  requestDelete:  () => void;
   readonly:       boolean;
 }
 
@@ -63,7 +76,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     if (pmRoot && document.activeElement === pmRoot) {
       pmRoot.blur();
     }
-    if (t.closest('[contenteditable="true"], button, input, select, textarea, .board-card, .board-column')) {
+    if (t.closest(BOARD_INTERACTIVE_SELECTOR)) {
       e.stopPropagation();
     }
   }, true);
@@ -122,6 +135,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
         ro ? undefined : (nextBoard) => mutate(nextBoard),
       );
     },
+    requestDelete: () => opts.onDelete?.(),
     readonly: opts.isReadOnly(),
   };
 

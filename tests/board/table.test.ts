@@ -51,6 +51,7 @@ function makeCtx(
     getBoard: () => boardRef.current,
     mutate: (next: Board) => { boardRef.current = next; },
     openSidePanel: (_id: string) => { /* no-op */ },
+    requestDelete: () => { /* no-op */ },
     readonly: false,
     ...overrides,
   };
