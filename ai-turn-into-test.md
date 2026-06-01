@@ -52,6 +52,21 @@ Northwind's Q3 work breaks down across four owners. Maya is leading the new onbo
 
 When a new customer signs up, they first land on the welcome screen. From there they either start the guided setup or skip straight to the dashboard. If they start guided setup, they connect a data source, then invite their team, then reach the dashboard. If a data source connection fails, they're sent back to the connect step with an error. Once at the dashboard, first-time users see the sample report; returning users see their own saved reports.
 
+```mermaid
+flowchart TB
+    A[Sign up] --> B[Welcome screen]
+    B -->|Start guided setup| C[Connect data source]
+    B -->|Skip| G{First-time user?}
+    C -->|Connection fails| E[Error: back to connect]
+    E --> C
+    C -->|Success| D[Invite team]
+    D --> G
+    G -->|First-time| H[See sample report]
+    G -->|Returning| I[See saved reports]
+    H --> Z[Dashboard]
+    I --> Z[Dashboard]
+```
+
 **What good looks like:** a rendered flowchart with branches for "start guided setup" vs "skip", a failure loop back to the connect step, and the first-time vs returning split at the dashboard.
 
 ---
@@ -63,6 +78,14 @@ When a new customer signs up, they first land on the welcome screen. From there 
 **Select this:**
 
 The Q3 release is the largest update Northwind has shipped since launch. The headline change is a redesigned onboarding flow that cuts the steps to first value from nine to four, based on the funnel analysis we ran in May, where 38% of trials dropped off before connecting a data source. Alongside onboarding, we're migrating every account off the legacy billing system onto the new metered-usage engine, which unblocks usage-based pricing — a top request from enterprise prospects throughout Q1 and Q2. The analytics dashboard has been rebuilt on the new charting library, roughly halving render time on large datasets and finally supporting dark mode. Smaller items round out the release: CSV export on every report, a refreshed public API reference, and a launch demo video. The one open risk is the billing migration, which is gated on a finance sign-off that has slipped twice; if it slips again we'll ship onboarding and the dashboard on schedule and fast-follow with billing.
+
+**Summary:**
+
+- **Headline:** Q3 is Northwind's largest release since launch — a redesigned onboarding flow cuts steps to first value from nine to four, addressing the 38% of trials that dropped off before connecting a data source (per the May funnel analysis).
+- **Billing migration:** every account moves off the legacy system onto the new metered-usage engine, unblocking usage-based pricing — a top enterprise request from Q1–Q2.
+- **Dashboard:** rebuilt on a new charting library, roughly halving render time on large datasets and adding dark mode.
+- **Smaller items:** CSV export on every report, a refreshed public API reference, and a launch demo video.
+- **Open risk:** the billing migration is gated on a finance sign-off that has slipped twice; if it slips again, onboarding and the dashboard ship on schedule and billing follows as a fast-follow.
 
 **What good looks like:** a tight 3–5 bullet (or short paragraph) summary capturing the headline, the billing risk, and the supporting items.
 
@@ -112,9 +135,17 @@ The dashboard rebuild started in late May. Onboarding redesign kicked off June 2
 
 Competitor dashboards we reviewed for the redesign:
 
-- Acme Insights — clean, but no dark mode. ![Acme dashboard](./assets/acme-dashboard.png)
-- BluePeak — great filtering, cluttered header. ![BluePeak dashboard](./assets/bluepeak-dashboard.png)
-- Northwind (current) — slow on big datasets. ![Our current dashboard](./assets/northwind-current.png)
+- Acme Insights — clean, but no dark mode.
+
+  ![Acme dashboard](./assets/acme-dashboard.png)
+
+- BluePeak — great filtering, cluttered header.
+
+  ![BluePeak dashboard](./assets/bluepeak-dashboard.png)
+
+- Northwind (current) — slow on big datasets.
+
+  ![Our current dashboard](./assets/northwind-current.png)
 
 **What good looks like:** a table with a row per competitor; the image rides along as a cell (the `![...](...)` link is preserved, never dropped). If the AI can open the image files, it may also factor in what they show.
 
