@@ -41,12 +41,11 @@ export function createAiTransformPanel(): AiTransformPanel {
       <textarea class="ai-panel-ask-input" spellcheck="true" placeholder="e.g. explain this, find the risks, rewrite for clarity, suggest next steps…"></textarea>
     </div>
     <details class="ai-panel-prompt-wrap">
-      <summary>Prompt</summary>
-      <textarea class="ai-panel-prompt" spellcheck="false"></textarea>
+      <summary>Preview prompt</summary>
+      <textarea class="ai-panel-prompt" spellcheck="false" readonly></textarea>
     </details>
     <ol class="ai-panel-steps"></ol>
     <div class="ai-panel-foot">
-      <button class="ai-panel-btn" data-ai-act="edit">Edit prompt</button>
       <button class="ai-panel-btn ai-panel-btn-primary" data-ai-act="copy">📋 Copy prompt</button>
     </div>
   `;
@@ -124,10 +123,6 @@ export function createAiTransformPanel(): AiTransformPanel {
     if (!actBtn) return;
     switch (actBtn.dataset.aiAct) {
       case 'close': close(); break;
-      case 'edit':
-        (el.querySelector('.ai-panel-prompt-wrap') as HTMLDetailsElement).open = true;
-        promptEl.focus();
-        break;
       case 'copy': {
         copyToClipboard(promptEl.value);
         const prev = copyBtn.textContent;
