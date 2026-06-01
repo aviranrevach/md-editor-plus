@@ -108,6 +108,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         type: 'init',
         markdown: document.getText(),
         mediaBaseUri,
+        documentPath: vscode.workspace.asRelativePath(document.uri),
         defaults: {
           theme:               cfg.get<string>('theme', 'light'),
           font:                cfg.get<string>('font', 'sans'),
@@ -199,6 +200,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       if (msg.type === 'copyFilePath') {
         await vscode.env.clipboard.writeText(document.uri.fsPath);
         await vscode.window.showInformationMessage('File path copied to clipboard');
+      }
+      if (msg.type === 'copyText') {
+        const text = (msg as unknown as { text?: unknown }).text;
+        if (typeof text !== 'string') return;
+        await vscode.env.clipboard.writeText(text);
+        await vscode.window.showInformationMessage('AI prompt copied to clipboard');
+        return;
       }
       if (msg.type === 'saveOutlineVisible') {
         const value = (msg as unknown as { value?: unknown }).value;

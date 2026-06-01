@@ -9,6 +9,7 @@ import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { initBoardSidePanel } from './boardSidePanel';
+import { setDocumentPath } from './docContext';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -75,7 +76,7 @@ interface SavedDefaults {
   readOnly?: boolean;
   sourceWordWrap?: boolean;
 }
-interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; }
+interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
 type HostMessage = InitMessage | UpdateMessage;
 
@@ -854,6 +855,7 @@ function init(): void {
       try {
       currentMarkdown = msg.markdown;
       if (msg.mediaBaseUri) setMediaBaseUri(msg.mediaBaseUri);
+      setDocumentPath(msg.documentPath ?? '');
       savedDefaults = { ...FACTORY_DEFAULTS, ...(msg.defaults ?? {}) };
       applyDefaults(msg.defaults ?? {});
       refreshDefaultsButtons();
