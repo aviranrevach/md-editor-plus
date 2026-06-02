@@ -4599,21 +4599,30 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 .ai-panel-close:hover { opacity: 1; }
 .ai-panel-summary { padding: 12px 16px 4px; font-size: 12px; color: var(--text-secondary); }
-.ai-panel-mode { display: flex; gap: 8px; padding: 8px 16px; }
+/* Placement as a segmented control (one pill, three segments) */
+.ai-panel-mode {
+  display: flex;
+  gap: 2px;
+  margin: 8px 16px;
+  padding: 3px;
+  background: var(--seg-bg, rgba(127,127,127,0.12));
+  border-radius: 10px;
+}
 .ai-mode-btn {
   flex: 1;
-  padding: 8px;
-  font-size: 12px;
+  padding: 8px 6px;
+  font-size: 12.5px;
   cursor: pointer;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: none;
+  border-radius: 7px;
   background: transparent;
-  color: inherit;
+  color: var(--text-secondary);
 }
 .ai-mode-btn.active {
-  border-color: #2f9f5f;
-  background: rgba(47,159,95,0.12);
+  background: var(--bg, #fff);
+  color: var(--text-primary);
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 .ai-panel-prompt-wrap { padding: 4px 16px; }
 .ai-panel-prompt-wrap > summary {

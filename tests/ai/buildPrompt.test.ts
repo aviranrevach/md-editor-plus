@@ -47,6 +47,12 @@ describe('buildPrompt — shared parts', () => {
   it('uses add wording for add mode', () => {
     expect(buildPrompt({ ...base, mode: 'add' })).toMatch(/immediately after it, leaving the original/i);
   });
+  it('custom mode → open placement, no fixed replace/add instruction', () => {
+    const p = buildPrompt({ ...base, mode: 'custom' });
+    expect(p).toMatch(/I'll tell you what to do with it/i);
+    expect(p).not.toMatch(/Replace that entire section/i);
+    expect(p).not.toMatch(/immediately after it, leaving the original/i);
+  });
   it('carries the content-handling rule and forbids a bare acknowledgement', () => {
     const p = buildPrompt(base);
     expect(p).toMatch(/Never silently drop content/i);

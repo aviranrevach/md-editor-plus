@@ -56,8 +56,9 @@ export function createAiTransformPanel(): AiTransformPanel {
     </div>
     <div class="ai-panel-summary"></div>
     <div class="ai-panel-mode">
-      <button class="ai-mode-btn" data-ai-mode="replace">↻ Replace selection</button>
-      <button class="ai-mode-btn" data-ai-mode="add">＋ Add below (keep original)</button>
+      <button class="ai-mode-btn" data-ai-mode="add" data-tip="Keeps your selection and puts the AI's result right after it.">＋ Add below</button>
+      <button class="ai-mode-btn" data-ai-mode="replace" data-tip="The AI's result replaces the section you selected.">↻ Replace</button>
+      <button class="ai-mode-btn" data-ai-mode="custom" data-tip="Leaves placement open — you tell the AI what to do with the result in the chat.">⌥ Custom</button>
     </div>
     <div class="ai-panel-steps"></div>
     <details class="ai-panel-prompt-wrap">
@@ -79,7 +80,7 @@ export function createAiTransformPanel(): AiTransformPanel {
   const modeBtns  = Array.from(el.querySelectorAll<HTMLElement>('[data-ai-mode]'));
 
   let current: AiPanelInput | null = null;
-  let mode: AiInsertMode = 'replace';
+  let mode: AiInsertMode = 'add';
 
   function isAsk(): boolean {
     return current?.target === 'ask';
@@ -145,7 +146,7 @@ export function createAiTransformPanel(): AiTransformPanel {
   return {
     open(input: AiPanelInput): void {
       current = input;
-      mode = 'replace';
+      mode = 'add';
       render();
       el.style.display = 'block';
     },

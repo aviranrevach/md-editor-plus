@@ -13,7 +13,7 @@ export type AiTarget =
   | 'action-items'
   | 'outline'
   | 'timeline';
-export type AiInsertMode = 'replace' | 'add';
+export type AiInsertMode = 'replace' | 'add' | 'custom';
 
 export interface AiPromptContext {
   /** Workspace-relative path of the file being edited. */
@@ -217,9 +217,14 @@ function buildWhere(ctx: AiPromptContext): string {
 
 function buildInstruction(ctx: AiPromptContext): string {
   const phrase = TARGET_PHRASE[ctx.target as Exclude<AiTarget, 'ask'>];
-  return ctx.mode === 'replace'
-    ? `Replace that entire section with ${phrase} built from its content.`
-    : `Insert ${phrase} built from that section's content immediately after it, leaving the original text in place.`;
+  if (ctx.mode === 'replace') {
+    return `Replace that entire section with ${phrase} built from its content.`;
+  }
+  if (ctx.mode === 'add') {
+    return `Insert ${phrase} built from that section's content immediately after it, leaving the original text in place.`;
+  }
+  // custom — leave placement open; the user will say what to do in the chat.
+  return `Build ${phrase} from that section's content. I'll tell you what to do with it (replace the section, add it below, or something else).`;
 }
 
 // Open-ended discussion prompt — no Replace/Add, no "edit the file" rule. The
@@ -231,9 +236,12 @@ function buildAskPrompt(ctx: AiPromptContext): string {
   ];
   const req = (ctx.request ?? '').trim();
   lines.push(req || "I'll tell you what I'd like to do with it next.");
-  lines.push(ctx.mode === 'add'
-    ? 'If you produce a revised version of this section, add it right below the original (keep the original in place).'
-    : 'If you produce a revised version of this section, replace the section with it.');
+  if (ctx.mode === 'replace') {
+    lines.push('If you produce a revised version of this section, replace the section with it.');
+  } else if (ctx.mode === 'add') {
+    lines.push('If you produce a revised version of this section, add it right below the original (keep the original in place).');
+  }
+  // custom — no placement line; the user will direct it in the chat.
   lines.push(`Rules:\n- ${CONTENT_RULE}`);
   return lines.join('\n\n');
 }
