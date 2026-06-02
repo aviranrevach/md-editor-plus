@@ -4,7 +4,7 @@ All notable changes to **MD Editor Plus** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.2] - 2026-05-31
+## [0.5.2] - 2026-06-02
 
 ### Fixed
 
@@ -12,7 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Turn selection into… (using AI)** — select a run of blocks and the ✨ AI button in the bubble menu (or the **Using AI** group in *Turn into*) builds a ready-to-paste prompt for a **file-aware AI** (Claude Code, Cursor, the VS Code AI). The prompt carries the file path, the selection's location (line + text anchors), and the app's *exact* block grammar so the AI's output round-trips into a real board/table/diagram. **No network, no API keys — the prompt travels through the clipboard, nothing else.**
+  - Targets: **Ask AI…** (free-form conversation), **Table**, **Board: Kanban**, **Board: Table**, **Mermaid diagram**, and the plain-markdown "thinking" transforms **Summary**, **Action items**, **Outline**, **Timeline**.
+  - Placement via a segmented control — **Add below** (default), **Replace**, or **Custom** (leaves placement open so you direct it in the chat). The chosen mode is reflected in the prompt.
+  - Prompts are ordered context → format spec → rules → **action last**, so the cursor lands where you'd keep typing; Ask AI / Custom end open on purpose.
+  - Hardened against agents that reply "done" without acting — the prompt asks them to either edit the file or output the block, never just acknowledge.
+  - A small panel previews the exact prompt (read-only) with a 3-step "what to do next", and copies it to the clipboard.
+- **Delete blocks** — remove any block from the **⠿ dragger menu** ("Delete"), a board from its **⋯ menu** ("Delete board"), a Mermaid diagram from its **⋯ menu** ("Delete"), or select a board and press **Delete / Backspace** (click the board's chrome to select it; it shows a selected outline).
 - **End-to-end pipeline regression test** ([tests/board/pipeline.test.ts](tests/board/pipeline.test.ts)) — runs the full chain `preprocess → markdown-it → DOMParser → parseBoardSource` and asserts every card survives. Covers single board, multi-word column names ("Up Next", "In Progress"), two boards in one file, and boards with `board:body` blocks attached. Locks the fix in.
+
+### Developer
+
+- `F5` ("Run Extension") opens `demo-tester.md` in the Extension Development Host.
 
 ## [0.5.1] - 2026-05-28
 
