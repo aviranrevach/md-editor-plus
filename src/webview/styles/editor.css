@@ -4706,3 +4706,9 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: #fff;
   font-weight: 600;
 }
+
+/* Blocks-skill panel */
+.skill-blocks { display: flex; flex-direction: column; gap: 8px; padding: 8px 16px 4px; }
+.skill-block { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.skill-block input { cursor: pointer; }
+.skill-foot { flex-wrap: wrap; }
