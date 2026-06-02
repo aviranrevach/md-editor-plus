@@ -1,4 +1,5 @@
 import { buildPrompt, AI_TRANSFORMS, type AiPromptContext } from '../../src/webview/aiTransforms';
+import { BLOCK_REFERENCES } from '../../src/webview/blockFormatReference';
 
 const base: AiPromptContext = {
   filePath: 'notes/q2-launch.md',
@@ -78,7 +79,7 @@ describe('buildPrompt — per-target format spec', () => {
     expect(p).toContain('<!-- board:start');
     expect(p).toContain('<!-- board:end -->');
     expect(p).toContain('<!-- board:body id=');
-    expect(p).toContain('active-view="kanban"');
+    expect(p).not.toContain('active-view="table"');
     expect(p).toContain('text, status, date, person, tags');
     expect(p).toContain('gray, blue, amber, emerald, red, purple');
   });
@@ -141,5 +142,16 @@ describe('buildPrompt — ask (custom prompt)', () => {
     expect(p).not.toMatch(/Replace that entire section/i);
     // but the content-handling rule still applies
     expect(p).toMatch(/Never silently drop content/i);
+  });
+});
+
+describe('prompt grammar stays in sync with blockFormatReference', () => {
+  it('kanban prompt embeds the reference board example', () => {
+    const p = buildPrompt({ ...base, target: 'kanban' });
+    expect(p).toContain('| Write the spec | Doing | @maya | 2026-06-10 | c1 |');
+  });
+  it('mermaid prompt embeds the reference mermaid example', () => {
+    const p = buildPrompt({ ...base, target: 'mermaid' });
+    expect(p).toContain(BLOCK_REFERENCES.mermaid.example);
   });
 });

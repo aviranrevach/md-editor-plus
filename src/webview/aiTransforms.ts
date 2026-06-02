@@ -1,6 +1,8 @@
 // Pure prompt-builder for "Turn selection into… (using AI)".
 // No editor/DOM imports — must stay unit-testable in the node jest env.
 
+import { BLOCK_REFERENCES } from './blockFormatReference';
+
 export type AiTarget =
   // Open-ended discussion — a free-text request, not a format conversion.
   | 'ask'
@@ -129,43 +131,19 @@ const TABLE_SPEC = `Use a standard GitHub-flavored markdown pipe table — a hea
 In cells: escape literal pipes as \\| and use <br> instead of a newline.`;
 
 // Both the Kanban and Table targets are the SAME custom board block — they
-// differ only by `active-view` and the framing. This generator keeps them in
-// lockstep so the grammar can never drift between the two views.
+// differ only by `active-view` and the framing. The example + rules are pulled
+// from the shared blockFormatReference so the ✨ prompts and the generated
+// blocks skill share ONE grammar and can never drift.
 function boardSpec(view: 'kanban' | 'table'): string {
+  const ref = BLOCK_REFERENCES[view === 'table' ? 'table' : 'kanban'];
   const intro = view === 'kanban'
     ? 'Use EXACTLY this custom board block, displayed as a Kanban board (cards grouped into columns by their Status).'
-    : 'Use EXACTLY this custom board block, displayed as a table / database view (one row per card, with typed fields as columns). This is NOT a plain markdown table — it is the same board block, just shown as a grid.';
-  return `${intro} The app parses it — do not deviate. The whole region from <!-- board:start --> through <!-- board:end --> is one block:
-
-<!-- board:start id="b-XXXX" name="Board name" columns="Todo|Doing|Done" column-colors="blue|amber|emerald" field-types="Title=text,Status=status,Owner=person,Due=date,id=text" hidden-fields="id" active-view="${view}" -->
-
-| Title | Status | Owner | Due | id |
-|---|---|---|---|---|
-| Card title | Doing | @name | 2026-06-01 | c1 |
-
-<!-- board:body id="c1" -->
-
-Optional longer notes for this card.
-
-<!-- board:end -->
-
-Constraints:
-- columns="..." are the board's Status values (pipe-separated)${view === 'kanban' ? ', shown as the Kanban lanes' : ''}. Each card's Status must be EXACTLY one of those column names.
-- column-colors: one token per column, same order, from: gray, blue, amber, emerald, red, purple.
-- field-types values allowed: text, status, date, person, tags. Keep the hidden id field. Add whatever fields the content implies (Owner, Due, Tags, …) as columns of the table.
-- Every card needs a unique id (c1, c2, …) used in BOTH its table row and its <!-- board:body id="..."  --> block.
-- Dates as YYYY-MM-DD; people as @name. In cells escape pipes as \\| and use <br> for newlines.`;
+    : 'Use EXACTLY this custom board block, displayed as a table / database view. This is NOT a plain markdown table — it is the same board block with active-view="table".';
+  const rules = ref.rules.map((r) => `- ${r}`).join('\n');
+  return `${intro} The app parses it — do not deviate.\n\n${ref.example}\n\nConstraints:\n${rules}`;
 }
 
-const MERMAID_SPEC = `Use a fenced code block whose language is mermaid — it renders as a live diagram:
-
-\`\`\`mermaid
-flowchart TB
-    A[Start] --> B[Process]
-    B --> C[End]
-\`\`\`
-
-Pick the diagram type that best fits the content (flowchart, sequenceDiagram, stateDiagram-v2, gantt, etc.).`;
+const MERMAID_SPEC = `Use a fenced code block whose language is mermaid — it renders as a live diagram:\n\n${BLOCK_REFERENCES.mermaid.example}\n\nPick the diagram type that best fits the content (flowchart, sequenceDiagram, stateDiagram-v2, gantt, etc.).`;
 
 const SUMMARY_SPEC = `Write a concise summary in plain markdown — 3 to 6 bullet points (or a short paragraph if the content is already brief). Capture the key points, any decisions, and any open risks. Do not add information that is not in the source.`;
 
