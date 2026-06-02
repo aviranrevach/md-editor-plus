@@ -215,16 +215,22 @@ function buildWhere(ctx: AiPromptContext): string {
   );
 }
 
-function buildInstruction(ctx: AiPromptContext): string {
+const performRule = (filePath: string): string =>
+  `Actually perform the change now: edit \`${filePath}\` in place and save it. If you cannot edit files, output the complete new block as your entire reply so it can be pasted in. Do NOT reply with only an acknowledgement such as "done", "ok", or "sure" — either make the edit or output the block.`;
+
+// The action line — placed LAST so it's the final thing in the prompt (B). For
+// replace/add it's a complete, send-ready instruction; for custom it's left
+// open (trailing "— ") so the user finishes it in the chat.
+function buildAction(ctx: AiPromptContext): string {
   const phrase = TARGET_PHRASE[ctx.target as Exclude<AiTarget, 'ask'>];
   if (ctx.mode === 'replace') {
-    return `Replace that entire section with ${phrase} built from its content.`;
+    return `Now, replace that entire section with ${phrase} built from its content.`;
   }
   if (ctx.mode === 'add') {
-    return `Insert ${phrase} built from that section's content immediately after it, leaving the original text in place.`;
+    return `Now, add ${phrase} built from that section's content right below it, leaving the original text in place.`;
   }
-  // custom — leave placement open; the user will say what to do in the chat.
-  return `Build ${phrase} from that section's content. I'll tell you what to do with it (replace the section, add it below, or something else).`;
+  // custom — open trailing line; the user finishes it (placement, extra detail).
+  return `———\nNow, build ${phrase} from that section — `;
 }
 
 // Open-ended discussion prompt — no Replace/Add, no "edit the file" rule. The
@@ -234,24 +240,30 @@ function buildAskPrompt(ctx: AiPromptContext): string {
   const lines = [
     `Let's talk about a section of the file \`${ctx.filePath}\` in this workspace — the section that ${anchorClause(ctx)}.`,
   ];
-  const req = (ctx.request ?? '').trim();
-  lines.push(req || "I'll tell you what I'd like to do with it next.");
-  if (ctx.mode === 'replace') {
-    lines.push('If you produce a revised version of this section, replace the section with it.');
-  } else if (ctx.mode === 'add') {
-    lines.push('If you produce a revised version of this section, add it right below the original (keep the original in place).');
-  }
-  // custom — no placement line; the user will direct it in the chat.
   lines.push(`Rules:\n- ${CONTENT_RULE}`);
+  if (ctx.mode === 'replace') {
+    lines.push('When you revise it, replace the section with your result.');
+  } else if (ctx.mode === 'add') {
+    lines.push('When you revise it, add your result right below the original (keep the original in place).');
+  }
+  // Ends open (B + A): the user's request is the last thing, cursor on it.
+  const req = (ctx.request ?? '').trim();
+  lines.push(req ? req : '———\nWhat I\'d like you to do with this section: ');
   return lines.join('\n\n');
 }
 
 export function buildPrompt(ctx: AiPromptContext): string {
   if (ctx.target === 'ask') return buildAskPrompt(ctx);
+  // B ordering: context → format spec → rules → action (last). The perform
+  // rule only applies when placement is fixed (replace/add); custom defers to
+  // the user, so it's omitted there.
+  const rules = ctx.mode === 'custom'
+    ? `Rules:\n- ${CONTENT_RULE}`
+    : `Rules:\n- ${CONTENT_RULE}\n- ${performRule(ctx.filePath)}`;
   return [
     buildWhere(ctx),
-    buildInstruction(ctx),
     FORMAT_SPECS[ctx.target],
-    `Rules:\n- ${CONTENT_RULE}\n- Actually perform the change now: edit \`${ctx.filePath}\` in place and save it. If you cannot edit files, output the complete new block as your entire reply so it can be pasted in. Do NOT reply with only an acknowledgement such as "done", "ok", or "sure" — either make the edit or output the block.`,
+    rules,
+    buildAction(ctx),
   ].join('\n\n');
 }

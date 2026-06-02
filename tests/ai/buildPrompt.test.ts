@@ -41,17 +41,20 @@ describe('buildPrompt — shared parts', () => {
     expect(p).toContain('Draft press release — Maya, Fri');
     expect(p).not.toMatch(/about line null/);
   });
-  it('uses replace wording for replace mode', () => {
-    expect(buildPrompt(base)).toMatch(/Replace that entire section/i);
+  it('replace mode → complete replace instruction as the last line', () => {
+    const p = buildPrompt(base);
+    expect(p).toMatch(/Now, replace that entire section/i);
+    expect(p.trimEnd().endsWith('built from its content.')).toBe(true);
   });
-  it('uses add wording for add mode', () => {
-    expect(buildPrompt({ ...base, mode: 'add' })).toMatch(/immediately after it, leaving the original/i);
+  it('add mode → complete add-below instruction', () => {
+    expect(buildPrompt({ ...base, mode: 'add' })).toMatch(/Now, add .+ right below it, leaving the original/i);
   });
-  it('custom mode → open placement, no fixed replace/add instruction', () => {
+  it('custom mode → open trailing action, no fixed replace/add and no perform rule', () => {
     const p = buildPrompt({ ...base, mode: 'custom' });
-    expect(p).toMatch(/I'll tell you what to do with it/i);
-    expect(p).not.toMatch(/Replace that entire section/i);
-    expect(p).not.toMatch(/immediately after it, leaving the original/i);
+    expect(p).toMatch(/Now, build .+ from that section — *$/);
+    expect(p).not.toMatch(/replace that entire section/i);
+    expect(p).not.toMatch(/right below it, leaving the original/i);
+    expect(p).not.toMatch(/reply with only an acknowledgement/i);
   });
   it('carries the content-handling rule and forbids a bare acknowledgement', () => {
     const p = buildPrompt(base);
@@ -124,13 +127,13 @@ describe('buildPrompt — ask (custom prompt)', () => {
     const p = buildPrompt({ ...base, target: 'ask', request: 'find the riskiest assumption here' });
     expect(p).toContain('find the riskiest assumption here');
   });
-  it('falls back to an opener when no request is given', () => {
+  it('ends with an open cue when no request is given', () => {
     const p = buildPrompt({ ...base, target: 'ask', request: '   ' });
-    expect(p).toMatch(/what I'd like to do with it next/i);
+    expect(p).toMatch(/What I'd like you to do with this section: *$/);
   });
   it('reflects the replace/add choice in the ask prompt', () => {
-    expect(buildPrompt({ ...base, target: 'ask', mode: 'replace' })).toMatch(/replace the section with it/i);
-    expect(buildPrompt({ ...base, target: 'ask', mode: 'add' })).toMatch(/add it right below the original/i);
+    expect(buildPrompt({ ...base, target: 'ask', mode: 'replace' })).toMatch(/replace the section with your result/i);
+    expect(buildPrompt({ ...base, target: 'ask', mode: 'add' })).toMatch(/add your result right below the original/i);
   });
   it('does NOT carry the edit-the-file / no-acknowledgement rule', () => {
     const p = buildPrompt({ ...base, target: 'ask', request: 'explain this' });
