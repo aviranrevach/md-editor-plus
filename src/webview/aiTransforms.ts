@@ -231,6 +231,9 @@ function buildAskPrompt(ctx: AiPromptContext): string {
   ];
   const req = (ctx.request ?? '').trim();
   lines.push(req || "I'll tell you what I'd like to do with it next.");
+  lines.push(ctx.mode === 'add'
+    ? 'If you produce a revised version of this section, add it right below the original (keep the original in place).'
+    : 'If you produce a revised version of this section, replace the section with it.');
   lines.push(`Rules:\n- ${CONTENT_RULE}`);
   return lines.join('\n\n');
 }

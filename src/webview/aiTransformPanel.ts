@@ -104,8 +104,6 @@ export function createAiTransformPanel(): AiTransformPanel {
       ? '✨ Ask AI about this section'
       : `✨ Turn selection into ${current.targetLabel} — using AI`;
     summaryEl.textContent = formatSummary(current.summary);
-    // Replace/Add only applies to the format targets, not the open-ended chat.
-    modeRow.style.display = ask ? 'none' : '';
     stepsEl.innerHTML = stepsHtml(ask ? STEPS_ASK : STEPS_TRANSFORM);
     promptEl.value = buildPrompt(ctx());
     modeBtns.forEach(b =>

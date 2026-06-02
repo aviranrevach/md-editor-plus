@@ -122,6 +122,10 @@ describe('buildPrompt — ask (custom prompt)', () => {
     const p = buildPrompt({ ...base, target: 'ask', request: '   ' });
     expect(p).toMatch(/what I'd like to do with it next/i);
   });
+  it('reflects the replace/add choice in the ask prompt', () => {
+    expect(buildPrompt({ ...base, target: 'ask', mode: 'replace' })).toMatch(/replace the section with it/i);
+    expect(buildPrompt({ ...base, target: 'ask', mode: 'add' })).toMatch(/add it right below the original/i);
+  });
   it('does NOT carry the edit-the-file / no-acknowledgement rule', () => {
     const p = buildPrompt({ ...base, target: 'ask', request: 'explain this' });
     expect(p).not.toMatch(/reply with only an acknowledgement/i);
