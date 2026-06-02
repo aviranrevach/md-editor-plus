@@ -271,7 +271,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           await vscode.window.showErrorMessage(`MD Editor Plus: save failed — ${(err as Error).message}`);
           return;
         }
-        await vscode.window.showInformationMessage(`Saved ${target.fsPath.split('/').pop()}`);
+        await vscode.window.showInformationMessage(`Saved ${path.basename(target.fsPath)}`);
         return;
       }
       if (msg.type === 'saveOutlineVisible') {
