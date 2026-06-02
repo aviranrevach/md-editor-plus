@@ -10,6 +10,7 @@ import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { initBoardSidePanel } from './boardSidePanel';
 import { setDocumentPath } from './docContext';
+import { createSkillPanel } from './skillPanel';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -600,6 +601,9 @@ function init(): void {
     syncToolbarPanelState();
   }
 
+  // Single skill panel instance shared by both actions panels (wide + narrow).
+  const skillPanel = createSkillPanel();
+
   // Wire up action buttons inside both panels (each panel has its own DOM)
   function bindActions(panel: HTMLElement): void {
     const exportTrigger = panel.querySelector<HTMLElement>('.act-export-menu');
@@ -631,6 +635,10 @@ function init(): void {
     });
     panel.querySelector<HTMLElement>('.act-duplicate')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'duplicate' });
+      closeAllActionsPanels();
+    });
+    panel.querySelector<HTMLElement>('.act-blocks-skill')?.addEventListener('click', () => {
+      skillPanel.open();
       closeAllActionsPanels();
     });
     panel.querySelector<HTMLElement>('.act-finder')?.addEventListener('click', () => {
