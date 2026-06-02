@@ -208,6 +208,72 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         await vscode.window.showInformationMessage('AI prompt copied to clipboard');
         return;
       }
+      if (msg.type === 'installSkill') {
+        const m = msg as unknown as { scope?: unknown; skillMd?: unknown };
+        const skillMd = m.skillMd;
+        if (typeof skillMd !== 'string') return;
+        const scope = m.scope === 'global' ? 'global' : 'project';
+        let baseDir: vscode.Uri;
+        if (scope === 'global') {
+          baseDir = vscode.Uri.file(path.join(os.homedir(), '.claude', 'skills'));
+        } else {
+          const ws = vscode.workspace.getWorkspaceFolder(document.uri);
+          if (!ws) {
+            await vscode.window.showErrorMessage('MD Editor Plus: no workspace folder for a project skill. Use Global or Download.');
+            return;
+          }
+          baseDir = vscode.Uri.joinPath(ws.uri, '.claude', 'skills');
+        }
+        const skillDir = vscode.Uri.joinPath(baseDir, 'md-editor-blocks');
+        const target = vscode.Uri.joinPath(skillDir, 'SKILL.md');
+        try {
+          await vscode.workspace.fs.stat(target);
+          const overwrite = 'Overwrite';
+          const choice = await vscode.window.showWarningMessage(
+            `A blocks skill already exists at ${target.fsPath}. Replace it?`,
+            { modal: true },
+            overwrite,
+          );
+          if (choice !== overwrite) return;
+        } catch { /* doesn't exist — proceed */ }
+        try {
+          await vscode.workspace.fs.createDirectory(skillDir);
+          await vscode.workspace.fs.writeFile(target, Buffer.from(skillMd, 'utf8'));
+        } catch (err) {
+          await vscode.window.showErrorMessage(`MD Editor Plus: skill install failed — ${(err as Error).message}`);
+          return;
+        }
+        const reveal = 'Reveal';
+        const choice = await vscode.window.showInformationMessage(
+          `Blocks skill installed → ${target.fsPath}`,
+          reveal,
+        );
+        if (choice === reveal) {
+          await vscode.commands.executeCommand('revealFileInOS', target);
+        }
+        return;
+      }
+      if (msg.type === 'downloadSkill') {
+        const skillMd = (msg as unknown as { skillMd?: unknown }).skillMd;
+        if (typeof skillMd !== 'string') return;
+        const dir = vscode.Uri.joinPath(document.uri, '..');
+        const defaultUri = vscode.Uri.joinPath(dir, 'SKILL.md');
+        const target = await vscode.window.showSaveDialog({
+          defaultUri,
+          filters: { Markdown: ['md'] },
+          saveLabel: 'Save skill',
+          title: 'Download blocks skill (place it in a md-editor-blocks/ folder in your skills dir)',
+        });
+        if (!target) return;
+        try {
+          await vscode.workspace.fs.writeFile(target, Buffer.from(skillMd, 'utf8'));
+        } catch (err) {
+          await vscode.window.showErrorMessage(`MD Editor Plus: save failed — ${(err as Error).message}`);
+          return;
+        }
+        await vscode.window.showInformationMessage(`Saved ${target.fsPath.split('/').pop()}`);
+        return;
+      }
       if (msg.type === 'saveOutlineVisible') {
         const value = (msg as unknown as { value?: unknown }).value;
         if (typeof value !== 'boolean') return;
@@ -525,6 +591,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <button class="settings-action act-duplicate" data-tip="Save a copy of this file in the same folder">${iDuplicate}<span class="settings-action-label">Duplicate</span></button>
     <button class="settings-action act-finder" data-tip="Reveal this file in your OS file browser">${iFolder}<span class="settings-action-label">Open in Finder</span></button>
     <button class="settings-action act-export-menu" data-submenu="export">${iDownload}<span class="settings-action-label">Export</span><span class="settings-action-caret">›</span></button>
+    <button class="settings-action act-blocks-skill" data-tip="Generate a Claude skill that teaches your AI this app's block grammar">${iDownload}<span class="settings-action-label">Create blocks skill…</span></button>
   </div>
   <div class="actions-panel hidden" id="actions-panel-dots" data-anchor="dots">
     <button class="settings-action act-toggle-readonly" id="act-toggle-readonly" data-tip="Toggle read-only mode — when on, typing and structural edits are blocked">${iLock}<span class="settings-action-label">Read only</span></button>
@@ -534,6 +601,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <button class="settings-action act-duplicate" data-tip="Save a copy of this file in the same folder">${iDuplicate}<span class="settings-action-label">Duplicate</span></button>
     <button class="settings-action act-finder" data-tip="Reveal this file in your OS file browser">${iFolder}<span class="settings-action-label">Open in Finder</span></button>
     <button class="settings-action act-export-menu" data-submenu="export">${iDownload}<span class="settings-action-label">Export</span><span class="settings-action-caret">›</span></button>
+    <button class="settings-action act-blocks-skill" data-tip="Generate a Claude skill that teaches your AI this app's block grammar">${iDownload}<span class="settings-action-label">Create blocks skill…</span></button>
   </div>
   <div class="outline-panel hidden" id="outline-panel"></div>
   <div class="actions-submenu hidden" id="actions-submenu-export" role="menu">
