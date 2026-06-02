@@ -19,7 +19,12 @@ package-lock.json
 demo.md
 demo-rtl.md
 demo-tester.md
+demo-*.md
+*-test.md
 PUBLISHING.md
+.playwright-mcp/**
+.claude/**
+/*.png
 media/icon.svg
 media/header.svg
 media/claude-icon.svg
