@@ -13,7 +13,7 @@ export type AiTarget =
   | 'action-items'
   | 'outline'
   | 'timeline';
-export type AiInsertMode = 'replace' | 'add';
+export type AiInsertMode = 'replace' | 'add' | 'custom';
 
 export interface AiPromptContext {
   /** Workspace-relative path of the file being edited. */
@@ -215,11 +215,22 @@ function buildWhere(ctx: AiPromptContext): string {
   );
 }
 
-function buildInstruction(ctx: AiPromptContext): string {
+const performRule = (filePath: string): string =>
+  `Actually perform the change now: edit \`${filePath}\` in place and save it. If you cannot edit files, output the complete new block as your entire reply so it can be pasted in. Do NOT reply with only an acknowledgement such as "done", "ok", or "sure" — either make the edit or output the block.`;
+
+// The action line — placed LAST so it's the final thing in the prompt (B). For
+// replace/add it's a complete, send-ready instruction; for custom it's left
+// open (trailing "— ") so the user finishes it in the chat.
+function buildAction(ctx: AiPromptContext): string {
   const phrase = TARGET_PHRASE[ctx.target as Exclude<AiTarget, 'ask'>];
-  return ctx.mode === 'replace'
-    ? `Replace that entire section with ${phrase} built from its content.`
-    : `Insert ${phrase} built from that section's content immediately after it, leaving the original text in place.`;
+  if (ctx.mode === 'replace') {
+    return `Now, replace that entire section with ${phrase} built from its content.`;
+  }
+  if (ctx.mode === 'add') {
+    return `Now, add ${phrase} built from that section's content right below it, leaving the original text in place.`;
+  }
+  // custom — open trailing line; the user finishes it (placement, extra detail).
+  return `———\nNow, build ${phrase} from that section — `;
 }
 
 // Open-ended discussion prompt — no Replace/Add, no "edit the file" rule. The
@@ -229,18 +240,30 @@ function buildAskPrompt(ctx: AiPromptContext): string {
   const lines = [
     `Let's talk about a section of the file \`${ctx.filePath}\` in this workspace — the section that ${anchorClause(ctx)}.`,
   ];
-  const req = (ctx.request ?? '').trim();
-  lines.push(req || "I'll tell you what I'd like to do with it next.");
   lines.push(`Rules:\n- ${CONTENT_RULE}`);
+  if (ctx.mode === 'replace') {
+    lines.push('When you revise it, replace the section with your result.');
+  } else if (ctx.mode === 'add') {
+    lines.push('When you revise it, add your result right below the original (keep the original in place).');
+  }
+  // Ends open (B + A): the user's request is the last thing, cursor on it.
+  const req = (ctx.request ?? '').trim();
+  lines.push(req ? req : '———\nWhat I\'d like you to do with this section: ');
   return lines.join('\n\n');
 }
 
 export function buildPrompt(ctx: AiPromptContext): string {
   if (ctx.target === 'ask') return buildAskPrompt(ctx);
+  // B ordering: context → format spec → rules → action (last). The perform
+  // rule only applies when placement is fixed (replace/add); custom defers to
+  // the user, so it's omitted there.
+  const rules = ctx.mode === 'custom'
+    ? `Rules:\n- ${CONTENT_RULE}`
+    : `Rules:\n- ${CONTENT_RULE}\n- ${performRule(ctx.filePath)}`;
   return [
     buildWhere(ctx),
-    buildInstruction(ctx),
     FORMAT_SPECS[ctx.target],
-    `Rules:\n- ${CONTENT_RULE}\n- Actually perform the change now: edit \`${ctx.filePath}\` in place and save it. If you cannot edit files, output the complete new block as your entire reply so it can be pasted in. Do NOT reply with only an acknowledgement such as "done", "ok", or "sure" — either make the edit or output the block.`,
+    rules,
+    buildAction(ctx),
   ].join('\n\n');
 }

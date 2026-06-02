@@ -22,6 +22,29 @@ export interface AiTransformPanel {
   open(input: AiPanelInput): void;
 }
 
+type Step = [num: string, title: string, sub: string];
+
+const STEPS_TRANSFORM: Step[] = [
+  ['1', 'Copy', 'the prompt below'],
+  ['2', 'Paste into your AI', 'Claude Code, Cursor, VS Code AI'],
+  ['3', 'It renders', 'the AI edits the file'],
+];
+const STEPS_ASK: Step[] = [
+  ['1', 'Copy', 'the prompt below'],
+  ['2', 'Paste into your AI', 'starts the conversation'],
+  ['3', 'Ask away', 'follow up, or tell it to edit'],
+];
+
+function stepsHtml(steps: Step[]): string {
+  return steps
+    .map(
+      ([n, t, s]) =>
+        `<div class="ai-step-box"><div class="ai-step-num">${n}</div>` +
+        `<div class="ai-step-title">${t}</div><div class="ai-step-sub">${s}</div></div>`,
+    )
+    .join('');
+}
+
 export function createAiTransformPanel(): AiTransformPanel {
   const el = document.createElement('div');
   el.className = 'ai-panel';
@@ -33,20 +56,16 @@ export function createAiTransformPanel(): AiTransformPanel {
     </div>
     <div class="ai-panel-summary"></div>
     <div class="ai-panel-mode">
-      <button class="ai-mode-btn" data-ai-mode="replace">↻ Replace selection</button>
-      <button class="ai-mode-btn" data-ai-mode="add">＋ Add below (keep original)</button>
+      <button class="ai-mode-btn" data-ai-mode="add" data-tip="Keeps your selection and puts the AI's result right after it.">＋ Add below</button>
+      <button class="ai-mode-btn" data-ai-mode="replace" data-tip="The AI's result replaces the section you selected.">↻ Replace</button>
+      <button class="ai-mode-btn" data-ai-mode="custom" data-tip="Leaves placement open — you tell the AI what to do with the result in the chat.">⌥ Custom</button>
     </div>
-    <div class="ai-panel-ask" style="display:none">
-      <label class="ai-panel-ask-label">What do you want to ask about this section? <span class="ai-panel-ask-hint">(optional — you can also continue in your AI after pasting)</span></label>
-      <textarea class="ai-panel-ask-input" spellcheck="true" placeholder="e.g. explain this, find the risks, rewrite for clarity, suggest next steps…"></textarea>
-    </div>
+    <div class="ai-panel-steps"></div>
     <details class="ai-panel-prompt-wrap">
-      <summary>Prompt</summary>
-      <textarea class="ai-panel-prompt" spellcheck="false"></textarea>
+      <summary>Preview prompt</summary>
+      <textarea class="ai-panel-prompt" spellcheck="false" readonly></textarea>
     </details>
-    <ol class="ai-panel-steps"></ol>
     <div class="ai-panel-foot">
-      <button class="ai-panel-btn" data-ai-act="edit">Edit prompt</button>
       <button class="ai-panel-btn ai-panel-btn-primary" data-ai-act="copy">📋 Copy prompt</button>
     </div>
   `;
@@ -55,24 +74,13 @@ export function createAiTransformPanel(): AiTransformPanel {
   const titleEl   = el.querySelector<HTMLElement>('.ai-panel-title')!;
   const summaryEl = el.querySelector<HTMLElement>('.ai-panel-summary')!;
   const modeRow   = el.querySelector<HTMLElement>('.ai-panel-mode')!;
-  const askWrap   = el.querySelector<HTMLElement>('.ai-panel-ask')!;
-  const askInput  = el.querySelector<HTMLTextAreaElement>('.ai-panel-ask-input')!;
   const stepsEl   = el.querySelector<HTMLElement>('.ai-panel-steps')!;
   const promptEl  = el.querySelector<HTMLTextAreaElement>('.ai-panel-prompt')!;
   const copyBtn   = el.querySelector<HTMLElement>('[data-ai-act="copy"]')!;
   const modeBtns  = Array.from(el.querySelectorAll<HTMLElement>('[data-ai-mode]'));
 
-  const STEPS_TRANSFORM =
-    '<li><b>Copy</b> the prompt.</li>' +
-    '<li><b>Paste it into your file-aware AI</b> (Claude Code, Cursor, the VS Code AI).</li>' +
-    '<li>It <b>edits the file</b> — your viewer re-renders with the result.</li>';
-  const STEPS_ASK =
-    '<li><b>Copy</b> the prompt.</li>' +
-    '<li><b>Paste it into your AI</b> to start the conversation about this section.</li>' +
-    '<li><b>Ask follow-ups there</b> — or tell it to edit the file if you want changes.</li>';
-
   let current: AiPanelInput | null = null;
-  let mode: AiInsertMode = 'replace';
+  let mode: AiInsertMode = 'add';
 
   function isAsk(): boolean {
     return current?.target === 'ask';
@@ -87,7 +95,6 @@ export function createAiTransformPanel(): AiTransformPanel {
       endLine:   current!.endLine,
       startText: current!.startText,
       endText:   current!.endText,
-      request:   askInput.value,
     };
   }
 
@@ -98,9 +105,7 @@ export function createAiTransformPanel(): AiTransformPanel {
       ? '✨ Ask AI about this section'
       : `✨ Turn selection into ${current.targetLabel} — using AI`;
     summaryEl.textContent = formatSummary(current.summary);
-    modeRow.style.display = ask ? 'none' : '';
-    askWrap.style.display = ask ? '' : 'none';
-    stepsEl.innerHTML = ask ? STEPS_ASK : STEPS_TRANSFORM;
+    stepsEl.innerHTML = stepsHtml(ask ? STEPS_ASK : STEPS_TRANSFORM);
     promptEl.value = buildPrompt(ctx());
     modeBtns.forEach(b =>
       b.classList.toggle('active', b.dataset.aiMode === mode),
@@ -124,10 +129,6 @@ export function createAiTransformPanel(): AiTransformPanel {
     if (!actBtn) return;
     switch (actBtn.dataset.aiAct) {
       case 'close': close(); break;
-      case 'edit':
-        (el.querySelector('.ai-panel-prompt-wrap') as HTMLDetailsElement).open = true;
-        promptEl.focus();
-        break;
       case 'copy': {
         copyToClipboard(promptEl.value);
         const prev = copyBtn.textContent;
@@ -138,9 +139,6 @@ export function createAiTransformPanel(): AiTransformPanel {
     }
   });
 
-  // Live-rebuild the prompt as the user types their custom request.
-  askInput.addEventListener('input', () => { if (isAsk()) promptEl.value = buildPrompt(ctx()); });
-
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && el.style.display !== 'none') close();
   });
@@ -148,11 +146,9 @@ export function createAiTransformPanel(): AiTransformPanel {
   return {
     open(input: AiPanelInput): void {
       current = input;
-      mode = 'replace';
-      askInput.value = '';
+      mode = 'add';
       render();
       el.style.display = 'block';
-      if (input.target === 'ask') setTimeout(() => askInput.focus(), 0);
     },
   };
 }

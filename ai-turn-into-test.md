@@ -123,6 +123,17 @@ launch channels: email to existing customers, in-app banner, blog post, changelo
 
 The dashboard rebuild started in late May. Onboarding redesign kicked off June 2. The funnel analysis that justified it was actually finished back in mid-May. Billing migration was supposed to begin June 15 but is still blocked. Code freeze is July 22. Launch is set for July 29. The demo video shoot is booked for July 24. Finance sign-off was originally promised June 20.
 
+**Timeline:**
+
+- **2026-05-15** — Funnel analysis finished, justifying the onboarding redesign (mid-May, date?)
+- **2026-05-28** — Dashboard rebuild started (late May, date?)
+- **2026-06-02** — Onboarding redesign kicked off
+- **2026-06-15** — Billing migration was supposed to begin — ⚠️ still blocked
+- **2026-06-20** — Finance sign-off originally promised — ⚠️ slipped
+- **2026-07-22** — Code freeze
+- **2026-07-24** — Demo video shoot booked
+- **2026-07-29** — Launch
+
 **What good looks like:** events sorted earliest to latest (mid-May funnel analysis → late-May dashboard start → June 2 onboarding → … → July 29 launch), with the blocked/slipped items marked.
 
 ---

@@ -4541,7 +4541,17 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 
 /* ── Turn selection into… using AI ───────────────────────────────────── */
 .bubble-ai.hidden { display: none; }
-.bubble-ai { padding: 4px; max-height: 340px; overflow-y: auto; }
+/* Scrolls when the target list overflows — hide the OS scrollbar, reveal a
+   subtle custom one on hover (see scrollbar-styling rule). NEVER leave raw
+   overflow-y:auto here; the OS default dark bar reads as a bug. */
+.bubble-ai { padding: 4px; max-height: 340px; overflow-y: auto; scrollbar-width: none; }
+.bubble-ai::-webkit-scrollbar { width: 0; background: transparent; }
+.bubble-ai::-webkit-scrollbar-track { background: transparent; }
+.bubble-ai::-webkit-scrollbar-thumb { background: transparent; }
+.bubble-ai:hover { scrollbar-width: thin; }
+.bubble-ai:hover::-webkit-scrollbar { width: 8px; }
+.bubble-ai:hover::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.35); border-radius: 4px; border: 1.5px solid transparent; background-clip: padding-box; }
+.bubble-ai:hover::-webkit-scrollbar-thumb:hover { background: rgba(127,127,127,0.55); background-clip: padding-box; }
 .bm-ai-btn.active { color: var(--link); }
 
 .bm-into-divider {
@@ -4576,8 +4586,7 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 16px 4px;
 }
 .ai-panel-title { font-size: 14px; font-weight: 700; }
 .ai-panel-close {
@@ -4590,40 +4599,31 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 }
 .ai-panel-close:hover { opacity: 1; }
 .ai-panel-summary { padding: 12px 16px 4px; font-size: 12px; color: var(--text-secondary); }
-.ai-panel-mode { display: flex; gap: 8px; padding: 8px 16px; }
+/* Placement as a segmented control (one pill, three segments) */
+.ai-panel-mode {
+  display: flex;
+  gap: 2px;
+  margin: 8px 16px;
+  padding: 3px;
+  background: var(--seg-bg, rgba(127,127,127,0.12));
+  border-radius: 10px;
+}
 .ai-mode-btn {
   flex: 1;
-  padding: 8px;
-  font-size: 12px;
+  padding: 8px 6px;
+  font-size: 12.5px;
   cursor: pointer;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: none;
+  border-radius: 7px;
   background: transparent;
-  color: inherit;
+  color: var(--text-secondary);
 }
 .ai-mode-btn.active {
-  border-color: #2f9f5f;
-  background: rgba(47,159,95,0.12);
-  font-weight: 600;
-}
-.ai-panel-ask { padding: 4px 16px 8px; }
-.ai-panel-ask-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
-.ai-panel-ask-hint { opacity: 0.7; font-weight: 400; }
-.ai-panel-ask-input {
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 64px;
-  font: inherit;
-  font-size: 13px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--bg);
+  background: var(--bg, #fff);
   color: var(--text-primary);
-  resize: vertical;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
-.ai-panel-ask-input:focus { outline: none; border-color: var(--link); }
-
 .ai-panel-prompt-wrap { padding: 4px 16px; }
 .ai-panel-prompt-wrap > summary {
   font-size: 12px;
@@ -4644,19 +4644,52 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: inherit;
   resize: vertical;
 }
+/* Never the OS default scrollbar (see scrollbar-styling rule). Hide it on the
+   panel and the preview textarea; reveal a subtle custom bar only on hover. */
+.ai-panel, .ai-panel-prompt { scrollbar-width: none; }
+.ai-panel::-webkit-scrollbar,
+.ai-panel-prompt::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
+.ai-panel::-webkit-scrollbar-thumb,
+.ai-panel-prompt::-webkit-scrollbar-thumb { background: transparent; }
+.ai-panel:hover, .ai-panel-prompt:hover { scrollbar-width: thin; }
+.ai-panel:hover::-webkit-scrollbar,
+.ai-panel-prompt:hover::-webkit-scrollbar { width: 8px; height: 8px; }
+.ai-panel:hover::-webkit-scrollbar-thumb,
+.ai-panel-prompt:hover::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.35); border-radius: 4px; border: 1.5px solid transparent; background-clip: padding-box; }
+.ai-panel:hover::-webkit-scrollbar-thumb:hover,
+.ai-panel-prompt:hover::-webkit-scrollbar-thumb:hover { background: rgba(127,127,127,0.55); background-clip: padding-box; }
+/* Steps as a row of three boxes (layout A) */
 .ai-panel-steps {
-  margin: 8px 16px;
-  padding-left: 20px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: var(--text-secondary);
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px 4px;
 }
+.ai-step-box {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 12px;
+  text-align: center;
+}
+.ai-step-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2f9f5f;
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 9px;
+}
+.ai-step-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.ai-step-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; }
 .ai-panel-foot {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  padding: 12px 16px 16px;
 }
 .ai-panel-btn {
   padding: 8px 14px;

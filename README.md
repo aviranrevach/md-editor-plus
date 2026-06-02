@@ -46,13 +46,13 @@ Select any run of blocks, click the ✨ button in the bubble menu (or the **Usin
 
 The prompt carries the file path, the selection's location (line + text anchors), and — crucially — the app's *exact* block grammar, so the AI's output round-trips into a real board/table/diagram instead of a near-miss. Targets:
 
-- **Ask AI…** — a free-text request ("explain this", "find the risks", "rewrite for clarity"); opens a conversation about the selected section (optional — you can also continue in your AI after pasting)
+- **Ask AI…** — opens a conversation about the selected section; the prompt ends open so you type your request in the chat after pasting
 - **Table** — a GFM pipe table from loose notes
 - **Board: Kanban** / **Board: Table** — a full board, in either of its two views
 - **Mermaid diagram** — a diagram from a process description
 - **Summary** · **Action items** · **Outline** · **Timeline** — plain-markdown "thinking" transforms
 
-For the structural targets you choose **Replace selection** or **Add below**, and the panel previews the exact prompt before you copy it.
+A small panel walks you through it: choose where the result goes via a segmented control — **Add below** (default), **Replace**, or **Custom** (leaves placement open so you direct it in the chat) — preview the exact prompt, then copy. Prompts end with the action itself, so when they land in your AI the cursor sits right where you'd keep typing.
 
 ### Display settings (Aa panel)
 

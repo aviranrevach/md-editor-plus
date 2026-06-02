@@ -313,6 +313,10 @@ export function createBubbleMenu(editor: Editor): void {
     });
     closeAi();
     closeInto();
+    // Dismiss the bubble menu so it doesn't float over the panel — collapsing
+    // the selection makes shouldShow() false. Anchors/summary are already
+    // captured above, so nothing is lost.
+    editor.commands.setTextSelection(to);
   }
 
   editor.registerPlugin(
