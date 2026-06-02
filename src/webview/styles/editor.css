@@ -4635,6 +4635,20 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: inherit;
   resize: vertical;
 }
+/* Never the OS default scrollbar (see scrollbar-styling rule). Hide it on the
+   panel and the preview textarea; reveal a subtle custom bar only on hover. */
+.ai-panel, .ai-panel-prompt { scrollbar-width: none; }
+.ai-panel::-webkit-scrollbar,
+.ai-panel-prompt::-webkit-scrollbar { width: 0; height: 0; background: transparent; }
+.ai-panel::-webkit-scrollbar-thumb,
+.ai-panel-prompt::-webkit-scrollbar-thumb { background: transparent; }
+.ai-panel:hover, .ai-panel-prompt:hover { scrollbar-width: thin; }
+.ai-panel:hover::-webkit-scrollbar,
+.ai-panel-prompt:hover::-webkit-scrollbar { width: 8px; height: 8px; }
+.ai-panel:hover::-webkit-scrollbar-thumb,
+.ai-panel-prompt:hover::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.35); border-radius: 4px; border: 1.5px solid transparent; background-clip: padding-box; }
+.ai-panel:hover::-webkit-scrollbar-thumb:hover,
+.ai-panel-prompt:hover::-webkit-scrollbar-thumb:hover { background: rgba(127,127,127,0.55); background-clip: padding-box; }
 /* Steps as a row of three boxes (layout A) */
 .ai-panel-steps {
   display: flex;
