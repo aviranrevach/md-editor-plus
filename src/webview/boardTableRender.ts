@@ -709,34 +709,41 @@ function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
   if (!fdef) return [{ key: '', cards }];
 
   const bucket = new Map<string, Card[]>();
-  for (const c of cards) {
-    let key = c.values[field] ?? '';
-    if (field === 'Status' && !b.columns.some(col => col.name === key)) key = 'Uncategorized';
-    if (fdef.type === 'tags') key = (key.split(',')[0] ?? '').trim();
-    key = key || '—';
+  const push = (key: string, c: Card) => {
     const arr = bucket.get(key) ?? [];
     arr.push(c);
     bucket.set(key, arr);
-  }
+  };
+  const alpha = (a: string, c: string) => {
+    if (a === '—') return 1;
+    if (c === '—') return -1;
+    return a.localeCompare(c, undefined, { sensitivity: 'base' });
+  };
 
-  let keys: string[];
-  if (field === 'Status') {
-    // Build keys in board.columns order, including empty groups, then Uncategorized last.
-    for (const col of b.columns) {
-      if (!bucket.has(col.name)) bucket.set(col.name, []);
+  if (fdef.type === 'tags') {
+    for (const c of cards) {
+      const tags = (c.values[field] ?? '').split(',').map(s => s.trim()).filter(Boolean);
+      if (tags.length === 0) push('—', c);
+      else for (const t of tags) push(t, c);
     }
-    keys = b.columns.map(col => col.name);
-    if (bucket.has('Uncategorized')) keys.push('Uncategorized');
-  } else {
-    keys = Array.from(bucket.keys());
-    keys.sort((a, c) => {
-      if (a === '—') return 1;
-      if (c === '—') return -1;
-      return a.localeCompare(c, undefined, { sensitivity: 'base' });
-    });
+    return Array.from(bucket.keys()).sort(alpha).map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
   }
 
-  return keys.map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
+  if (fdef.type === 'status') {
+    const opts = getStatusOptions(b, field);
+    const valid = new Set(opts.map(o => o.name));
+    for (const c of cards) {
+      const raw = c.values[field] ?? '';
+      push(valid.has(raw) ? raw : 'Uncategorized', c);
+    }
+    for (const o of opts) if (!bucket.has(o.name)) bucket.set(o.name, []);
+    const keys = opts.map(o => o.name);
+    if (bucket.has('Uncategorized')) keys.push('Uncategorized');
+    return keys.map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
+  }
+
+  for (const c of cards) push((c.values[field] ?? '') || '—', c);
+  return Array.from(bucket.keys()).sort(alpha).map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
 }
 
 let currentColumnMenuOutside: ((e: MouseEvent) => void) | null = null;
