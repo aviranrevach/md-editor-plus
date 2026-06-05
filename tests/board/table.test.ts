@@ -725,3 +725,41 @@ describe('readonly mode', () => {
     ops.destroy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 12. Column-header ⋯ menu — "Edit options" item
+// ---------------------------------------------------------------------------
+
+describe('column-header ⋯ menu Edit options item', () => {
+  it('shows "Edit options" for a status column', () => {
+    const { ctx } = makeCtx(makeBoard());
+    const ops = mountTable(ctx);
+
+    const statusTh = ctx.root.querySelector('th[data-field="Status"]') as HTMLElement;
+    const menuBtn = statusTh.querySelector('.bd-col-menu-btn') as HTMLButtonElement;
+    menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const menu = document.querySelector('.bd-col-menu') as HTMLElement;
+    expect(menu).not.toBeNull();
+    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    expect(labels).toContain('Edit options');
+
+    ops.destroy();
+  });
+
+  it('does NOT show "Edit options" for a non-status column (Owner)', () => {
+    const { ctx } = makeCtx(makeBoard());
+    const ops = mountTable(ctx);
+
+    const ownerTh = ctx.root.querySelector('th[data-field="Owner"]') as HTMLElement;
+    const menuBtn = ownerTh.querySelector('.bd-col-menu-btn') as HTMLButtonElement;
+    menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const menu = document.querySelector('.bd-col-menu') as HTMLElement;
+    expect(menu).not.toBeNull();
+    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    expect(labels).not.toContain('Edit options');
+
+    ops.destroy();
+  });
+});
