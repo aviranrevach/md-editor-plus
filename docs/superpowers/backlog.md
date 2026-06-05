@@ -7,6 +7,19 @@ Add new entries at the top of each section.
 
 ---
 
+## Board — tags & grouping follow-ups (deferred 2026-06-05)
+
+Deferred from `2026-06-05-board-grouping-design.md` and `2026-06-05-board-tags-design.md` (both shipped).
+
+- **Kanban "group by" any field** — kanban columns are still hardwired to the built-in Status. Let the columns be driven by any chosen status (or tag) field, like the table's group-by. (Grouping option "B" from the brainstorm.)
+- **Persist collapsed groups** — table group collapse/expand is in-memory and resets on reload; store it per view. (Also listed under "Board — table view".)
+- **Multi-tag row drag (table)** — when grouped by a tag, a card that appears in several tag groups resolves to its *first* bucket for drag/reorder; grabbing it from another bucket reorders relative to the first. No data loss (moveCard works by id), just unintuitive. See the comment at `boardTableRender.ts` drag handler.
+- **Tag-set reordering** — no UI to reorder options within a status/tag set; order is stored/derived (first-seen). A drag-to-reorder in the options editor would be nice.
+- **Picker chip style consistency (cosmetic)** — the tags picker rows use the dotted `.board-column-chip` while rendered cells use flat `.bd-tag`; unify the look.
+- **Tags picker re-anchor on toggle (cosmetic)** — toggling a tag in the table rebuilds the cell, so the open picker's anchor detaches; it stays functional but doesn't reposition.
+
+---
+
 ## Header / chrome responsiveness (deferred from whiteboard manual smoke 2026-05-26)
 
 At narrow window widths the top-of-plugin chrome stops fitting:
@@ -53,7 +66,6 @@ Open questions worth a separate brainstorm:
 
 - Multi-column sort
 - "Group by week / month" smart bucketing for `date` fields (v1 buckets by exact value)
-- Multi-group membership when grouping by `tags` (v1: card appears only in its first tag's group)
 - Frozen / sticky first column on horizontal scroll
 - Filter / search bar inside the table
 - Aggregations in the group header row (count, sum, avg)
