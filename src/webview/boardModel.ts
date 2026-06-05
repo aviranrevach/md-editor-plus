@@ -1,5 +1,6 @@
 export type ColorToken =
-  | 'gray' | 'blue' | 'amber' | 'emerald' | 'red' | 'purple';
+  | 'gray' | 'blue' | 'amber' | 'emerald' | 'red' | 'purple'
+  | 'orange' | 'teal' | 'indigo' | 'pink';
 
 export type FieldType = 'text' | 'status' | 'date' | 'person' | 'tags';
 
@@ -59,7 +60,7 @@ const TABLE_LINE = /^\s*\|(.+)\|\s*$/;
 const SEPARATOR_LINE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 
 const COLOR_TOKENS: ColorToken[] =
-  ['gray', 'blue', 'amber', 'emerald', 'red', 'purple'];
+  ['gray', 'blue', 'amber', 'emerald', 'red', 'purple', 'orange', 'teal', 'indigo', 'pink'];
 
 function autoColor(name: string): ColorToken {
   let h = 0;

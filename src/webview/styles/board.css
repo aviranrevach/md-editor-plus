@@ -34,6 +34,18 @@
   --board-chip-purple-bg: #e8deee;
   --board-chip-purple-fg: #3a1a4a;
   --board-chip-purple-dot:#7c3aed;
+  --board-chip-orange-bg: #fcebe0;
+  --board-chip-orange-fg: #bc5a26;
+  --board-chip-orange-dot:#e8743b;
+  --board-chip-teal-bg:   #dcf2f0;
+  --board-chip-teal-fg:   #147a76;
+  --board-chip-teal-dot:  #16a6a0;
+  --board-chip-indigo-bg: #e7e7fb;
+  --board-chip-indigo-fg: #4242a8;
+  --board-chip-indigo-dot:#5b5bd6;
+  --board-chip-pink-bg:   #fbe6f1;
+  --board-chip-pink-fg:   #b23380;
+  --board-chip-pink-dot:  #d6499b;
 }
 
 .dark {
@@ -65,6 +77,18 @@
   --board-chip-purple-bg: rgba(120, 70, 175, 0.30);
   --board-chip-purple-fg: #d3bdee;
   --board-chip-purple-dot:#9d70d7;
+  --board-chip-orange-bg: rgba(188, 90, 38, 0.30);
+  --board-chip-orange-fg: #f4b28a;
+  --board-chip-orange-dot:#f09460;
+  --board-chip-teal-bg:   rgba(20, 122, 118, 0.30);
+  --board-chip-teal-fg:   #a8e6e3;
+  --board-chip-teal-dot:  #3ec8c2;
+  --board-chip-indigo-bg: rgba(66, 66, 168, 0.30);
+  --board-chip-indigo-fg: #c5c5f5;
+  --board-chip-indigo-dot:#8484e0;
+  --board-chip-pink-bg:   rgba(178, 51, 128, 0.30);
+  --board-chip-pink-fg:   #f0b8d8;
+  --board-chip-pink-dot:  #e070b8;
 }
 
 /* ===== Block root ===== */
@@ -298,6 +322,22 @@ button.board-column-chip-dot:hover {
 .color-purple.board-column-chip { background: var(--board-chip-purple-bg); color: var(--board-chip-purple-fg); }
 .color-purple .board-column-chip-dot,
 .color-purple.board-column-chip .board-column-chip-dot { background: var(--board-chip-purple-dot); }
+.color-orange .board-column-chip,
+.color-orange.board-column-chip { background: var(--board-chip-orange-bg); color: var(--board-chip-orange-fg); }
+.color-orange .board-column-chip-dot,
+.color-orange.board-column-chip .board-column-chip-dot { background: var(--board-chip-orange-dot); }
+.color-teal   .board-column-chip,
+.color-teal.board-column-chip   { background: var(--board-chip-teal-bg);   color: var(--board-chip-teal-fg); }
+.color-teal   .board-column-chip-dot,
+.color-teal.board-column-chip   .board-column-chip-dot { background: var(--board-chip-teal-dot); }
+.color-indigo .board-column-chip,
+.color-indigo.board-column-chip { background: var(--board-chip-indigo-bg); color: var(--board-chip-indigo-fg); }
+.color-indigo .board-column-chip-dot,
+.color-indigo.board-column-chip .board-column-chip-dot { background: var(--board-chip-indigo-dot); }
+.color-pink   .board-column-chip,
+.color-pink.board-column-chip   { background: var(--board-chip-pink-bg);   color: var(--board-chip-pink-fg); }
+.color-pink   .board-column-chip-dot,
+.color-pink.board-column-chip   .board-column-chip-dot { background: var(--board-chip-pink-dot); }
 
 .board-column-dots {
   margin-left: auto;
@@ -583,6 +623,10 @@ button.board-column-chip-dot:hover {
 .board-color-swatch.color-amber  { background: var(--board-chip-amber-dot); }
 .board-color-swatch.color-red    { background: var(--board-chip-red-dot); }
 .board-color-swatch.color-purple { background: var(--board-chip-purple-dot); }
+.board-color-swatch.color-orange { background: var(--board-chip-orange-dot); }
+.board-color-swatch.color-teal   { background: var(--board-chip-teal-dot); }
+.board-color-swatch.color-indigo { background: var(--board-chip-indigo-dot); }
+.board-color-swatch.color-pink   { background: var(--board-chip-pink-dot); }
 
 /* ===== Side panel ===== */
 .board-side-panel {
