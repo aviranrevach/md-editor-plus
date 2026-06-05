@@ -1019,9 +1019,11 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
         placeholder.textContent = '—';
         td.appendChild(placeholder);
       } else {
+        const opts = getStatusOptions(ctx.getBoard(), field.name);
         for (const t of tags) {
+          const color = opts.find(o => o.name === t)?.color ?? autoColorPublic(t);
           const chip = document.createElement('span');
-          chip.className = 'bd-tag';
+          chip.className = `bd-tag color-${color}`;
           chip.textContent = t;
           td.appendChild(chip);
         }

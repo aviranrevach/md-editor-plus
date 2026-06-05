@@ -1480,6 +1480,16 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-date { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); font: 500 11.5px ui-sans-serif, sans-serif; }
 .bd-date-overdue { background: #fee2e2; color: #b91c1c; }
 .bd-tag { display: inline-block; padding: 1px 7px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); border-radius: 4px; font-size: 11px; margin-right: 4px; }
+.bd-tag.color-gray,    .board-tag-chip.color-gray    { background: var(--board-chip-gray-bg);   color: var(--board-chip-gray-fg); }
+.bd-tag.color-blue,    .board-tag-chip.color-blue    { background: var(--board-chip-blue-bg);   color: var(--board-chip-blue-fg); }
+.bd-tag.color-amber,   .board-tag-chip.color-amber   { background: var(--board-chip-amber-bg);  color: var(--board-chip-amber-fg); }
+.bd-tag.color-emerald, .board-tag-chip.color-emerald { background: var(--board-chip-green-bg);  color: var(--board-chip-green-fg); }
+.bd-tag.color-red,     .board-tag-chip.color-red     { background: var(--board-chip-red-bg);    color: var(--board-chip-red-fg); }
+.bd-tag.color-purple,  .board-tag-chip.color-purple  { background: var(--board-chip-purple-bg); color: var(--board-chip-purple-fg); }
+.bd-tag.color-orange,  .board-tag-chip.color-orange  { background: var(--board-chip-orange-bg); color: var(--board-chip-orange-fg); }
+.bd-tag.color-teal,    .board-tag-chip.color-teal    { background: var(--board-chip-teal-bg);   color: var(--board-chip-teal-fg); }
+.bd-tag.color-indigo,  .board-tag-chip.color-indigo  { background: var(--board-chip-indigo-bg); color: var(--board-chip-indigo-fg); }
+.bd-tag.color-pink,    .board-tag-chip.color-pink    { background: var(--board-chip-pink-bg);   color: var(--board-chip-pink-fg); }
 .bd-date-input { font: 13px ui-sans-serif, sans-serif; padding: 4px 6px; border: 1px solid var(--link, #2563eb); border-radius: 5px; background: var(--bg); }
 /* Sort caret inherits the header's secondary text color so it doesn't read as
    a clickable link. Slightly smaller than the label text. */

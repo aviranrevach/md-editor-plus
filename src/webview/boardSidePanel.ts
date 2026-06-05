@@ -1,6 +1,6 @@
 // src/webview/boardSidePanel.ts
 import type { Board, Card, FieldDef, FieldType } from './boardModel';
-import { getStatusOptions } from './boardModel';
+import { getStatusOptions, autoColorPublic } from './boardModel';
 import { createEditor } from './editor';
 import { promptNewField, openFieldActionMenu } from './boardProperties';
 import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
@@ -460,6 +460,8 @@ function renderTagsEditor(card: Card, fieldName: string, rawValue: string): HTML
   const wrap = document.createElement('div');
   wrap.className = 'board-tag-input board-panel-prop-value';
   const tags = rawValue.split(',').map((t) => t.trim()).filter(Boolean);
+  const colorFor = (t: string) =>
+    getStatusOptions(currentBoard!, fieldName).find(o => o.name === t)?.color ?? autoColorPublic(t);
   if (currentReadOnly) {
     if (tags.length === 0) {
       wrap.classList.add('is-empty');
@@ -467,7 +469,7 @@ function renderTagsEditor(card: Card, fieldName: string, rawValue: string): HTML
     } else {
       tags.forEach((tag) => {
         const chip = document.createElement('span');
-        chip.className = 'board-tag-chip';
+        chip.className = 'board-tag-chip color-' + colorFor(tag);
         chip.textContent = tag;
         chip.style.pointerEvents = 'none';
         wrap.appendChild(chip);
@@ -482,7 +484,7 @@ function renderTagsEditor(card: Card, fieldName: string, rawValue: string): HTML
     wrap.querySelectorAll('.board-tag-chip').forEach((n) => n.remove());
     tags.forEach((tag, i) => {
       const chip = document.createElement('span');
-      chip.className = 'board-tag-chip';
+      chip.className = 'board-tag-chip color-' + colorFor(tag);
       chip.textContent = tag;
       const x = document.createElement('button');
       x.type = 'button';

@@ -1,8 +1,28 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import {
   addTagOption, renameTagOption, deleteTagOption, toggleTagOnCard, getStatusOptions,
   parseBoardSource, serializeBoard,
 } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
+import { mountTable } from '../../src/webview/boardTableRender';
+import type { BoardRendererCtx } from '../../src/webview/boardBlock';
+
+function ctxFor(b: Board) {
+  const root = document.createElement('div'); document.body.appendChild(root);
+  const ref = { current: b };
+  const ctx: BoardRendererCtx = {
+    root,
+    getBoard: () => ref.current,
+    mutate: (n: Board) => { ref.current = n; },
+    openSidePanel: (_id: string) => {},
+    requestDelete: () => {},
+    readonly: false,
+  };
+  return { ctx, ref };
+}
 
 function board(): Board {
   return {
@@ -87,5 +107,29 @@ describe('tag options serialize + derive-on-load', () => {
     expect(f.options!.map(o => o.name)).toEqual(['backend', 'urgent']); // first-seen order
     expect(f.options!.every(o => typeof o.color === 'string')).toBe(true);
     expect(parseBoardSource(serializeBoard(a))).toEqual(a);
+  });
+});
+
+describe('tag chip color', () => {
+  it('renders each tag chip with its option color class', () => {
+    const b: Board = {
+      id: 'b1', name: '', columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title', type: 'text', visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'Tags', type: 'tags', visibleOnCard: true,
+          options: [{ name: 'backend', color: 'teal' }, { name: 'urgent', color: 'red' }] },
+      ],
+      cards: [{ id: 'c1', values: { id: 'c1', Title: 'A', Status: 'Todo', Tags: 'backend, urgent' }, body: '' }],
+      orphanBodies: [], views: [], activeView: 'table',
+    };
+    const { ctx } = ctxFor(b);
+    mountTable(ctx);
+    const cell = ctx.root.querySelector('td[data-field="Tags"]')!;
+    const chips = Array.from(cell.querySelectorAll('.bd-tag'));
+    expect(chips.map(c => c.className)).toEqual([
+      expect.stringContaining('color-teal'),
+      expect.stringContaining('color-red'),
+    ]);
   });
 });
