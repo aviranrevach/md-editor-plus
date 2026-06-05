@@ -7,9 +7,12 @@ export interface BuiltSkill {
 
 const FOLDER_NAME = 'md-editor-blocks';
 const DESCRIPTION =
-  'Use when creating or editing Kanban/Table boards, Mermaid diagrams, callouts, ' +
-  'or toggles in markdown files for MD Editor Plus. Provides the exact block ' +
-  'grammar so they render correctly instead of as raw text.';
+  'Use when creating or editing rich blocks in Markdown (.md/.mdx) files for the ' +
+  'MD Editor Plus editor — Kanban or Table/database boards (project boards, ' +
+  'task/sprint boards), Mermaid diagrams (flowcharts, graphs), callouts ' +
+  '(note / tip / warning / important / caution admonitions), and collapsible ' +
+  'toggles (expandable <details> sections). Provides the exact on-disk block ' +
+  'grammar so they render in the editor instead of showing as raw text.';
 
 // A block example is itself fenced markdown; wrap it in a ```markdown fence,
 // and bump any inner ``` to ~~~~ so the outer fence isn't broken by mermaid's

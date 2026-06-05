@@ -56,7 +56,7 @@ A small panel walks you through it: choose where the result goes via a segmented
 
 ### Create a blocks skill
 
-From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Claude Skill** (`SKILL.md`) that teaches your AI the exact grammar for this app's blocks (Kanban/Table boards, Mermaid, Callouts, Toggles) — tick which blocks to include, then **Install in project** (`.claude/skills/`), **Install globally** (`~/.claude/skills/`), or **Download**. Once installed, Claude auto-loads it whenever you ask for one of these blocks, so the output renders correctly with no copy-paste. The grammar comes from the same single source as the ✨ prompts, so they never drift.
+From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Claude Skill** (`SKILL.md`) that teaches your AI the exact grammar for this app's blocks (Kanban/Table boards, Mermaid, Callouts, Toggles) — tick which blocks to include, then **Install in project** (`.claude/skills/`), **Install globally** (`~/.claude/skills/`), or **Download**. Hit **Preview** first to see the exact `SKILL.md` it will write — a read-only, scrollable view that updates live as you tick blocks, so you know precisely what lands on disk before you create it. Once installed, Claude auto-loads it whenever you ask for one of these blocks, so the output renders correctly with no copy-paste. The grammar comes from the same single source as the ✨ prompts, so they never drift.
 
 ### Display settings (Aa panel)
 
