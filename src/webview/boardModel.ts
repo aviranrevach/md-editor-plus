@@ -112,6 +112,70 @@ export function recolorStatusOption(
   return setStatusOptions(board, fieldName, opts);
 }
 
+// ---------------------------------------------------------------------------
+// Tag-list helpers
+// A "tags" field stores its option palette in field.options (same as status),
+// but card values are comma-separated strings, e.g. "backend, urgent".
+// ---------------------------------------------------------------------------
+
+function splitTags(v: string): string[] {
+  return v.split(',').map(s => s.trim()).filter(Boolean);
+}
+function joinTags(tags: string[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of tags) { if (t && !seen.has(t)) { seen.add(t); out.push(t); } }
+  return out.join(', ');
+}
+
+/** Append a tag option (auto-colored by name); no-op if it already exists. */
+export function addTagOption(board: Board, field: string, name: string): Board {
+  const opts = getStatusOptions(board, field);
+  if (opts.some(o => o.name === name)) return board;
+  return setStatusOptions(board, field, [...opts, { name, color: autoColor(name) }]);
+}
+
+/** Rename a tag option and remap it inside every card's comma-list. */
+export function renameTagOption(board: Board, field: string, oldName: string, newName: string): Board {
+  const opts = getStatusOptions(board, field).map(o => o.name === oldName ? { ...o, name: newName } : o);
+  const b = setStatusOptions(board, field, opts);
+  return {
+    ...b,
+    cards: b.cards.map(c => {
+      const tags = splitTags(c.values[field] ?? '');
+      if (!tags.includes(oldName)) return c;
+      return { ...c, values: { ...c.values, [field]: joinTags(tags.map(t => t === oldName ? newName : t)) } };
+    }),
+  };
+}
+
+/** Delete a tag option and strip it from every card's comma-list. */
+export function deleteTagOption(board: Board, field: string, name: string): Board {
+  const opts = getStatusOptions(board, field).filter(o => o.name !== name);
+  const b = setStatusOptions(board, field, opts);
+  return {
+    ...b,
+    cards: b.cards.map(c => {
+      const tags = splitTags(c.values[field] ?? '');
+      if (!tags.includes(name)) return c;
+      return { ...c, values: { ...c.values, [field]: joinTags(tags.filter(t => t !== name)) } };
+    }),
+  };
+}
+
+/** Toggle a tag on/off for a single card. */
+export function toggleTagOnCard(board: Board, field: string, cardId: string, name: string): Board {
+  return {
+    ...board,
+    cards: board.cards.map(c => {
+      if (c.id !== cardId) return c;
+      const tags = splitTags(c.values[field] ?? '');
+      const next = tags.includes(name) ? tags.filter(t => t !== name) : [...tags, name];
+      return { ...c, values: { ...c.values, [field]: joinTags(next) } };
+    }),
+  };
+}
+
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
 const VIEW_RE = /<!--\s*board:view([\s\S]*?)-->/gi;
 const BODY_RE = /<!--\s*board:body\s+id="([^"]+)"\s*-->/gi;
