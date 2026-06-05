@@ -28,7 +28,9 @@ function flushPendingRename(): void {
 /** Render the editable list of states into `host`. Pure DOM, no board knowledge. */
 export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig): void {
   host.innerHTML = '';
-  host.className = 'bd-opt-editor';
+  // Use classList.add (not className=) so a host that's also a styled popover
+  // (.bd-opt-popover, which carries position/border/shadow) keeps its class.
+  host.classList.add('bd-opt-editor');
 
   for (const opt of cfg.getOptions()) {
     const row = document.createElement('div');

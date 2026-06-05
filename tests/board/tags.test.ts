@@ -210,3 +210,23 @@ describe('Edit options works for tags', () => {
     expect(latest.cards[0].values.Tags).toBe('infra, urgent');
   });
 });
+
+describe('options editor popover keeps its styling class', () => {
+  it('the .bd-opt-popover element retains its class after render (not overwritten)', () => {
+    const { openStatusOptionsEditor } = require('../../src/webview/boardStatusOptions');
+    let latest: Board = {
+      id:'b1', name:'', columns:[{name:'Todo',color:'blue'}],
+      fields:[
+        { name:'Title', type:'text', visibleOnCard:true },
+        { name:'Status', type:'status', visibleOnCard:true },
+        { name:'Tags', type:'tags', visibleOnCard:true, options:[{name:'backend',color:'teal'}] },
+      ],
+      cards:[], orphanBodies:[], views:[], activeView:'kanban',
+    };
+    const a = document.createElement('button'); document.body.appendChild(a);
+    openStatusOptionsEditor(a, () => latest, 'Tags', (n: Board) => { latest = n; });
+    const pop = document.querySelector('.bd-opt-popover');
+    expect(pop).not.toBeNull();                              // popover class survives
+    expect(pop!.classList.contains('bd-opt-editor')).toBe(true); // editor class also present
+  });
+});
