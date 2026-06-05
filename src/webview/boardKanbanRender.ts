@@ -5,6 +5,7 @@
 // that happens inside the board's root element.
 
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
+import { COLOR_TOKENS_PUBLIC } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
@@ -681,8 +682,7 @@ function showEndOfListDropIndicator(list: HTMLElement): void {
 // Column color picker & column menu
 // ---------------------------------------------------------------------------
 
-const COLOR_PALETTE: ColorToken[] =
-  ['gray', 'blue', 'amber', 'emerald', 'red', 'purple'];
+const COLOR_PALETTE: readonly ColorToken[] = COLOR_TOKENS_PUBLIC;
 
 // Inline SVG icons used in the column menu.
 const ICON_EDIT = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5l2 2L6 12l-3 1 1-3 7.5-7.5z"/></svg>`;
@@ -1001,8 +1001,7 @@ function cssEscape(s: string): string {
 }
 
 function nextColor(used: string[]): ColorToken {
-  const all: ColorToken[] = ['blue', 'amber', 'emerald', 'red', 'purple', 'gray'];
-  return all.find((c) => !used.includes(c)) ?? 'gray';
+  return COLOR_TOKENS_PUBLIC.find((c) => !used.includes(c)) ?? COLOR_TOKENS_PUBLIC[0];
 }
 
 function bodyPreview(body: string): string {

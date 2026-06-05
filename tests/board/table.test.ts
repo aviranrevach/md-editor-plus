@@ -261,6 +261,38 @@ describe('status chip + dropdown', () => {
 
     ops.destroy();
   });
+
+  it('a second status field renders its own options and writes its own value', () => {
+    const board = makeBoard({
+      fields: [
+        { name: 'Title',  type: 'text',   visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'Impact', type: 'status', visibleOnCard: true,
+          options: [{ name: 'Low', color: 'gray' }, { name: 'High', color: 'red' }] },
+      ],
+      cards: [
+        { id: 'c1', values: { id: 'c1', Title: 'Alpha', Status: 'Todo', Impact: 'Low' }, body: '' },
+      ],
+    });
+    const { ctx, boardRef } = makeCtx(board);
+    const ops = mountTable(ctx);
+
+    const impactCell = ctx.root.querySelector(
+      'td.bd-table-cell[data-field="Impact"]',
+    ) as HTMLElement;
+    expect(impactCell).not.toBeNull();
+    impactCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const dropdown = document.querySelector('.board-status-dropdown')!;
+    const options = dropdown.querySelectorAll('.board-status-option');
+    expect(options).toHaveLength(2);
+
+    (options[1] as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(boardRef.current.cards[0].values.Impact).toBe('High');
+    expect(boardRef.current.cards[0].values.Status).toBe('Todo');
+
+    ops.destroy();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -689,6 +721,44 @@ describe('readonly mode', () => {
     titleCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(titleCell.getAttribute('contenteditable')).not.toBe('true');
+
+    ops.destroy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Column-header ⋯ menu — "Edit options" item
+// ---------------------------------------------------------------------------
+
+describe('column-header ⋯ menu Edit options item', () => {
+  it('shows "Edit options" for a status column', () => {
+    const { ctx } = makeCtx(makeBoard());
+    const ops = mountTable(ctx);
+
+    const statusTh = ctx.root.querySelector('th[data-field="Status"]') as HTMLElement;
+    const menuBtn = statusTh.querySelector('.bd-col-menu-btn') as HTMLButtonElement;
+    menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const menu = document.querySelector('.bd-col-menu') as HTMLElement;
+    expect(menu).not.toBeNull();
+    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    expect(labels).toContain('Edit options');
+
+    ops.destroy();
+  });
+
+  it('does NOT show "Edit options" for a non-status column (Owner)', () => {
+    const { ctx } = makeCtx(makeBoard());
+    const ops = mountTable(ctx);
+
+    const ownerTh = ctx.root.querySelector('th[data-field="Owner"]') as HTMLElement;
+    const menuBtn = ownerTh.querySelector('.bd-col-menu-btn') as HTMLButtonElement;
+    menuBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const menu = document.querySelector('.bd-col-menu') as HTMLElement;
+    expect(menu).not.toBeNull();
+    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    expect(labels).not.toContain('Edit options');
 
     ops.destroy();
   });

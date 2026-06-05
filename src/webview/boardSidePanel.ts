@@ -1,5 +1,6 @@
 // src/webview/boardSidePanel.ts
-import type { Board, Card, FieldType } from './boardModel';
+import type { Board, Card, FieldDef, FieldType } from './boardModel';
+import { getStatusOptions } from './boardModel';
 import { createEditor } from './editor';
 import { promptNewField, openFieldActionMenu } from './boardProperties';
 import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
@@ -339,7 +340,7 @@ function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: bo
     }
     row.appendChild(input);
   } else if (field.type === 'status') {
-    row.appendChild(renderStatusChipTrigger(board, card));
+    row.appendChild(renderStatusChipTrigger(board, card, field));
   } else if (field.type === 'tags') {
     row.appendChild(renderTagsEditor(card, field.name, rawValue));
   } else {
@@ -366,14 +367,14 @@ function renderPropRow(field: { name: string; type: FieldType; visibleOnCard: bo
 
 // === Status: render the current value as a chip (matches the column chip),
 // and on click open a dropdown of chips for every column. No more <select>. ===
-function renderStatusChipTrigger(board: Board, card: Card): HTMLElement {
+function renderStatusChipTrigger(board: Board, card: Card, field: FieldDef): HTMLElement {
   const trigger = document.createElement('button');
   trigger.type = 'button';
   trigger.className = 'board-panel-status-trigger board-panel-prop-value';
   trigger.disabled = currentReadOnly;
 
-  const status = card.values.Status || '';
-  const col = board.columns.find((c) => c.name === status);
+  const status = card.values[field.name] || '';
+  const col = getStatusOptions(board, field.name).find((c) => c.name === status);
   if (status && col) {
     trigger.appendChild(buildChip(col.name, col.color));
   } else {
@@ -390,7 +391,7 @@ function renderStatusChipTrigger(board: Board, card: Card): HTMLElement {
   if (!currentReadOnly) {
     trigger.addEventListener('click', (e) => {
       e.stopPropagation();
-      openStatusDropdown(trigger);
+      openStatusDropdown(trigger, field);
     });
   }
   return trigger;
@@ -409,7 +410,7 @@ export function buildChip(name: string, color: string): HTMLElement {
   return chip;
 }
 
-function openStatusDropdown(anchor: HTMLElement): void {
+function openStatusDropdown(anchor: HTMLElement, field: FieldDef): void {
   document.querySelectorAll('.board-status-dropdown').forEach((n) => n.remove());
   if (!currentBoard || !currentCard) return;
   const board = currentBoard;
@@ -425,19 +426,19 @@ function openStatusDropdown(anchor: HTMLElement): void {
   menu.style.left = `${rect.left + window.scrollX}px`;
   menu.style.minWidth = `${rect.width}px`;
 
-  for (const col of board.columns) {
+  for (const col of getStatusOptions(board, field.name)) {
     const opt = document.createElement('button');
     opt.type = 'button';
     opt.className = 'board-status-option';
     opt.appendChild(buildChip(col.name, col.color));
-    if (card.values.Status === col.name) {
+    if (card.values[field.name] === col.name) {
       const check = document.createElement('span');
       check.className = 'board-status-check';
       check.innerHTML = ICON_CHECK;
       opt.appendChild(check);
     }
     opt.addEventListener('click', () => {
-      commitCard((c) => ({ ...c, values: { ...c.values, Status: col.name } }));
+      commitCard((c) => ({ ...c, values: { ...c.values, [field.name]: col.name } }));
       close();
     });
     menu.appendChild(opt);

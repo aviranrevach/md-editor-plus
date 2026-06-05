@@ -1,5 +1,6 @@
 export type ColorToken =
-  | 'gray' | 'blue' | 'amber' | 'emerald' | 'red' | 'purple';
+  | 'gray' | 'blue' | 'amber' | 'emerald' | 'red' | 'purple'
+  | 'orange' | 'teal' | 'indigo' | 'pink';
 
 export type FieldType = 'text' | 'status' | 'date' | 'person' | 'tags';
 
@@ -7,6 +8,7 @@ export interface FieldDef {
   name: string;
   type: FieldType;
   visibleOnCard: boolean;
+  options?: ColumnDef[];   // states for status fields other than the built-in "Status"
 }
 
 export interface ColumnDef {
@@ -43,6 +45,73 @@ export interface Board {
   activeView: string;
 }
 
+/** Read the option list (states) for any status field. */
+export function getStatusOptions(board: Board, fieldName: string): ColumnDef[] {
+  if (fieldName === 'Status') return board.columns;
+  return board.fields.find((f) => f.name === fieldName)?.options ?? [];
+}
+
+/** Return a new Board with the option list for a status field replaced. */
+export function setStatusOptions(board: Board, fieldName: string, options: ColumnDef[]): Board {
+  if (fieldName === 'Status') {
+    return { ...board, columns: options };
+  }
+  return {
+    ...board,
+    fields: board.fields.map((f) => (f.name === fieldName ? { ...f, options } : f)),
+  };
+}
+
+/** Rename a status option and migrate every card value holding the old name. */
+export function renameStatusOption(
+  board: Board, fieldName: string, oldName: string, newName: string,
+): Board {
+  const opts = getStatusOptions(board, fieldName).map(
+    (o) => (o.name === oldName ? { ...o, name: newName } : o),
+  );
+  const b = setStatusOptions(board, fieldName, opts);
+  return {
+    ...b,
+    cards: b.cards.map((c) =>
+      c.values[fieldName] === oldName
+        ? { ...c, values: { ...c.values, [fieldName]: newName } }
+        : c,
+    ),
+  };
+}
+
+/** Delete a status option and clear it from any card that held it. */
+export function deleteStatusOption(board: Board, fieldName: string, name: string): Board {
+  const opts = getStatusOptions(board, fieldName).filter((o) => o.name !== name);
+  const b = setStatusOptions(board, fieldName, opts);
+  return {
+    ...b,
+    cards: b.cards.map((c) =>
+      c.values[fieldName] === name
+        ? { ...c, values: { ...c.values, [fieldName]: '' } }
+        : c,
+    ),
+  };
+}
+
+/** Append a status option, auto-picking a color not already used. */
+export function addStatusOption(board: Board, fieldName: string, name: string): Board {
+  const opts = getStatusOptions(board, fieldName);
+  const used = opts.map((o) => o.color);
+  const color = COLOR_TOKENS.find((t) => !used.includes(t)) ?? autoColor(name);
+  return setStatusOptions(board, fieldName, [...opts, { name, color }]);
+}
+
+/** Change the color of one status option. */
+export function recolorStatusOption(
+  board: Board, fieldName: string, name: string, color: ColorToken,
+): Board {
+  const opts = getStatusOptions(board, fieldName).map(
+    (o) => (o.name === name ? { ...o, color } : o),
+  );
+  return setStatusOptions(board, fieldName, opts);
+}
+
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
 const VIEW_RE = /<!--\s*board:view([\s\S]*?)-->/gi;
 const BODY_RE = /<!--\s*board:body\s+id="([^"]+)"\s*-->/gi;
@@ -59,7 +128,10 @@ const TABLE_LINE = /^\s*\|(.+)\|\s*$/;
 const SEPARATOR_LINE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 
 const COLOR_TOKENS: ColorToken[] =
-  ['gray', 'blue', 'amber', 'emerald', 'red', 'purple'];
+  ['gray', 'blue', 'amber', 'emerald', 'red', 'purple', 'orange', 'teal', 'indigo', 'pink'];
+
+/** Public, ordered palette for color pickers. Frozen to prevent accidental mutation. */
+export const COLOR_TOKENS_PUBLIC: readonly ColorToken[] = Object.freeze([...COLOR_TOKENS]);
 
 function autoColor(name: string): ColorToken {
   let h = 0;
@@ -173,6 +245,31 @@ function parseFieldTypes(raw: string): Map<string, FieldType> {
   return out;
 }
 
+function parseFieldOptions(raw: string): Map<string, ColumnDef[]> {
+  const out = new Map<string, ColumnDef[]>();
+  if (!raw) return out;
+  for (const chunk of raw.split(';')) {
+    const eq = chunk.indexOf('=');
+    if (eq < 0) continue;
+    const fieldName = chunk.slice(0, eq).trim();
+    if (!fieldName) continue;
+    const opts: ColumnDef[] = [];
+    for (const optChunk of chunk.slice(eq + 1).split('|')) {
+      if (!optChunk) continue;
+      const colon = optChunk.lastIndexOf(':');
+      const name = (colon >= 0 ? optChunk.slice(0, colon) : optChunk).trim();
+      const tok = colon >= 0 ? optChunk.slice(colon + 1).trim() : '';
+      if (!name) continue;
+      const color = COLOR_TOKENS.includes(tok as ColorToken)
+        ? (tok as ColorToken)
+        : autoColor(name);
+      opts.push({ name, color });
+    }
+    out.set(fieldName, opts);
+  }
+  return out;
+}
+
 export function parseBoardSource(source: string): Board {
   const startMatch = source.match(START_RE);
   const attrs = startMatch ? parseAttrs(startMatch[1]) : {};
@@ -210,6 +307,14 @@ export function parseBoardSource(source: string): Board {
       if (!fields.find((f) => f.name === name)) {
         fields.push({ name, type: 'text', visibleOnCard: false });
       }
+    }
+  }
+
+  const fieldOptions = parseFieldOptions(attrs['field-options'] ?? '');
+  for (const f of fields) {
+    if (f.type === 'status' && f.name !== 'Status') {
+      const opts = fieldOptions.get(f.name);
+      if (opts) f.options = opts;
     }
   }
 
@@ -288,6 +393,14 @@ function serializeStartMarker(board: Board): string {
   const colors = board.columns.map((c) => c.color).join('|');
   const fieldTypes = board.fields.map((f) => `${f.name}=${f.type}`).join(',');
 
+  const fieldOptionsParts: string[] = [];
+  for (const f of board.fields) {
+    if (f.type === 'status' && f.name !== 'Status' && f.options && f.options.length) {
+      const opts = f.options.map((o) => `${o.name}:${o.color}`).join('|');
+      fieldOptionsParts.push(`${f.name}=${opts}`);
+    }
+  }
+
   const attrs: string[] = [`id="${board.id}"`];
   if (board.name) attrs.push(`name="${board.name}"`);
   if (board.columns.length) {
@@ -295,6 +408,9 @@ function serializeStartMarker(board: Board): string {
     attrs.push(`column-colors="${colors}"`);
   }
   if (fieldNames.length) attrs.push(`field-types="${fieldTypes}"`);
+  if (fieldOptionsParts.length) {
+    attrs.push(`field-options="${fieldOptionsParts.join(';')}"`);
+  }
   if (hidden.length) attrs.push(`hidden-fields="${hidden.join(',')}"`);
   if (board.activeView && board.activeView !== 'kanban') {
     attrs.push(`active-view="${board.activeView}"`);

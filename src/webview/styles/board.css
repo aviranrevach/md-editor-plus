@@ -34,6 +34,18 @@
   --board-chip-purple-bg: #e8deee;
   --board-chip-purple-fg: #3a1a4a;
   --board-chip-purple-dot:#7c3aed;
+  --board-chip-orange-bg: #fcebe0;
+  --board-chip-orange-fg: #bc5a26;
+  --board-chip-orange-dot:#e8743b;
+  --board-chip-teal-bg:   #dcf2f0;
+  --board-chip-teal-fg:   #147a76;
+  --board-chip-teal-dot:  #16a6a0;
+  --board-chip-indigo-bg: #e7e7fb;
+  --board-chip-indigo-fg: #4242a8;
+  --board-chip-indigo-dot:#5b5bd6;
+  --board-chip-pink-bg:   #fbe6f1;
+  --board-chip-pink-fg:   #b23380;
+  --board-chip-pink-dot:  #d6499b;
 }
 
 .dark {
@@ -65,6 +77,18 @@
   --board-chip-purple-bg: rgba(120, 70, 175, 0.30);
   --board-chip-purple-fg: #d3bdee;
   --board-chip-purple-dot:#9d70d7;
+  --board-chip-orange-bg: rgba(188, 90, 38, 0.30);
+  --board-chip-orange-fg: #f4b28a;
+  --board-chip-orange-dot:#f09460;
+  --board-chip-teal-bg:   rgba(20, 122, 118, 0.30);
+  --board-chip-teal-fg:   #a8e6e3;
+  --board-chip-teal-dot:  #3ec8c2;
+  --board-chip-indigo-bg: rgba(66, 66, 168, 0.30);
+  --board-chip-indigo-fg: #c5c5f5;
+  --board-chip-indigo-dot:#8484e0;
+  --board-chip-pink-bg:   rgba(178, 51, 128, 0.30);
+  --board-chip-pink-fg:   #f0b8d8;
+  --board-chip-pink-dot:  #e070b8;
 }
 
 /* ===== Block root ===== */
@@ -298,6 +322,22 @@ button.board-column-chip-dot:hover {
 .color-purple.board-column-chip { background: var(--board-chip-purple-bg); color: var(--board-chip-purple-fg); }
 .color-purple .board-column-chip-dot,
 .color-purple.board-column-chip .board-column-chip-dot { background: var(--board-chip-purple-dot); }
+.color-orange .board-column-chip,
+.color-orange.board-column-chip { background: var(--board-chip-orange-bg); color: var(--board-chip-orange-fg); }
+.color-orange .board-column-chip-dot,
+.color-orange.board-column-chip .board-column-chip-dot { background: var(--board-chip-orange-dot); }
+.color-teal   .board-column-chip,
+.color-teal.board-column-chip   { background: var(--board-chip-teal-bg);   color: var(--board-chip-teal-fg); }
+.color-teal   .board-column-chip-dot,
+.color-teal.board-column-chip   .board-column-chip-dot { background: var(--board-chip-teal-dot); }
+.color-indigo .board-column-chip,
+.color-indigo.board-column-chip { background: var(--board-chip-indigo-bg); color: var(--board-chip-indigo-fg); }
+.color-indigo .board-column-chip-dot,
+.color-indigo.board-column-chip .board-column-chip-dot { background: var(--board-chip-indigo-dot); }
+.color-pink   .board-column-chip,
+.color-pink.board-column-chip   { background: var(--board-chip-pink-bg);   color: var(--board-chip-pink-fg); }
+.color-pink   .board-column-chip-dot,
+.color-pink.board-column-chip   .board-column-chip-dot { background: var(--board-chip-pink-dot); }
 
 .board-column-dots {
   margin-left: auto;
@@ -583,6 +623,10 @@ button.board-column-chip-dot:hover {
 .board-color-swatch.color-amber  { background: var(--board-chip-amber-dot); }
 .board-color-swatch.color-red    { background: var(--board-chip-red-dot); }
 .board-color-swatch.color-purple { background: var(--board-chip-purple-dot); }
+.board-color-swatch.color-orange { background: var(--board-chip-orange-dot); }
+.board-color-swatch.color-teal   { background: var(--board-chip-teal-dot); }
+.board-color-swatch.color-indigo { background: var(--board-chip-indigo-dot); }
+.board-color-swatch.color-pink   { background: var(--board-chip-pink-dot); }
 
 /* ===== Side panel ===== */
 .board-side-panel {
@@ -1262,6 +1306,20 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   background: transparent;
   color: var(--board-text);
 }
+.board-add-field-create {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--board-chip-blue-dot);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.board-add-field-create:hover { opacity: 0.9; }
 
 /* Shared drop indicator — a 2px line, always blue, never an outline on rows. */
 .bd-drop-line {
@@ -1550,3 +1608,29 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 /* ── Table add-row (new design) ─────────────────────────────────────────── */
 .bd-addrow-placeholder { color: var(--text-secondary, #888); font-style: normal; font-size: 13px; }
 .bd-table-addrow .bd-table-gutter { width: 14px; }
+
+/* ===== Status-options editor (buildOptionsEditor / openStatusOptionsEditor) ===== */
+.bd-opt-editor { display: flex; flex-direction: column; gap: 2px; padding: 6px; min-width: 220px; }
+.bd-opt-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 7px; }
+.bd-opt-row:hover { background: var(--board-hover); }
+.bd-opt-swatch { width: 14px; height: 14px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; }
+.bd-opt-name { flex: 1; border: 0; background: transparent; font: inherit; color: inherit; outline: none; padding: 1px 4px; border-radius: 5px; }
+.bd-opt-name:focus { background: var(--board-border-soft); }
+.bd-opt-delete { border: 0; background: transparent; color: var(--board-text-muted); font-weight: 700; cursor: pointer; }
+.bd-opt-add { border: 0; background: transparent; color: #2b6cff; text-align: left; padding: 6px; cursor: pointer; border-top: 1px solid var(--board-border-soft); margin-top: 4px; }
+.bd-opt-palette { position: absolute; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 9px; background: var(--board-bg-card); border: 1px solid var(--board-border); border-radius: 10px; box-shadow: 0 14px 36px rgba(20,30,50,.2); z-index: 20; }
+.bd-opt-pchip { width: 22px; height: 22px; border-radius: 6px; border: 0; cursor: pointer; }
+.bd-opt-pchip.is-selected { box-shadow: 0 0 0 2px var(--board-bg-card), 0 0 0 3px var(--board-text); }
+.bd-opt-popover { position: absolute; background: var(--board-bg-card); border: 1px solid var(--board-border); border-radius: 11px; box-shadow: 0 16px 40px rgba(20,30,50,.18); z-index: 19; }
+
+/* Swatch + palette chip backgrounds — one rule per token, mirrors .board-color-swatch scheme */
+.bd-opt-swatch.color-gray,   .bd-opt-pchip.color-gray   { background: var(--board-chip-gray-dot); }
+.bd-opt-swatch.color-blue,   .bd-opt-pchip.color-blue   { background: var(--board-chip-blue-dot); }
+.bd-opt-swatch.color-amber,  .bd-opt-pchip.color-amber  { background: var(--board-chip-amber-dot); }
+.bd-opt-swatch.color-emerald,.bd-opt-pchip.color-emerald { background: var(--board-chip-green-dot); }
+.bd-opt-swatch.color-red,    .bd-opt-pchip.color-red    { background: var(--board-chip-red-dot); }
+.bd-opt-swatch.color-purple, .bd-opt-pchip.color-purple { background: var(--board-chip-purple-dot); }
+.bd-opt-swatch.color-orange, .bd-opt-pchip.color-orange { background: var(--board-chip-orange-dot); }
+.bd-opt-swatch.color-teal,   .bd-opt-pchip.color-teal   { background: var(--board-chip-teal-dot); }
+.bd-opt-swatch.color-indigo, .bd-opt-pchip.color-indigo { background: var(--board-chip-indigo-dot); }
+.bd-opt-swatch.color-pink,   .bd-opt-pchip.color-pink   { background: var(--board-chip-pink-dot); }

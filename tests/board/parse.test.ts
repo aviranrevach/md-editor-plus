@@ -57,7 +57,7 @@ describe('parseBoardSource — start attributes', () => {
     const board = parseBoardSource(source);
     expect(board.columns).toHaveLength(2);
     // Auto-color is deterministic, but we only assert it's a valid token here.
-    const tokens: string[] = ['gray', 'blue', 'amber', 'emerald', 'red', 'purple'];
+    const tokens: string[] = ['gray', 'blue', 'amber', 'emerald', 'red', 'purple', 'orange', 'teal', 'indigo', 'pink'];
     expect(tokens).toContain(board.columns[0].color);
     expect(tokens).toContain(board.columns[1].color);
   });
