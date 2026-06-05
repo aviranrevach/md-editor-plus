@@ -100,6 +100,50 @@ describe('applyGroup via mountTable', () => {
   });
 });
 
+describe('group band color', () => {
+  it('tints the band by the status option color and colors the chip', () => {
+    const board: Board = {
+      id: 'b1', name: '',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title',  type: 'text',   visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'Impact', type: 'status', visibleOnCard: true,
+          options: [{ name: 'Low', color: 'teal' }, { name: 'High', color: 'red' }] },
+      ],
+      cards: [{ id:'c1', values:{ id:'c1', Title:'A', Status:'Todo', Impact:'High' }, body:'' }],
+      orphanBodies: [], views: [{ name: 'table', groupBy: 'Impact' }], activeView: 'table',
+    };
+    const { ctx } = makeCtx(board);
+    mountTable(ctx);
+    const highRow = Array.from(ctx.root.querySelectorAll('.bd-group-row'))
+      .find((r) => /High/.test(r.textContent || ''))!;
+    expect(highRow.classList.contains('bd-group-band')).toBe(true);
+    expect(highRow.classList.contains('color-red')).toBe(true);
+    const chip = highRow.querySelector('.bd-group-chip')!;
+    expect(chip.classList.contains('color-red')).toBe(true);
+  });
+
+  it('uses a neutral band (no color class) for the Uncategorized group', () => {
+    const board: Board = {
+      id: 'b1', name: '',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title', type: 'text', visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'Impact', type: 'status', visibleOnCard: true, options: [{ name: 'Low', color: 'teal' }] },
+      ],
+      cards: [{ id:'c1', values:{ id:'c1', Title:'A', Status:'Todo', Impact:'??' }, body:'' }],
+      orphanBodies: [], views: [{ name: 'table', groupBy: 'Impact' }], activeView: 'table',
+    };
+    const { ctx } = makeCtx(board);
+    mountTable(ctx);
+    const uncat = Array.from(ctx.root.querySelectorAll('.bd-group-row'))
+      .find((r) => /Uncategorized/.test(r.textContent || ''))!;
+    expect(uncat.classList.contains('bd-group-band')).toBe(false);
+  });
+});
+
 describe('status sort uses the field options order (any status field)', () => {
   it('sorts a custom status field by its options order, not alphabetical', () => {
     const board: Board = {

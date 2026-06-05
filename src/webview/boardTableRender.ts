@@ -11,8 +11,8 @@
 // check (target.closest('.bd-table-host') === this mount's bodyEl). The
 // listener is removed on destroy.
 
-import type { Board, Card, ViewDef, FieldDef } from './boardModel';
-import { getStatusOptions } from './boardModel';
+import type { Board, Card, ViewDef, FieldDef, ColorToken } from './boardModel';
+import { getStatusOptions, autoColorPublic } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
@@ -391,12 +391,10 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         caretEl.className = 'bd-group-caret';
         caretEl.textContent = collapsedGroups.has(g.key) ? '▸' : '▾';
 
-        // Chip: colored pill matching the Status chip palette.
-        let chipColor = 'gray';
-        if (v.groupBy === 'Status') {
-          const colDef = b.columns.find(c => c.name === g.key);
-          if (colDef) chipColor = colDef.color;
-        }
+        // Color from the grouped field: status option color, tag hash, else neutral.
+        const gc = groupColor(b, v.groupBy!, g.key);
+        const chipColor = gc ?? 'gray';
+        if (gc) row.classList.add('bd-group-band', `color-${gc}`);
         const chip = document.createElement('span');
         chip.className = `board-column-chip color-${chipColor} bd-group-chip`;
         const dot = document.createElement('span');
@@ -700,6 +698,18 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.classList.remove('bd-table-host');
     },
   };
+}
+
+/** The color token for a group key, or null for a neutral band. */
+function groupColor(b: Board, field: string, key: string): ColorToken | null {
+  const f = b.fields.find(x => x.name === field);
+  if (!f) return null;
+  if (f.type === 'status') {
+    if (key === 'Uncategorized') return null;
+    return getStatusOptions(b, field).find(o => o.name === key)?.color ?? null;
+  }
+  if (f.type === 'tags' && key !== '—') return autoColorPublic(key);
+  return null;
 }
 
 function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {

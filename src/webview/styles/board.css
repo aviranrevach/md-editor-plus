@@ -1464,7 +1464,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   font: 500 13px ui-sans-serif, sans-serif;
   color: var(--text-primary);
 }
-.bd-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
+.bd-table tbody td { padding: 5px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); vertical-align: middle; }
 .bd-table-row:hover { background: var(--block-hover); }
 /* Gutter cell must override the default tbody td padding — the column is only
    14 px wide so the standard 8px×10px padding would push the grip out of the
@@ -1634,3 +1634,15 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-opt-swatch.color-teal,   .bd-opt-pchip.color-teal   { background: var(--board-chip-teal-dot); }
 .bd-opt-swatch.color-indigo, .bd-opt-pchip.color-indigo { background: var(--board-chip-indigo-dot); }
 .bd-opt-swatch.color-pink,   .bd-opt-pchip.color-pink   { background: var(--board-chip-pink-dot); }
+
+/* Grouped-table: tint the whole group band in the group's color. */
+.bd-group-band.color-gray    { background: var(--board-chip-gray-bg); }
+.bd-group-band.color-blue    { background: var(--board-chip-blue-bg); }
+.bd-group-band.color-amber   { background: var(--board-chip-amber-bg); }
+.bd-group-band.color-emerald { background: var(--board-chip-green-bg); }
+.bd-group-band.color-red     { background: var(--board-chip-red-bg); }
+.bd-group-band.color-purple  { background: var(--board-chip-purple-bg); }
+.bd-group-band.color-orange  { background: var(--board-chip-orange-bg); }
+.bd-group-band.color-teal    { background: var(--board-chip-teal-bg); }
+.bd-group-band.color-indigo  { background: var(--board-chip-indigo-bg); }
+.bd-group-band.color-pink    { background: var(--board-chip-pink-bg); }
