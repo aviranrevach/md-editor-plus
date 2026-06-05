@@ -4,7 +4,7 @@
 
 import {
   addTagOption, renameTagOption, deleteTagOption, toggleTagOnCard, getStatusOptions,
-  parseBoardSource, serializeBoard,
+  parseBoardSource, serializeBoard, sanitizeTagName,
 } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 import { mountTable } from '../../src/webview/boardTableRender';
@@ -208,6 +208,60 @@ describe('Edit options works for tags', () => {
     nameInput.focus(); nameInput.value = 'infra'; nameInput.dispatchEvent(new Event('blur'));
     expect(latest.fields.find(f => f.name === 'Tags')!.options!.map(o => o.name)).toEqual(['infra', 'urgent']);
     expect(latest.cards[0].values.Tags).toBe('infra, urgent');
+  });
+});
+
+describe('tag name safety + rename merge', () => {
+  const mk = (): Board => ({
+    id:'b1', name:'', columns:[{name:'Todo',color:'blue'}],
+    fields:[
+      { name:'Title', type:'text', visibleOnCard:true },
+      { name:'Status', type:'status', visibleOnCard:true },
+      { name:'Tags', type:'tags', visibleOnCard:true,
+        options:[{name:'backend',color:'teal'},{name:'urgent',color:'red'}] },
+    ],
+    cards:[{ id:'c1', values:{ id:'c1', Title:'A', Status:'Todo', Tags:'backend, urgent' }, body:'' }],
+    orphanBodies:[], views:[], activeView:'kanban',
+  });
+
+  it('sanitizeTagName strips | ; , and trims', () => {
+    expect(sanitizeTagName('  a|b;c,d ')).toBe('abcd');
+    expect(sanitizeTagName(' ; , | ')).toBe('');
+  });
+
+  it('addTagOption strips unsafe chars and stays round-trippable', () => {
+    const b = addTagOption(mk(), 'Tags', 'code|review;x');
+    expect(getStatusOptions(b, 'Tags').map((o: any) => o.name)).toContain('codereviewx');
+  });
+
+  it('renameTagOption merges into an existing option instead of duplicating', () => {
+    const b = renameTagOption(mk(), 'Tags', 'urgent', 'backend'); // backend already exists
+    expect(getStatusOptions(b, 'Tags').map((o: any) => o.name)).toEqual(['backend']); // no dup
+    expect(b.cards[0].values.Tags).toBe('backend'); // 'backend, urgent' -> both map to backend -> deduped
+  });
+});
+
+describe('tags picker sanitizes created tag', () => {
+  it('creating a tag with unsafe chars stores + toggles the sanitized name', () => {
+    const board: Board = {
+      id:'b1', name:'', columns:[{name:'Todo',color:'blue'}],
+      fields:[
+        { name:'Title', type:'text', visibleOnCard:true },
+        { name:'Status', type:'status', visibleOnCard:true },
+        { name:'Tags', type:'tags', visibleOnCard:true, options:[] },
+      ],
+      cards:[{ id:'c1', values:{ id:'c1', Title:'A', Status:'Todo', Tags:'' }, body:'' }],
+      orphanBodies:[], views:[], activeView:'table',
+    };
+    const { ctx, ref } = ctxFor(board);
+    mountTable(ctx);
+    (ctx.root.querySelector('td[data-field="Tags"]') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles:true }));
+    const input = document.querySelector('.bd-tags-pop input') as HTMLInputElement;
+    input.value = 'a|b;c'; input.dispatchEvent(new Event('input', { bubbles:true }));
+    (document.querySelector('.bd-tags-create') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles:true }));
+    const f = ref.current.fields.find((x: any) => x.name === 'Tags')!;
+    expect(f.options!.map((o: any) => o.name)).toEqual(['abc']);
+    expect(ref.current.cards[0].values.Tags).toBe('abc'); // sanitized name toggled on, not raw
   });
 });
 

@@ -128,23 +128,38 @@ function joinTags(tags: string[]): string {
   return out.join(', ');
 }
 
-/** Append a tag option (auto-colored by name); no-op if it already exists. */
-export function addTagOption(board: Board, field: string, name: string): Board {
-  const opts = getStatusOptions(board, field);
-  if (opts.some(o => o.name === name)) return board;
-  return setStatusOptions(board, field, [...opts, { name, color: autoColor(name) }]);
+/** Strip characters that would corrupt tag serialization / list-splitting. */
+export function sanitizeTagName(name: string): string {
+  return name.replace(/[|;,]/g, '').trim();
 }
 
-/** Rename a tag option and remap it inside every card's comma-list. */
+/** Append a tag option (auto-colored by name); no-op if it already exists. */
+export function addTagOption(board: Board, field: string, name: string): Board {
+  const clean = sanitizeTagName(name);
+  if (!clean) return board;
+  const opts = getStatusOptions(board, field);
+  if (opts.some(o => o.name === clean)) return board;
+  return setStatusOptions(board, field, [...opts, { name: clean, color: autoColor(clean) }]);
+}
+
+/** Rename a tag option and remap it inside every card's comma-list.
+ *  If the sanitized new name already exists as an option, MERGE: drop the old
+ *  option and remap cards to the existing target (joinTags dedupes). */
 export function renameTagOption(board: Board, field: string, oldName: string, newName: string): Board {
-  const opts = getStatusOptions(board, field).map(o => o.name === oldName ? { ...o, name: newName } : o);
+  const clean = sanitizeTagName(newName);
+  if (!clean || clean === oldName) return board;
+  const cur = getStatusOptions(board, field);
+  const exists = cur.some(o => o.name === clean);
+  const opts = exists
+    ? cur.filter(o => o.name !== oldName)                         // merge into existing target
+    : cur.map(o => (o.name === oldName ? { ...o, name: clean } : o));
   const b = setStatusOptions(board, field, opts);
   return {
     ...b,
     cards: b.cards.map(c => {
       const tags = splitTags(c.values[field] ?? '');
       if (!tags.includes(oldName)) return c;
-      return { ...c, values: { ...c.values, [field]: joinTags(tags.map(t => t === oldName ? newName : t)) } };
+      return { ...c, values: { ...c.values, [field]: joinTags(tags.map(t => (t === oldName ? clean : t))) } };
     }),
   };
 }

@@ -1,4 +1,4 @@
-import { getStatusOptions, addTagOption, toggleTagOnCard } from './boardModel';
+import { getStatusOptions, addTagOption, toggleTagOnCard, sanitizeTagName } from './boardModel';
 import type { Board } from './boardModel';
 import { buildChip } from './boardSidePanel';
 
@@ -67,8 +67,10 @@ export function openTagsPicker(
       create.textContent = `+ Create "${typed}"`;
       create.addEventListener('click', (e) => {
         e.stopPropagation();
-        const withOpt = addTagOption(getBoard(), fieldName, typed);
-        onChange(toggleTagOnCard(withOpt, fieldName, cardId, typed));
+        const clean = sanitizeTagName(typed);
+        if (!clean) return;
+        const withOpt = addTagOption(getBoard(), fieldName, clean);
+        onChange(toggleTagOnCard(withOpt, fieldName, cardId, clean));
         input.value = '';
         render();
       });
