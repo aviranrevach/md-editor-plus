@@ -381,7 +381,7 @@ export function parseBoardSource(source: string): Board {
 
   const fieldOptions = parseFieldOptions(attrs['field-options'] ?? '');
   for (const f of fields) {
-    if (f.type === 'status' && f.name !== 'Status') {
+    if ((f.type === 'status' && f.name !== 'Status') || f.type === 'tags') {
       const opts = fieldOptions.get(f.name);
       if (opts) f.options = opts;
     }
@@ -440,6 +440,20 @@ export function parseBoardSource(source: string): Board {
     }
   }
 
+  // Tags fields: ensure every tag present in a card is in the field's option set
+  // (auto-colored), so existing boards are immediately colored + managed.
+  for (const f of fields) {
+    if (f.type !== 'tags') continue;
+    const opts = [...(f.options ?? [])];
+    const seen = new Set(opts.map(o => o.name));
+    for (const c of cards) {
+      for (const t of (c.values[f.name] ?? '').split(',').map(s => s.trim()).filter(Boolean)) {
+        if (!seen.has(t)) { seen.add(t); opts.push({ name: t, color: autoColor(t) }); }
+      }
+    }
+    if (opts.length) f.options = opts;
+  }
+
   return {
     id: attrs.id ?? '',
     name: attrs.name ?? '',
@@ -464,7 +478,7 @@ function serializeStartMarker(board: Board): string {
 
   const fieldOptionsParts: string[] = [];
   for (const f of board.fields) {
-    if (f.type === 'status' && f.name !== 'Status' && f.options && f.options.length) {
+    if (((f.type === 'status' && f.name !== 'Status') || f.type === 'tags') && f.options && f.options.length) {
       const opts = f.options.map((o) => `${o.name}:${o.color}`).join('|');
       fieldOptionsParts.push(`${f.name}=${opts}`);
     }

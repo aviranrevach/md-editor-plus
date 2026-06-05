@@ -1,5 +1,6 @@
 import {
   addTagOption, renameTagOption, deleteTagOption, toggleTagOnCard, getStatusOptions,
+  parseBoardSource, serializeBoard,
 } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 
@@ -50,5 +51,41 @@ describe('tag-list model helpers', () => {
     expect(b.cards[0].values.Tags).toBe('backend, urgent');
     b = toggleTagOnCard(b, 'Tags', 'c2', 'urgent');
     expect(b.cards[1].values.Tags).toBe('backend');
+  });
+});
+
+describe('tag options serialize + derive-on-load', () => {
+  it('round-trips stored tag options (names + colors), including a space in a name', () => {
+    const src = [
+      `<!-- board:start id="b1" columns="Todo" column-colors="blue" field-types="Title=text,Status=status,Tag Set=tags" field-options="Tag Set=backend:teal|urgent:red" -->`,
+      ``,
+      `| Title | Status | Tag Set |`,
+      `|---|---|---|`,
+      `| A | Todo | backend, urgent |`,
+      ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const a = parseBoardSource(src);
+    const f = a.fields.find(x => x.name === 'Tag Set')!;
+    expect(f.options).toEqual([{ name: 'backend', color: 'teal' }, { name: 'urgent', color: 'red' }]);
+    expect(parseBoardSource(serializeBoard(a))).toEqual(a);
+  });
+
+  it('derives a tag set from existing tag values when none is stored, auto-colored', () => {
+    const src = [
+      `<!-- board:start id="b1" columns="Todo" column-colors="blue" field-types="Title=text,Status=status,Tags=tags" -->`,
+      ``,
+      `| Title | Status | Tags |`,
+      `|---|---|---|`,
+      `| A | Todo | backend, urgent |`,
+      `| B | Todo | backend |`,
+      ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const a = parseBoardSource(src);
+    const f = a.fields.find(x => x.name === 'Tags')!;
+    expect(f.options!.map(o => o.name)).toEqual(['backend', 'urgent']); // first-seen order
+    expect(f.options!.every(o => typeof o.color === 'string')).toBe(true);
+    expect(parseBoardSource(serializeBoard(a))).toEqual(a);
   });
 });
