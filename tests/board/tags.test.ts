@@ -133,3 +133,45 @@ describe('tag chip color', () => {
     ]);
   });
 });
+
+describe('tags picker', () => {
+  const mk = (): Board => ({
+    id:'b1', name:'', columns:[{name:'Todo',color:'blue'}],
+    fields:[
+      { name:'Title', type:'text', visibleOnCard:true },
+      { name:'Status', type:'status', visibleOnCard:true },
+      { name:'Tags', type:'tags', visibleOnCard:true,
+        options:[{name:'backend',color:'teal'},{name:'urgent',color:'red'}] },
+    ],
+    cards:[{ id:'c1', values:{ id:'c1', Title:'A', Status:'Todo', Tags:'backend' }, body:'' }],
+    orphanBodies:[], views:[], activeView:'table',
+  });
+
+  it('clicking a tags cell opens a checklist; toggling adds/removes the tag', () => {
+    const { ctx, ref } = ctxFor(mk());
+    mountTable(ctx);
+    (ctx.root.querySelector('td[data-field="Tags"]') as HTMLElement)
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const pop = document.querySelector('.bd-tags-pop')!;
+    const rows = Array.from(pop.querySelectorAll('.bd-tags-opt')) as HTMLElement[];
+    expect(rows.length).toBe(2);
+    const urgent = rows.find(r => /urgent/.test(r.textContent || ''))!;
+    urgent.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(ref.current.cards[0].values.Tags).toBe('backend, urgent');
+  });
+
+  it('typing a new tag and creating it adds an auto-colored option and toggles it on', () => {
+    const { ctx, ref } = ctxFor(mk());
+    mountTable(ctx);
+    (ctx.root.querySelector('td[data-field="Tags"]') as HTMLElement)
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const input = document.querySelector('.bd-tags-pop input') as HTMLInputElement;
+    input.value = 'deploy';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const create = document.querySelector('.bd-tags-create') as HTMLElement;
+    create.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const f = ref.current.fields.find(x => x.name === 'Tags')!;
+    expect(f.options!.map(o => o.name)).toContain('deploy');
+    expect(ref.current.cards[0].values.Tags).toBe('backend, deploy');
+  });
+});

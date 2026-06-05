@@ -18,6 +18,7 @@ import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
 import { openStatusOptionsEditor } from './boardStatusOptions';
+import { openTagsPicker } from './boardTagsPicker';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -1029,7 +1030,10 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
         }
       }
       if (!ctx.readonly) {
-        td.addEventListener('click', (e) => { e.stopPropagation(); openTagsEditor(td, card, field, ctx); });
+        td.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openTagsPicker(td, ctx.getBoard, field.name, card.id, ctx.mutate);
+        });
       }
       return;
     }
@@ -1074,48 +1078,6 @@ function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: B
   const onOutside = (e: MouseEvent) => { if (e.target !== input) commit(); };
   input.addEventListener('change', commit);
   document.addEventListener('mousedown', onOutside, true);
-}
-
-function openTagsEditor(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
-  const td = anchor;
-  td.innerHTML = '';
-  td.textContent = (card.values[field.name] ?? '');
-  td.setAttribute('contenteditable', 'true');
-  td.focus();
-  const range = document.createRange();
-  range.selectNodeContents(td);
-  range.collapse(false);
-  const sel = window.getSelection();
-  sel?.removeAllRanges();
-  sel?.addRange(range);
-  const commit = () => {
-    td.removeAttribute('contenteditable');
-    const next = (td.textContent ?? '')
-      .split(',').map(s => s.trim()).filter(Boolean).join(', ');
-    if (next !== (card.values[field.name] ?? '')) {
-      const cur = ctx.getBoard();
-      ctx.mutate({
-        ...cur,
-        cards: cur.cards.map(c =>
-          c.id === card.id
-            ? { ...c, values: { ...c.values, [field.name]: next } }
-            : c,
-        ),
-      });
-    }
-    cleanup();
-  };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); td.removeAttribute('contenteditable'); cleanup(); }
-  };
-  const onBlur = () => commit();
-  function cleanup() {
-    td.removeEventListener('keydown', onKey);
-    td.removeEventListener('blur',    onBlur);
-  }
-  td.addEventListener('keydown', onKey);
-  td.addEventListener('blur',    onBlur);
 }
 
 let currentStatusOutside: ((e: MouseEvent) => void) | null = null;

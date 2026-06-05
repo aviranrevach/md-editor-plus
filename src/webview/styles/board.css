@@ -1656,3 +1656,12 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-group-band.color-teal    { background: var(--board-chip-teal-bg); }
 .bd-group-band.color-indigo  { background: var(--board-chip-indigo-bg); }
 .bd-group-band.color-pink    { background: var(--board-chip-pink-bg); }
+
+/* ===== Multi-select tags picker popover ===== */
+.bd-tags-pop { position:absolute; z-index:20; min-width:220px; background:var(--board-bg-card,#fff); border:1px solid var(--board-border,#e5e7eb); border-radius:11px; box-shadow:0 16px 40px rgba(20,30,50,.18); padding:6px; }
+.bd-tags-filter { width:100%; box-sizing:border-box; border:0; border-bottom:1px solid var(--board-border-soft,#f1f3f5); background:transparent; color:inherit; font:inherit; padding:6px 8px; outline:none; }
+.bd-tags-list { display:flex; flex-direction:column; gap:2px; padding-top:4px; max-height:240px; overflow:auto; }
+.bd-tags-opt, .bd-tags-create { display:flex; align-items:center; gap:8px; width:100%; border:0; background:transparent; padding:6px 8px; border-radius:7px; cursor:pointer; text-align:left; font:inherit; color:inherit; }
+.bd-tags-opt:hover, .bd-tags-create:hover { background:var(--board-hover,#f5f7fa); }
+.bd-tags-check { margin-left:auto; color:#2b6cff; }
+.bd-tags-create { color:#2b6cff; }

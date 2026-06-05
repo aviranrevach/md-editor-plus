@@ -1,0 +1,96 @@
+import { getStatusOptions, addTagOption, toggleTagOnCard } from './boardModel';
+import type { Board } from './boardModel';
+import { buildChip } from './boardSidePanel';
+
+/**
+ * Multi-select tag picker: a checklist of the field's tag options (toggle each
+ * on/off for the given card) plus a filter input that offers "+ Create '<x>'".
+ */
+export function openTagsPicker(
+  anchor: HTMLElement,
+  getBoard: () => Board,
+  fieldName: string,
+  cardId: string,
+  onChange: (next: Board) => void,
+): void {
+  document.querySelectorAll('.bd-tags-pop').forEach(n => n.remove());
+  const pop = document.createElement('div');
+  pop.className = 'bd-tags-pop';
+  document.body.appendChild(pop);
+  const rect = anchor.getBoundingClientRect();
+  pop.style.position = 'absolute';
+  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
+  pop.style.left = `${rect.left + window.scrollX}px`;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'bd-tags-filter';
+  input.placeholder = 'Filter or create…';
+
+  const list = document.createElement('div');
+  list.className = 'bd-tags-list';
+
+  const cardTags = (): string[] => {
+    const c = getBoard().cards.find(x => x.id === cardId);
+    return (c?.values[fieldName] ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  };
+
+  const render = () => {
+    list.innerHTML = '';
+    const q = input.value.trim().toLowerCase();
+    const opts = getStatusOptions(getBoard(), fieldName);
+    const have = new Set(cardTags());
+    for (const o of opts.filter(o => o.name.toLowerCase().includes(q))) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'bd-tags-opt';
+      row.appendChild(buildChip(o.name, o.color));
+      if (have.has(o.name)) {
+        const ck = document.createElement('span');
+        ck.className = 'bd-tags-check';
+        ck.textContent = '✓';
+        row.appendChild(ck);
+      }
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onChange(toggleTagOnCard(getBoard(), fieldName, cardId, o.name));
+        render();
+      });
+      list.appendChild(row);
+    }
+    const typed = input.value.trim();
+    const exists = opts.some(o => o.name.toLowerCase() === typed.toLowerCase());
+    if (typed && !exists) {
+      const create = document.createElement('button');
+      create.type = 'button';
+      create.className = 'bd-tags-create';
+      create.textContent = `+ Create "${typed}"`;
+      create.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const withOpt = addTagOption(getBoard(), fieldName, typed);
+        onChange(toggleTagOnCard(withOpt, fieldName, cardId, typed));
+        input.value = '';
+        render();
+      });
+      list.appendChild(create);
+    }
+  };
+
+  input.addEventListener('input', render);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      (list.querySelector('.bd-tags-create, .bd-tags-opt') as HTMLElement | null)?.click();
+    }
+  });
+
+  pop.append(input, list);
+  render();
+  input.focus();
+
+  function onOutside(e: MouseEvent) {
+    if (!pop.contains(e.target as Node) && e.target !== anchor) close();
+  }
+  function close() { pop.remove(); document.removeEventListener('mousedown', onOutside, true); }
+  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+}
