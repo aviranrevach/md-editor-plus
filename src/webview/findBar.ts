@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core';
-import { getSearchSummary } from './searchExtension';
+import { SearchCoordinator } from './searchCoordinator';
 
 // Floating, Notion-style find bar. It owns its own DOM and keyboard handling
 // and stays agnostic about WHICH editor it drives — the host hands it a
@@ -26,6 +26,7 @@ interface FindBarOptions {
 
 export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
   let open = false;
+  const coordinator = new SearchCoordinator();
 
   const bar = document.createElement('div');
   bar.className = 'find-bar';
@@ -49,12 +50,7 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
   const closeBtn = bar.querySelector('.find-bar-close') as HTMLButtonElement;
 
   function updateCount(): void {
-    const editor = getActiveEditor();
-    if (!editor) {
-      count.textContent = '0/0';
-      return;
-    }
-    const { total, active } = getSearchSummary(editor.state);
+    const { total, active } = coordinator.summary();
     count.textContent = `${active}/${total}`;
     bar.classList.toggle('find-bar-empty', total === 0 && input.value.length > 0);
   }
@@ -62,17 +58,19 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
   function runSearch(): void {
     const editor = getActiveEditor();
     if (!editor) return;
-    editor.commands.setSearchTerm(input.value);
+    coordinator.setQuery(editor, input.value);
     updateCount();
   }
 
   function goNext(): void {
-    getActiveEditor()?.commands.nextMatch();
+    const editor = getActiveEditor();
+    if (editor) coordinator.next(editor);
     updateCount();
   }
 
   function goPrev(): void {
-    getActiveEditor()?.commands.prevMatch();
+    const editor = getActiveEditor();
+    if (editor) coordinator.prev(editor);
     updateCount();
   }
 
@@ -119,14 +117,14 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
     if (!open) return;
     open = false;
     bar.classList.remove('open');
-    getActiveEditor()?.commands.clearSearch();
+    coordinator.clear(getActiveEditor());
     // Return focus to the editor so the user keeps typing where they were.
     getActiveEditor()?.commands.focus();
   }
 
   function retarget(previousEditor: Editor | null): void {
     if (!open) return;
-    previousEditor?.commands.clearSearch();
+    coordinator.clear(previousEditor);
     if (input.value) runSearch();
     else updateCount();
   }

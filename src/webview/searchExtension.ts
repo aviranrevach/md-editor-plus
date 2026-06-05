@@ -21,13 +21,6 @@ export interface SearchMatch {
   to: number;
 }
 
-export interface SearchSummary {
-  /** Total number of matches. */
-  total: number;
-  /** 1-based index of the active match, or 0 when there are none. */
-  active: number;
-}
-
 interface SearchState {
   query: string;
   caseSensitive: boolean;
@@ -129,8 +122,13 @@ declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     mdSearch: {
       setSearchTerm: (query: string, caseSensitive?: boolean) => ReturnType;
-      nextMatch: () => ReturnType;
-      prevMatch: () => ReturnType;
+      /**
+       * Highlight one match as the active (focused) one and scroll it into
+       * view, opening any collapsed toggle around it. `null` clears the active
+       * highlight (all matches stay highlighted as inactive) — used when the
+       * active match lives outside this editor, e.g. inside a board.
+       */
+      setActiveMatch: (index: number | null) => ReturnType;
       clearSearch: () => ReturnType;
     };
   }
@@ -161,7 +159,10 @@ export const SearchExtension = Extension.create({
               const query = meta.query ?? prev.query;
               const caseSensitive = meta.caseSensitive ?? prev.caseSensitive;
               const matches = computeMatches(tr.doc, query, caseSensitive);
-              const active = matches.length === 0 ? -1 : 0;
+              // Active index is driven externally by the coordinator; default to
+              // none. Clamp to the available matches.
+              const requested = meta.active ?? -1;
+              const active = matches.length === 0 || requested < 0 ? -1 : Math.min(requested, matches.length - 1);
               return {
                 query,
                 caseSensitive,
@@ -212,40 +213,28 @@ export const SearchExtension = Extension.create({
 
   addCommands() {
     return {
+      // Compute and highlight all matches, but do NOT pick an active one — the
+      // coordinator decides which match is active across all editors/boards.
       setSearchTerm:
         (query: string, caseSensitive?: boolean) =>
-        ({ tr, dispatch, view }) => {
+        ({ tr, dispatch }) => {
           if (dispatch) {
-            dispatch(tr.setMeta(searchPluginKey, { query, caseSensitive: caseSensitive ?? false }));
-            // Scroll to the first match (now active = 0) after the state applies.
-            const s = searchPluginKey.getState(view.state);
-            if (s && s.active >= 0) revealAndScroll(view, s.matches[s.active]);
+            dispatch(tr.setMeta(searchPluginKey, { query, caseSensitive: caseSensitive ?? false, active: -1 }));
           }
           return true;
         },
 
-      nextMatch:
-        () =>
+      setActiveMatch:
+        (index: number | null) =>
         ({ tr, dispatch, state, view }) => {
           const s = searchPluginKey.getState(state);
-          if (!s || s.matches.length === 0) return false;
-          const active = (s.active + 1) % s.matches.length;
+          if (!s) return false;
+          const active = index == null ? -1 : index;
           if (dispatch) {
             dispatch(tr.setMeta(searchPluginKey, { active }));
-            revealAndScroll(view, s.matches[active]);
-          }
-          return true;
-        },
-
-      prevMatch:
-        () =>
-        ({ tr, dispatch, state, view }) => {
-          const s = searchPluginKey.getState(state);
-          if (!s || s.matches.length === 0) return false;
-          const active = (s.active - 1 + s.matches.length) % s.matches.length;
-          if (dispatch) {
-            dispatch(tr.setMeta(searchPluginKey, { active }));
-            revealAndScroll(view, s.matches[active]);
+            if (active >= 0 && active < s.matches.length) {
+              revealAndScroll(view, s.matches[active]);
+            }
           }
           return true;
         },
@@ -253,7 +242,7 @@ export const SearchExtension = Extension.create({
       clearSearch:
         () =>
         ({ tr, dispatch }) => {
-          if (dispatch) dispatch(tr.setMeta(searchPluginKey, { query: '', caseSensitive: false }));
+          if (dispatch) dispatch(tr.setMeta(searchPluginKey, { query: '', caseSensitive: false, active: -1 }));
           return true;
         },
     };
@@ -262,10 +251,8 @@ export const SearchExtension = Extension.create({
 
 export default SearchExtension;
 
-// Read the current search summary (count + active position) off an editor's
-// plugin state — used by the find bar to render "3 / 12".
-export function getSearchSummary(state: EditorState): SearchSummary {
-  const s = searchPluginKey.getState(state);
-  if (!s || s.matches.length === 0) return { total: 0, active: 0 };
-  return { total: s.matches.length, active: s.active + 1 };
+// Read the current match ranges off an editor's plugin state. The coordinator
+// uses these (plus coordsAtPos) to order matches against board matches.
+export function getMatches(state: EditorState): SearchMatch[] {
+  return searchPluginKey.getState(state)?.matches ?? [];
 }

@@ -311,8 +311,30 @@ body {
 .theme-dark .actions-panel { box-shadow: 0 8px 28px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3); }
 .actions-panel.hidden { display: none; }
 .actions-panel .settings-action { padding: 7px 8px; border-radius: 6px; }
-.actions-panel .settings-action svg { color: var(--text-secondary); flex-shrink: 0; }
+/* Every row's icon occupies the same 18px box so labels align in a clean
+   column, regardless of each glyph's intrinsic width. */
+.actions-panel .settings-action svg {
+  color: var(--text-secondary);
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
 .actions-panel .settings-action-label { flex: 1; }
+
+/* Group separator + section label (⋯ menu grouping). */
+.actions-panel .actions-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 5px 8px;
+}
+.actions-panel .actions-group-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 6px 10px 3px;
+}
 .actions-panel .settings-action-caret {
   color: var(--text-secondary);
   font-size: 14px;
@@ -4780,26 +4802,49 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: #1a1a1a;
 }
 
-/* Floating find bar, top-right of the viewport. */
+/* Board card matches use the CSS Custom Highlight API (no DOM mutation). Same
+   palette as the decoration-based highlights above. */
+::highlight(md-board-search) {
+  background-color: #ffe27a;
+  color: #1a1a1a;
+}
+::highlight(md-board-search-active) {
+  background-color: #ff9a3d;
+  color: #1a1a1a;
+}
+.theme-dark ::highlight(md-board-search) {
+  background-color: #6b5a1f;
+  color: #fff3d6;
+}
+.theme-dark ::highlight(md-board-search-active) {
+  background-color: #d9822b;
+  color: #1a1a1a;
+}
+
+/* Find bar — anchored right under the ⋯ button, like the actions dropdown. */
 .find-bar {
   position: fixed;
-  top: 64px;
-  right: 20px;
+  top: 50px;
+  right: 16px;
   z-index: 300;
   display: none;
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
-  background: var(--toolbar-bg, var(--bg));
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.10);
   font-family: var(--font-body);
+  transform-origin: top right;
 }
 .theme-dark .find-bar {
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
-.find-bar.open { display: flex; }
+.find-bar.open {
+  display: flex;
+  animation: dropdown-in 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 
 .find-bar-icon {
   display: grid;

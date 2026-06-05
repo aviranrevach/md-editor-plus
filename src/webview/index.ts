@@ -656,6 +656,7 @@ function init(): void {
     });
     panel.querySelector<HTMLElement>('.act-find')?.addEventListener('click', () => {
       closeAllActionsPanels();
+      closeSettingsPanel();
       findBar?.open();
     });
   }
@@ -696,6 +697,7 @@ function init(): void {
   settingsBtn.addEventListener('click', e => {
     e.stopPropagation();
     closeAllActionsPanels();
+    findBar?.close();
     settingsPanel.classList.toggle('hidden');
     settingsBtn.classList.toggle('active');
     syncToolbarPanelState();
@@ -705,6 +707,7 @@ function init(): void {
   function openDotsPanel(): void {
     closeSettingsPanel();
     closeFilenamePanel();
+    findBar?.close();
     actionsPanelDots.classList.remove('hidden');
     actionsBtn.classList.add('active');
     syncToolbarPanelState();
@@ -724,6 +727,7 @@ function init(): void {
   function openFilenamePanel(): void {
     closeSettingsPanel();
     closeDotsPanel();
+    findBar?.close();
     actionsPanelFile.classList.remove('hidden');
     filenameEl?.classList.add('active');
     syncToolbarPanelState();
@@ -900,6 +904,9 @@ function init(): void {
         const mod = e.metaKey || e.ctrlKey;
         if (mod && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
           e.preventDefault();
+          // Find and the dropdowns share the same spot — never show both.
+          closeAllActionsPanels();
+          closeSettingsPanel();
           findBar?.open();
         }
       });
