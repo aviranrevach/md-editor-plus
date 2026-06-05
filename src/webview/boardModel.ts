@@ -112,6 +112,85 @@ export function recolorStatusOption(
   return setStatusOptions(board, fieldName, opts);
 }
 
+// ---------------------------------------------------------------------------
+// Tag-list helpers
+// A "tags" field stores its option palette in field.options (same as status),
+// but card values are comma-separated strings, e.g. "backend, urgent".
+// ---------------------------------------------------------------------------
+
+function splitTags(v: string): string[] {
+  return v.split(',').map(s => s.trim()).filter(Boolean);
+}
+function joinTags(tags: string[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of tags) { if (t && !seen.has(t)) { seen.add(t); out.push(t); } }
+  return out.join(', ');
+}
+
+/** Strip characters that would corrupt tag serialization / list-splitting. */
+export function sanitizeTagName(name: string): string {
+  return name.replace(/[|;,]/g, '').trim();
+}
+
+/** Append a tag option (auto-colored by name); no-op if it already exists. */
+export function addTagOption(board: Board, field: string, name: string): Board {
+  const clean = sanitizeTagName(name);
+  if (!clean) return board;
+  const opts = getStatusOptions(board, field);
+  if (opts.some(o => o.name === clean)) return board;
+  return setStatusOptions(board, field, [...opts, { name: clean, color: autoColor(clean) }]);
+}
+
+/** Rename a tag option and remap it inside every card's comma-list.
+ *  If the sanitized new name already exists as an option, MERGE: drop the old
+ *  option and remap cards to the existing target (joinTags dedupes). */
+export function renameTagOption(board: Board, field: string, oldName: string, newName: string): Board {
+  const clean = sanitizeTagName(newName);
+  if (!clean || clean === oldName) return board;
+  const cur = getStatusOptions(board, field);
+  const exists = cur.some(o => o.name === clean);
+  const opts = exists
+    ? cur.filter(o => o.name !== oldName)                         // merge into existing target
+    : cur.map(o => (o.name === oldName ? { ...o, name: clean } : o));
+  const b = setStatusOptions(board, field, opts);
+  return {
+    ...b,
+    cards: b.cards.map(c => {
+      const tags = splitTags(c.values[field] ?? '');
+      if (!tags.includes(oldName)) return c;
+      return { ...c, values: { ...c.values, [field]: joinTags(tags.map(t => (t === oldName ? clean : t))) } };
+    }),
+  };
+}
+
+/** Delete a tag option and strip it from every card's comma-list. */
+export function deleteTagOption(board: Board, field: string, name: string): Board {
+  const opts = getStatusOptions(board, field).filter(o => o.name !== name);
+  const b = setStatusOptions(board, field, opts);
+  return {
+    ...b,
+    cards: b.cards.map(c => {
+      const tags = splitTags(c.values[field] ?? '');
+      if (!tags.includes(name)) return c;
+      return { ...c, values: { ...c.values, [field]: joinTags(tags.filter(t => t !== name)) } };
+    }),
+  };
+}
+
+/** Toggle a tag on/off for a single card. */
+export function toggleTagOnCard(board: Board, field: string, cardId: string, name: string): Board {
+  return {
+    ...board,
+    cards: board.cards.map(c => {
+      if (c.id !== cardId) return c;
+      const tags = splitTags(c.values[field] ?? '');
+      const next = tags.includes(name) ? tags.filter(t => t !== name) : [...tags, name];
+      return { ...c, values: { ...c.values, [field]: joinTags(next) } };
+    }),
+  };
+}
+
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
 const VIEW_RE = /<!--\s*board:view([\s\S]*?)-->/gi;
 const BODY_RE = /<!--\s*board:body\s+id="([^"]+)"\s*-->/gi;
@@ -317,7 +396,7 @@ export function parseBoardSource(source: string): Board {
 
   const fieldOptions = parseFieldOptions(attrs['field-options'] ?? '');
   for (const f of fields) {
-    if (f.type === 'status' && f.name !== 'Status') {
+    if ((f.type === 'status' && f.name !== 'Status') || f.type === 'tags') {
       const opts = fieldOptions.get(f.name);
       if (opts) f.options = opts;
     }
@@ -376,6 +455,20 @@ export function parseBoardSource(source: string): Board {
     }
   }
 
+  // Tags fields: ensure every tag present in a card is in the field's option set
+  // (auto-colored), so existing boards are immediately colored + managed.
+  for (const f of fields) {
+    if (f.type !== 'tags') continue;
+    const opts = [...(f.options ?? [])];
+    const seen = new Set(opts.map(o => o.name));
+    for (const c of cards) {
+      for (const t of (c.values[f.name] ?? '').split(',').map(s => s.trim()).filter(Boolean)) {
+        if (!seen.has(t)) { seen.add(t); opts.push({ name: t, color: autoColor(t) }); }
+      }
+    }
+    if (opts.length) f.options = opts;
+  }
+
   return {
     id: attrs.id ?? '',
     name: attrs.name ?? '',
@@ -400,7 +493,7 @@ function serializeStartMarker(board: Board): string {
 
   const fieldOptionsParts: string[] = [];
   for (const f of board.fields) {
-    if (f.type === 'status' && f.name !== 'Status' && f.options && f.options.length) {
+    if (((f.type === 'status' && f.name !== 'Status') || f.type === 'tags') && f.options && f.options.length) {
       const opts = f.options.map((o) => `${o.name}:${o.color}`).join('|');
       fieldOptionsParts.push(`${f.name}=${opts}`);
     }

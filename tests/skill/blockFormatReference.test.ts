@@ -32,8 +32,14 @@ describe('BLOCK_REFERENCES', () => {
 
   it('board rules name the allowed colour and field-type tokens', () => {
     const rules = BLOCK_REFERENCES.kanban.rules.join(' ');
-    expect(rules).toMatch(/gray, blue, amber, emerald, red, purple/);
+    expect(rules).toMatch(/gray, blue, amber, emerald, red, purple, orange, teal, indigo, pink/);
     expect(rules).toMatch(/text, status, date, person, tags/);
+  });
+
+  it('board rules document field-options (multi-status + colored tags) and grouping', () => {
+    const rules = BLOCK_REFERENCES.kanban.rules.join(' ');
+    expect(rules).toMatch(/field-options/);
+    expect(rules).toMatch(/board:view name="table" group=/);
   });
 
   it('mermaid example is a fenced mermaid block', () => {

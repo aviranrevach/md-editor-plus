@@ -39,10 +39,13 @@ function boardExample(view: 'kanban' | 'table'): string {
 
 const BOARD_RULES = [
   'The whole region from `<!-- board:start … -->` through `<!-- board:end -->` is ONE block — do not split it.',
-  'Start-marker attributes, in order: `id`, `name`, `columns` (pipe-separated), `column-colors`, `field-types`, `hidden-fields`, optional `active-view`.',
-  'Allowed `column-colors` tokens (one per column, same order): gray, blue, amber, emerald, red, purple.',
+  'Start-marker attributes, in order: `id`, `name`, `columns` (pipe-separated), `column-colors`, `field-types`, `field-options`, `hidden-fields`, optional `active-view`.',
+  'Allowed colour tokens (for `column-colors` and `field-options`): gray, blue, amber, emerald, red, purple, orange, teal, indigo, pink.',
   'Allowed `field-types` values: text, status, date, person, tags. Keep the hidden `id` field.',
-  "Each card's Status MUST be exactly one of the `columns`.",
+  "The built-in `Status` field's options are the `columns` (coloured by `column-colors`); each card's Status MUST be exactly one of them.",
+  'You can have MORE THAN ONE `status` column. Extra `status` columns and any `tags` column carry their own options + colours via `field-options="Field=opt:colour|opt:colour;Other=a:blue|b:red"` (fields split by `;`, options by `|`, name and colour by `:`).',
+  'A `tags` cell is a comma-separated list of tag names (a card can have several); each tag is its own coloured chip. A tag not listed in `field-options` is auto-coloured. Names in `columns`/`field-options`/tags must not contain `| ; : =` (tag names also drop `,`).',
+  'Group the Table view by any status or tag column with a view marker placed right after `board:start`: `<!-- board:view name="table" group="FieldName" -->`.',
   'Every card needs a unique `id` (c1, c2, …) used in BOTH its table row and its `<!-- board:body id="…" -->` block.',
   'Dates as `YYYY-MM-DD`; people as `@name`. In table cells, escape pipes as `\\|` and use `<br>` for line breaks.',
 ];

@@ -279,7 +279,7 @@ export function openFieldActionMenu(
   };
 
   addItem(ICON_EDIT, 'Rename', '', isLocked, () => options.onRename?.());
-  if (field.type === 'status') {
+  if (field.type === 'status' || field.type === 'tags') {
     let liveBoard = board;
     addItem(ICON_EDIT, 'Edit options', '', false, () => {
       openStatusOptionsEditor(

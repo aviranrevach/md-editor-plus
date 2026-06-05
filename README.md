@@ -287,10 +287,15 @@ flowchart LR
 
 Type `/board kanban` or `/board table` to drop a project board. Two views over the same data:
 
-- **Kanban view** — columns of cards. Drag cards between columns, drag columns to reorder. Add columns from the right edge, add cards from the bottom of any column. Double-click a column header to rename. Per-column color swatch (gray / amber / emerald / blue / etc.).
-- **Table view** — a true database table. Sort by column, resize columns, drag to reorder. Show / hide properties from the Properties popover. Inline-edit every cell. The Description column is a synthetic field that maps to the card body text.
+- **Kanban view** — columns of cards. Drag cards between columns, drag columns to reorder. Add columns from the right edge, add cards from the bottom of any column. Double-click a column header to rename. Per-column color swatch from a **10-color palette** (gray, blue, amber, emerald, red, purple, orange, teal, indigo, pink).
+- **Table view** — a true database table. Sort by column, resize columns, drag to reorder. Show / hide properties from the Properties popover. Inline-edit every cell. The Description column is a synthetic field that maps to the card body text. **Group by any status or tag column** (column ⋯ → *Group by this*) — rows stack into colored, collapsible sections in that field's color and order, with a *Remove grouping* control.
 
-**Field types** — `text`, `status`, `date`, `tags`, with type-aware editors. **Locked columns** (gray pill) can be renamed but not moved. Boards round-trip as an HTML comment block + a fenced Markdown table, so the file stays plain text and works with any other Markdown tool.
+**Field types** — `text`, `status`, `date`, `person`, `tags`, with type-aware editors.
+
+- **Multiple status columns** — beyond the built-in Status, add as many `status` columns as you like (e.g. *Impact*, *Priority*). Each owns its own set of states with colors, editable from **Edit options** (the column ⋯, the property ⋯, or right when you create the column). Picking a state sets that column, independently of Status.
+- **Colored, managed tags** — `tags` columns are a multi-select set with colors. Click a cell for a **checklist picker** (toggle tags on/off, or type to create). New tags auto-pick a stable color you can change later; rename / recolor / delete the whole set from **Edit options**, and renames/deletes propagate across every card. Existing tags light up with colors automatically.
+
+**Locked columns** (gray pill) can be renamed but not moved. Boards round-trip as an HTML comment block + a fenced Markdown table, so the file stays plain text and works with any other Markdown tool.
 
 ### Drag handle
 
