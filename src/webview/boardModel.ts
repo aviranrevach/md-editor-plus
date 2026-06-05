@@ -62,6 +62,56 @@ export function setStatusOptions(board: Board, fieldName: string, options: Colum
   };
 }
 
+/** Rename a status option and migrate every card value holding the old name. */
+export function renameStatusOption(
+  board: Board, fieldName: string, oldName: string, newName: string,
+): Board {
+  const opts = getStatusOptions(board, fieldName).map(
+    (o) => (o.name === oldName ? { ...o, name: newName } : o),
+  );
+  const b = setStatusOptions(board, fieldName, opts);
+  return {
+    ...b,
+    cards: b.cards.map((c) =>
+      c.values[fieldName] === oldName
+        ? { ...c, values: { ...c.values, [fieldName]: newName } }
+        : c,
+    ),
+  };
+}
+
+/** Delete a status option and clear it from any card that held it. */
+export function deleteStatusOption(board: Board, fieldName: string, name: string): Board {
+  const opts = getStatusOptions(board, fieldName).filter((o) => o.name !== name);
+  const b = setStatusOptions(board, fieldName, opts);
+  return {
+    ...b,
+    cards: b.cards.map((c) =>
+      c.values[fieldName] === name
+        ? { ...c, values: { ...c.values, [fieldName]: '' } }
+        : c,
+    ),
+  };
+}
+
+/** Append a status option, auto-picking a color not already used. */
+export function addStatusOption(board: Board, fieldName: string, name: string): Board {
+  const opts = getStatusOptions(board, fieldName);
+  const used = opts.map((o) => o.color);
+  const color = COLOR_TOKENS.find((t) => !used.includes(t)) ?? autoColor(name);
+  return setStatusOptions(board, fieldName, [...opts, { name, color }]);
+}
+
+/** Change the color of one status option. */
+export function recolorStatusOption(
+  board: Board, fieldName: string, name: string, color: ColorToken,
+): Board {
+  const opts = getStatusOptions(board, fieldName).map(
+    (o) => (o.name === name ? { ...o, color } : o),
+  );
+  return setStatusOptions(board, fieldName, opts);
+}
+
 const START_RE = /<!--\s*board:start([\s\S]*?)-->/i;
 const VIEW_RE = /<!--\s*board:view([\s\S]*?)-->/gi;
 const BODY_RE = /<!--\s*board:body\s+id="([^"]+)"\s*-->/gi;

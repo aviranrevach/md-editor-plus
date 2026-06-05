@@ -1,4 +1,4 @@
-import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions } from '../../src/webview/boardModel';
+import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 
 describe('10-color palette', () => {
@@ -52,5 +52,30 @@ describe('status-option accessors', () => {
     const next = setStatusOptions(b, 'Impact', [{ name: 'High', color: 'red' }]);
     expect(next.fields.find(f => f.name === 'Impact')!.options).toEqual([{ name: 'High', color: 'red' }]);
     expect(b.fields.find(f => f.name === 'Impact')!.options).toEqual([{ name: 'Low', color: 'gray' }]);
+  });
+});
+
+describe('status-option mutations migrate card values', () => {
+  it('renameStatusOption renames the option and updates cards holding it (Status)', () => {
+    const next = renameStatusOption(makeBoard(), 'Status', 'Todo', 'Backlog');
+    expect(next.columns[0]).toEqual({ name: 'Backlog', color: 'blue' });
+    expect(next.cards[0].values.Status).toBe('Backlog');
+  });
+  it('renameStatusOption works on an additional field and leaves other fields alone', () => {
+    const next = renameStatusOption(makeBoard(), 'Impact', 'Low', 'Minor');
+    expect(next.fields.find(f => f.name === 'Impact')!.options).toEqual([{ name: 'Minor', color: 'gray' }]);
+    expect(next.cards[0].values.Impact).toBe('Minor');
+    expect(next.cards[0].values.Status).toBe('Todo');
+  });
+  it('deleteStatusOption removes the option and clears matching card values', () => {
+    const next = deleteStatusOption(makeBoard(), 'Impact', 'Low');
+    expect(next.fields.find(f => f.name === 'Impact')!.options).toEqual([]);
+    expect(next.cards[0].values.Impact).toBe('');
+  });
+  it('addStatusOption appends an option with a distinct color', () => {
+    const next = addStatusOption(makeBoard(), 'Impact', 'High');
+    const opts = next.fields.find(f => f.name === 'Impact')!.options!;
+    expect(opts.map(o => o.name)).toEqual(['Low', 'High']);
+    expect(opts[1].color).not.toBe(opts[0].color);
   });
 });
