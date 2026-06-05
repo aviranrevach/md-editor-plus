@@ -4728,6 +4728,19 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   color: #fff;
   font-weight: 600;
 }
+.ai-panel-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--toolbar-btn-hover, rgba(127, 127, 127, 0.12));
+  color: var(--text-primary);
+}
+.ai-panel-btn-secondary svg { flex: 0 0 15px; }
+.ai-panel-btn-secondary.active {
+  background: var(--seg-active-bg, rgba(35, 131, 226, 0.12));
+  border-color: var(--seg-active-bg, rgba(35, 131, 226, 0.4));
+  color: var(--link, #2383e2);
+}
 
 /* Blocks-skill panel */
 /* Compact: checkboxes flow in a wrapping row instead of a tall column. */
@@ -4779,6 +4792,47 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 .skill-path-muted { color: var(--text-secondary); }
 /* Bigger primary action in this panel. */
 .skill-panel .ai-panel-btn-primary { padding: 12px 22px; font-size: 14px; border-radius: 10px; }
+/* Preview (secondary) sits left; Create grows to fill the rest. */
+.skill-panel .ai-panel-foot { justify-content: flex-start; }
+.skill-panel .ai-panel-btn-primary { flex: 1; }
+.skill-panel .ai-panel-btn-secondary { padding: 12px 16px; font-size: 13px; border-radius: 10px; }
+
+/* Inline read-only SKILL.md preview. */
+.skill-preview {
+  margin: 6px 16px 2px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--block-hover, rgba(127, 127, 127, 0.06));
+  max-height: 260px;
+  overflow: auto;
+}
+.skill-preview[hidden] { display: none; }
+.skill-preview-head {
+  position: sticky;
+  top: 0;
+  background: var(--block-hover, rgba(127, 127, 127, 0.06));
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 8px 12px 4px;
+}
+.skill-preview-body {
+  margin: 0;
+  padding: 2px 12px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* Hide-until-hover scrollbar, matching the rest of the app. */
+.skill-preview::-webkit-scrollbar { width: 8px; height: 8px; }
+.skill-preview::-webkit-scrollbar-track { background: transparent; }
+.skill-preview::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; transition: background 0.15s; }
+.skill-preview:hover::-webkit-scrollbar-thumb { background: var(--border); }
 
 /* ─── In-document find (Cmd/Ctrl+F) ─────────────────────────────────────── */
 
