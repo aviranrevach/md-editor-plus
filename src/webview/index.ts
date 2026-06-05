@@ -969,6 +969,13 @@ function init(): void {
       if (sourceMode && sourceEditorReady) updateSourceContent(msg.markdown);
     }
   });
+
+  // Handshake: the host posts 'init' (carrying the markdown) only after it
+  // hears this. Without it, the host could fire 'init' before this listener
+  // exists — VS Code drops messages to a webview that isn't listening yet,
+  // leaving the editor uninitialized and the page blank. Must be the last
+  // thing init() does, so the listener above is guaranteed registered first.
+  vscode.postMessage({ type: 'ready' });
 }
 
 document.addEventListener('DOMContentLoaded', init);

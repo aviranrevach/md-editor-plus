@@ -153,6 +153,14 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         shortenCodeSnippets?: boolean;
       };
     }) => {
+      // Webview signals it has registered its message listener. Only now is it
+      // safe to send 'init' — posting it earlier races the webview's load and
+      // VS Code silently drops messages to a not-yet-listening webview, which
+      // leaves the page blank. Fires once per webview load (and on reload).
+      if (msg.type === 'ready') {
+        sendInit();
+        return;
+      }
       if (msg.type === 'edit' && msg.markdown !== undefined) {
         await this._applyEdit(document, msg.markdown);
       }
@@ -406,7 +414,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       onDocChange.dispose();
     });
 
-    sendInit();
+    // 'init' is sent in response to the webview's 'ready' handshake above —
+    // not here — so it can't arrive before the webview is listening.
   }
 
   private async _applyEdit(document: vscode.TextDocument, markdown: string): Promise<void> {
