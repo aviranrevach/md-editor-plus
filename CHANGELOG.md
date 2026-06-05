@@ -4,6 +4,17 @@ All notable changes to **MD Editor Plus** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Find in page (⌘F / Ctrl+F)** — a Notion-style find bar for the editor. VS Code's native find can't reach inside a custom-editor webview, so this is a built-in search over the document. Highlights every match with a live `3 / 12` count, <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> (or ↑ ↓) navigates, <kbd>Esc</kbd> closes. Also reachable from the `⋯` menu as **Find in page**.
+  - **Searches the document model, not the DOM**, via a ProseMirror decoration plugin — so it finds text inside a *collapsed* toggle, then auto-expands the toggle and scrolls the match into view. Decorations never touch content, so highlighting can't dirty the file.
+  - **Works in both views** — Preview and Code. Switching views while the bar is open moves the search to the now-active editor.
+  - **Searches inside boards too** — card titles, body previews, visible field/tag values, column names, and the board name. A board is an atom node that renders its own DOM and tells ProseMirror to ignore mutations inside it, so board matches are painted with the **CSS Custom Highlight API** (no DOM mutation — safe alongside the board's re-renders) and the matched card is scrolled into view. A coordinator merges ProseMirror and board matches into one list ordered top-to-bottom, so the count and Enter/Shift+Enter navigation flow through everything in visual order. (If the runtime lacks the Highlight API, board matches just aren't highlighted; the rest of search still works.)
+  - Case-insensitive plain-text matching (no regex/replace in this version).
+  - Match-finding is a pure function ([src/webview/search.ts](src/webview/search.ts)); board DOM scanning is covered by jsdom tests. See [tests/search.test.ts](tests/search.test.ts) and [tests/boardSearch.test.ts](tests/boardSearch.test.ts).
+
 ## [0.5.2] - 2026-06-02
 
 ### Fixed

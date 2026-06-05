@@ -76,11 +76,12 @@ From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Cla
 
 ### Workflow & UX
 
+- **Find in page** — <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> (or **Find in page** in the `⋯` menu) opens a Notion-style find bar: every match highlights with a live `3 / 12` count, <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> (or ↑ ↓) jumps between them, <kbd>Esc</kbd> closes. Works in both Preview and Code views. A match hidden inside a collapsed toggle auto-expands and scrolls into view, and search reaches **inside boards** too — card titles, body previews, field/tag values, column names — scrolling the matching card into view.
 - **Code / Preview toggle** — switch between rendered blocks and raw Markdown without leaving the editor
 - **Auto-fading toolbar** — drops to 50% opacity when your cursor is away, lights up when you approach
-- **Filename actions menu** — Copy page content, Copy file path, Duplicate, Open in Finder
+- **Actions menu** — the `⋯` menu carries Find in page, Read only, Reload from disk, Copy page content, Copy file path, Duplicate, Open in Finder, Export, and Create blocks skill
 - **Rich tooltips** — color swatches, font and size previews, 350 ms hover delay, edge-aware flipping
-- **Keyboard shortcuts** — `⌘B` / `⌘I` / `⌘U` / `⌘⇧X` / `⌘E` / `⌘K` / `⌘/` work the way you expect
+- **Keyboard shortcuts** — `⌘F` / `⌘B` / `⌘I` / `⌘U` / `⌘⇧X` / `⌘E` / `⌘K` / `⌘/` work the way you expect
 - **Command palette** — Open Block View / Open Source View on any file
 
 ### Privacy & footprint

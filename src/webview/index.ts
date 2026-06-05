@@ -2,14 +2,15 @@ import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
-import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly } from './editor';
+import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor } from './editor';
+import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { setAlwaysDarkDiagram } from './mermaidRenderer';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { initBoardSidePanel } from './boardSidePanel';
-import { setDocumentPath } from './docContext';
+import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
 import { common, createLowlight } from 'lowlight';
 
@@ -77,7 +78,7 @@ interface SavedDefaults {
   readOnly?: boolean;
   sourceWordWrap?: boolean;
 }
-interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; }
+interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
 type HostMessage = InitMessage | UpdateMessage;
 
@@ -300,6 +301,7 @@ function init(): void {
   let pendingExternalMarkdown: string | null = null;
   let sourceMode      = false;
   let widthMode: WidthMode = 'normal';
+  let findBar: FindBar | null = null;
 
   function setView(mode: 'preview' | 'source'): void {
     const targetSource = mode === 'source';
@@ -347,6 +349,13 @@ function init(): void {
       // returning to preview, so any external edits applied while in code
       // view are reflected.
       if (editorReady) updateContent(currentMarkdown);
+    }
+
+    // If find is open, move the search over to the now-active editor and clear
+    // it on the one we just left.
+    if (findBar?.isOpen()) {
+      const previousEditor = sourceMode ? getEditor() : getSourceEditor();
+      findBar.retarget(previousEditor);
     }
   }
 
@@ -645,6 +654,11 @@ function init(): void {
       vscode.postMessage({ type: 'openInFinder' });
       closeAllActionsPanels();
     });
+    panel.querySelector<HTMLElement>('.act-find')?.addEventListener('click', () => {
+      closeAllActionsPanels();
+      closeSettingsPanel();
+      findBar?.open();
+    });
   }
   bindActions(actionsPanelDots);
   bindActions(actionsPanelFile);
@@ -683,6 +697,7 @@ function init(): void {
   settingsBtn.addEventListener('click', e => {
     e.stopPropagation();
     closeAllActionsPanels();
+    findBar?.close();
     settingsPanel.classList.toggle('hidden');
     settingsBtn.classList.toggle('active');
     syncToolbarPanelState();
@@ -692,6 +707,7 @@ function init(): void {
   function openDotsPanel(): void {
     closeSettingsPanel();
     closeFilenamePanel();
+    findBar?.close();
     actionsPanelDots.classList.remove('hidden');
     actionsBtn.classList.add('active');
     syncToolbarPanelState();
@@ -711,6 +727,7 @@ function init(): void {
   function openFilenamePanel(): void {
     closeSettingsPanel();
     closeDotsPanel();
+    findBar?.close();
     actionsPanelFile.classList.remove('hidden');
     filenameEl?.classList.add('active');
     syncToolbarPanelState();
@@ -864,6 +881,7 @@ function init(): void {
       currentMarkdown = msg.markdown;
       if (msg.mediaBaseUri) setMediaBaseUri(msg.mediaBaseUri);
       setDocumentPath(msg.documentPath ?? '');
+      setWorkspaceName(msg.workspaceName ?? null);
       savedDefaults = { ...FACTORY_DEFAULTS, ...(msg.defaults ?? {}) };
       applyDefaults(msg.defaults ?? {});
       refreshDefaultsButtons();
@@ -875,6 +893,23 @@ function init(): void {
       });
       editorReady = true;
       initBoardSidePanel();
+
+      // In-document find. The webview is a custom editor, so VS Code's native
+      // Cmd/Ctrl+F never reaches this content — we run our own find bar over
+      // whichever editor (preview or source) is currently active.
+      findBar = createFindBar({
+        getActiveEditor: () => (sourceMode ? getSourceEditor() : getEditor()),
+      });
+      document.addEventListener('keydown', (e) => {
+        const mod = e.metaKey || e.ctrlKey;
+        if (mod && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
+          e.preventDefault();
+          // Find and the dropdowns share the same spot — never show both.
+          closeAllActionsPanels();
+          closeSettingsPanel();
+          findBar?.open();
+        }
+      });
 
       try {
         const outlineBtn   = document.getElementById('outline-btn') as HTMLElement | null;

@@ -26,6 +26,7 @@ import BlockOutline from './extensions/outline';
 import { createBubbleMenu } from './bubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
+import SearchExtension from './searchExtension';
 
 const lowlight = createLowlight(common);
 
@@ -120,6 +121,7 @@ export function createEditor(
       Toggle,
       BlockDirection,
       BlockOutline,
+      SearchExtension,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
     ],
     editorProps: {
@@ -229,6 +231,7 @@ export function createSourceEditor(
       Text,
       HardBreak,
       CodeBlock.configure({ lowlight, defaultLanguage: 'markdown', HTMLAttributes: { dir: 'ltr' } }),
+      SearchExtension,
     ],
     content: buildSourceContent(initialMarkdown),
     onUpdate({ editor }) {
@@ -259,4 +262,14 @@ export function destroySourceEditor(): void {
   if (_sourceDebounceTimer) clearTimeout(_sourceDebounceTimer);
   _sourceEditor?.destroy();
   _sourceEditor = null;
+}
+
+// Editor handles for features that need to talk to the live ProseMirror
+// instances directly (e.g. the find bar routing search to the active view).
+export function getEditor(): Editor | null {
+  return _editor;
+}
+
+export function getSourceEditor(): Editor | null {
+  return _sourceEditor;
 }
