@@ -49,3 +49,44 @@ describe('buildOptionsEditor', () => {
     expect(calls).toEqual([['Low', 'teal']]);
   });
 });
+
+describe('buildOptionsEditor — rename', () => {
+  const opts = () => [{ name: 'Low', color: 'gray' }, { name: 'High', color: 'red' }] as any;
+
+  it('blurring a changed name calls onRename(old, new)', () => {
+    const calls: any[] = [];
+    const host = render(opts(), { onRename: (o: string, n: string) => calls.push([o, n]) });
+    const input = host.querySelectorAll('.bd-opt-name')[0] as HTMLInputElement;
+    input.focus(); input.value = 'Minor'; input.dispatchEvent(new Event('blur'));
+    expect(calls).toEqual([['Low', 'Minor']]);
+  });
+
+  it('blurring an unchanged name does not call onRename', () => {
+    const calls: any[] = [];
+    const host = render(opts(), { onRename: (o: string, n: string) => calls.push([o, n]) });
+    const input = host.querySelectorAll('.bd-opt-name')[0] as HTMLInputElement;
+    input.focus(); input.dispatchEvent(new Event('blur'));
+    expect(calls).toEqual([]);
+  });
+
+  it('emptying a name does not call onRename', () => {
+    const calls: any[] = [];
+    const host = render(opts(), { onRename: (o: string, n: string) => calls.push([o, n]) });
+    const input = host.querySelectorAll('.bd-opt-name')[0] as HTMLInputElement;
+    input.focus(); input.value = '   '; input.dispatchEvent(new Event('blur'));
+    expect(calls).toEqual([]);
+  });
+
+  it("typing a new name then clicking another row's delete flushes the rename first (no loss)", () => {
+    const renamed: any[] = []; const deleted: string[] = [];
+    const host = render(opts(), {
+      onRename: (o: string, n: string) => renamed.push([o, n]),
+      onDelete: (n: string) => deleted.push(n),
+    });
+    const input0 = host.querySelectorAll('.bd-opt-name')[0] as HTMLInputElement;
+    input0.focus(); input0.value = 'Minor';
+    (host.querySelectorAll('.bd-opt-delete')[1] as HTMLElement).click();
+    expect(renamed).toEqual([['Low', 'Minor']]);
+    expect(deleted).toEqual(['High']);
+  });
+});

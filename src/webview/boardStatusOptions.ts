@@ -13,6 +13,17 @@ export interface OptionsEditorConfig {
   onDelete: (name: string) => void;
 }
 
+/**
+ * If a `.bd-opt-name` input currently has focus and its value has changed,
+ * blur it so the rename commit handler fires before any other mutation runs.
+ */
+function flushPendingRename(): void {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && active.classList.contains('bd-opt-name')) {
+    active.blur();
+  }
+}
+
 /** Render the editable list of states into `host`. Pure DOM, no board knowledge. */
 export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig): void {
   host.innerHTML = '';
@@ -27,7 +38,10 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig):
     swatch.className = `bd-opt-swatch color-${opt.color}`;
     swatch.addEventListener('click', (e) => {
       e.stopPropagation();
-      openPalette(row, opt.color, (tok) => cfg.onRecolor(opt.name, tok));
+      flushPendingRename();
+      // Read the live name from the row's input (may differ from opt.name after a rename).
+      const liveName = (row.querySelector('.bd-opt-name') as HTMLInputElement).value;
+      openPalette(row, opt.color, (tok) => cfg.onRecolor(liveName, tok));
     });
     row.appendChild(swatch);
 
@@ -49,7 +63,13 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig):
     del.type = 'button';
     del.className = 'bd-opt-delete';
     del.textContent = '×';
-    del.addEventListener('click', (e) => { e.stopPropagation(); cfg.onDelete(opt.name); });
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      flushPendingRename();
+      // Read the live name — may have been updated by the flush above.
+      const liveName = (row.querySelector('.bd-opt-name') as HTMLInputElement).value;
+      cfg.onDelete(liveName);
+    });
     row.appendChild(del);
 
     host.appendChild(row);
@@ -59,7 +79,11 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig):
   add.type = 'button';
   add.className = 'bd-opt-add';
   add.textContent = '+ Add option';
-  add.addEventListener('click', (e) => { e.stopPropagation(); cfg.onAdd(); });
+  add.addEventListener('click', (e) => {
+    e.stopPropagation();
+    flushPendingRename();
+    cfg.onAdd();
+  });
   host.appendChild(add);
 }
 
@@ -71,10 +95,21 @@ function openPalette(anchor: HTMLElement, current: ColorToken, pick: (c: ColorTo
     const sw = document.createElement('button');
     sw.type = 'button';
     sw.className = `bd-opt-pchip color-${tok}` + (tok === current ? ' is-selected' : '');
-    sw.addEventListener('click', (e) => { e.stopPropagation(); pick(tok); pal.remove(); });
+    sw.addEventListener('click', (e) => { e.stopPropagation(); pick(tok); pal.remove(); outsideHandler && document.removeEventListener('click', outsideHandler, true); });
     pal.appendChild(sw);
   }
   anchor.appendChild(pal);
+
+  // One-shot capture-phase outside-click dismissal (no listener leak across opens).
+  let outsideHandler: ((e: MouseEvent) => void) | null = null;
+  outsideHandler = (e: MouseEvent) => {
+    if (!pal.contains(e.target as Node)) {
+      pal.remove();
+      document.removeEventListener('click', outsideHandler!, true);
+    }
+  };
+  // Defer by a tick so this open-click doesn't immediately close the palette.
+  setTimeout(() => document.addEventListener('click', outsideHandler!, true), 0);
 }
 
 /**
@@ -93,13 +128,19 @@ export function openStatusOptionsEditor(
   document.body.appendChild(pop);
 
   const rect = anchor.getBoundingClientRect();
-  pop.style.position = 'absolute';
   pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
   pop.style.left = `${rect.left + window.scrollX}px`;
 
   const rerender = () => buildOptionsEditor(pop, {
     getOptions: () => getStatusOptions(getBoard(), fieldName),
-    onAdd:     () => { onChange(addStatusOption(getBoard(), fieldName, 'New')); rerender(); },
+    onAdd: () => {
+      const existing = getStatusOptions(getBoard(), fieldName).map((o) => o.name);
+      let label = 'New';
+      let counter = 2;
+      while (existing.includes(label)) { label = `New ${counter}`; counter++; }
+      onChange(addStatusOption(getBoard(), fieldName, label));
+      rerender();
+    },
     onRename:  (o, n) => { onChange(renameStatusOption(getBoard(), fieldName, o, n)); rerender(); },
     onRecolor: (n, c) => { onChange(recolorStatusOption(getBoard(), fieldName, n, c)); rerender(); },
     onDelete:  (n) => { onChange(deleteStatusOption(getBoard(), fieldName, n)); rerender(); },

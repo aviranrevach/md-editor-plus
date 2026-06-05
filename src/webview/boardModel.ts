@@ -130,8 +130,8 @@ const SEPARATOR_LINE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/;
 const COLOR_TOKENS: ColorToken[] =
   ['gray', 'blue', 'amber', 'emerald', 'red', 'purple', 'orange', 'teal', 'indigo', 'pink'];
 
-/** Public, ordered palette for color pickers. */
-export const COLOR_TOKENS_PUBLIC: ColorToken[] = COLOR_TOKENS;
+/** Public, ordered palette for color pickers. Frozen to prevent accidental mutation. */
+export const COLOR_TOKENS_PUBLIC: readonly ColorToken[] = Object.freeze([...COLOR_TOKENS]);
 
 function autoColor(name: string): ColorToken {
   let h = 0;
