@@ -890,7 +890,7 @@ function comparatorFor(f: FieldDef, b: Board): (a: string, c: string) => number 
     };
   }
   if (f.type === 'status') {
-    const order = new Map(b.columns.map((col, i) => [col.name, i]));
+    const order = new Map(getStatusOptions(b, f.name).map((col, i) => [col.name, i] as const));
     return (a, c) => (order.get(a) ?? 1e9) - (order.get(c) ?? 1e9);
   }
   if (f.type === 'tags') {

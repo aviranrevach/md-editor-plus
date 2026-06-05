@@ -99,3 +99,28 @@ describe('applyGroup via mountTable', () => {
     expect(titles.filter((t) => t === 'Onboard').length).toBe(2);
   });
 });
+
+describe('status sort uses the field options order (any status field)', () => {
+  it('sorts a custom status field by its options order, not alphabetical', () => {
+    const board: Board = {
+      id: 'b1', name: '',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title',  type: 'text',   visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'Impact', type: 'status', visibleOnCard: true,
+          options: [{ name: 'Low', color: 'teal' }, { name: 'High', color: 'red' }] },
+      ],
+      cards: [
+        { id: 'c1', values: { id:'c1', Title:'A', Status:'Todo', Impact:'High' }, body:'' },
+        { id: 'c2', values: { id:'c2', Title:'B', Status:'Todo', Impact:'Low'  }, body:'' },
+      ],
+      orphanBodies: [], views: [{ name: 'table', sort: { field: 'Impact', dir: 'asc' } }], activeView: 'table',
+    };
+    const { ctx } = makeCtx(board);
+    mountTable(ctx);
+    const titles = Array.from(ctx.root.querySelectorAll('.bd-table-row'))
+      .map((r) => r.querySelector('td[data-field="Title"]')?.textContent ?? '');
+    expect(titles).toEqual(['B', 'A']); // Low(0) before High(1)
+  });
+});
