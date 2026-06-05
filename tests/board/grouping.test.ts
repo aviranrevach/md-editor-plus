@@ -144,6 +144,50 @@ describe('group band color', () => {
   });
 });
 
+describe('Remove grouping menu item', () => {
+  const colMenuLabels = (root: HTMLElement, fieldName: string) => {
+    // Close any existing menu first
+    document.querySelector('.bd-col-menu')?.remove();
+    const th = Array.from(root.querySelectorAll('th'))
+      .find((h) => (h.textContent || '').includes(fieldName))!;
+    (th.querySelector('.bd-col-menu-btn') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return Array.from(document.querySelectorAll('.bd-col-menu-label')).map((n) => n.textContent);
+  };
+  const baseBoard = (groupBy?: string): Board => ({
+    id: 'b1', name: '',
+    columns: [{ name: 'Todo', color: 'blue' }],
+    fields: [
+      { name: 'Title', type: 'text', visibleOnCard: true },
+      { name: 'Status', type: 'status', visibleOnCard: true },
+      { name: 'Impact', type: 'status', visibleOnCard: true, options: [{ name: 'Low', color: 'teal' }] },
+    ],
+    cards: [{ id:'c1', values:{ id:'c1', Title:'A', Status:'Todo', Impact:'Low' }, body:'' }],
+    orphanBodies: [], views: [{ name: 'table', ...(groupBy ? { groupBy } : {}) }], activeView: 'table',
+  });
+
+  it('shows "Remove grouping" on the actively-grouped column', () => {
+    const { ctx } = makeCtx(baseBoard('Impact'));
+    mountTable(ctx);
+    expect(colMenuLabels(ctx.root, 'Impact')).toContain('Remove grouping');
+  });
+
+  it('shows "Group by this" on a column that is not the active group', () => {
+    const { ctx } = makeCtx(baseBoard('Impact'));
+    mountTable(ctx);
+    expect(colMenuLabels(ctx.root, 'Status')).toContain('Group by this');
+  });
+
+  it('clicking "Remove grouping" clears view.groupBy', () => {
+    const { ctx, boardRef } = makeCtx(baseBoard('Impact'));
+    mountTable(ctx);
+    colMenuLabels(ctx.root, 'Impact'); // open menu
+    const item = Array.from(document.querySelectorAll('.bd-col-menu-item'))
+      .find((n) => /Remove grouping/.test(n.textContent || '')) as HTMLElement;
+    item.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(boardRef.current.views.find(v => v.name === 'table')?.groupBy).toBeUndefined();
+  });
+});
+
 describe('status sort uses the field options order (any status field)', () => {
   it('sorts a custom status field by its options order, not alphabetical', () => {
     const board: Board = {

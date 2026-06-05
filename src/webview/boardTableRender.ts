@@ -823,13 +823,24 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     setViewSort(b2, 'table', null);
     ctx.mutate(b2);
   });
-  mkItem(ICON.group, 'Group by this', () => {
-    collapsedGroups.clear();
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewGroup(b2, 'table', f.name);
-    ctx.mutate(b2);
-  });
+  const tableGroupBy = ctx.getBoard().views.find(x => x.name === 'table')?.groupBy;
+  if (tableGroupBy === f.name) {
+    mkItem(ICON.group, 'Remove grouping', () => {
+      collapsedGroups.clear();
+      const cur = ctx.getBoard();
+      const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+      setViewGroup(b2, 'table', null);
+      ctx.mutate(b2);
+    });
+  } else {
+    mkItem(ICON.group, 'Group by this', () => {
+      collapsedGroups.clear();
+      const cur = ctx.getBoard();
+      const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+      setViewGroup(b2, 'table', f.name);
+      ctx.mutate(b2);
+    });
+  }
   mkItem(ICON.resetWidth, 'Reset column width', () => {
     const cur = ctx.getBoard();
     const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
