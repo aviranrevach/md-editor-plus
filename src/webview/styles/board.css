@@ -1594,3 +1594,29 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 /* ── Table add-row (new design) ─────────────────────────────────────────── */
 .bd-addrow-placeholder { color: var(--text-secondary, #888); font-style: normal; font-size: 13px; }
 .bd-table-addrow .bd-table-gutter { width: 14px; }
+
+/* ===== Status-options editor (buildOptionsEditor / openStatusOptionsEditor) ===== */
+.bd-opt-editor { display: flex; flex-direction: column; gap: 2px; padding: 6px; min-width: 220px; }
+.bd-opt-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 7px; }
+.bd-opt-row:hover { background: var(--bd-hover, #f5f7fa); }
+.bd-opt-swatch { width: 14px; height: 14px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; }
+.bd-opt-name { flex: 1; border: 0; background: transparent; font: inherit; color: inherit; outline: none; padding: 1px 4px; border-radius: 5px; }
+.bd-opt-name:focus { background: var(--bd-input-focus, #eef4ff); }
+.bd-opt-delete { border: 0; background: transparent; color: #c2c8d0; font-weight: 700; cursor: pointer; }
+.bd-opt-add { border: 0; background: transparent; color: #2b6cff; text-align: left; padding: 6px; cursor: pointer; border-top: 1px solid #f1f3f5; margin-top: 4px; }
+.bd-opt-palette { position: absolute; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 9px; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 14px 36px rgba(20,30,50,.2); z-index: 20; }
+.bd-opt-pchip { width: 22px; height: 22px; border-radius: 6px; border: 0; cursor: pointer; }
+.bd-opt-pchip.is-selected { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #2a2f38; }
+.bd-opt-popover { background: #fff; border: 1px solid #e5e7eb; border-radius: 11px; box-shadow: 0 16px 40px rgba(20,30,50,.18); z-index: 19; }
+
+/* Swatch + palette chip backgrounds — one rule per token, mirrors .board-color-swatch scheme */
+.bd-opt-swatch.color-gray,   .bd-opt-pchip.color-gray   { background: var(--board-chip-gray-dot); }
+.bd-opt-swatch.color-blue,   .bd-opt-pchip.color-blue   { background: var(--board-chip-blue-dot); }
+.bd-opt-swatch.color-amber,  .bd-opt-pchip.color-amber  { background: var(--board-chip-amber-dot); }
+.bd-opt-swatch.color-emerald,.bd-opt-pchip.color-emerald { background: var(--board-chip-green-dot); }
+.bd-opt-swatch.color-red,    .bd-opt-pchip.color-red    { background: var(--board-chip-red-dot); }
+.bd-opt-swatch.color-purple, .bd-opt-pchip.color-purple { background: var(--board-chip-purple-dot); }
+.bd-opt-swatch.color-orange, .bd-opt-pchip.color-orange { background: var(--board-chip-orange-dot); }
+.bd-opt-swatch.color-teal,   .bd-opt-pchip.color-teal   { background: var(--board-chip-teal-dot); }
+.bd-opt-swatch.color-indigo, .bd-opt-pchip.color-indigo { background: var(--board-chip-indigo-dot); }
+.bd-opt-swatch.color-pink,   .bd-opt-pchip.color-pink   { background: var(--board-chip-pink-dot); }
