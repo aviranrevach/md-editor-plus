@@ -123,6 +123,37 @@ describe('field action menu — Edit options', () => {
   });
 });
 
+describe('field action menu — Edit options: sequential edits compose (no stale snapshot)', () => {
+  beforeEach(() => {
+    // Remove any leftover menus/editors from previous tests in this file.
+    document.querySelectorAll('.board-field-action-menu, .bd-opt-editor, .bd-opt-popover').forEach((n) => n.remove());
+  });
+
+  it('multiple edits via the properties-menu Edit options compose (no stale snapshot)', () => {
+    const b = fieldMenuBoard(); // Status field has 1 column: Todo
+    let latest: any = null;
+    const a = document.createElement('button'); document.body.appendChild(a);
+
+    openFieldActionMenu(a, b, b.fields[1], (next) => { latest = next; });
+
+    const editBtn = Array.from(document.querySelectorAll('.board-field-action-item'))
+      .find((n) => /edit options/i.test(n.textContent || '')) as HTMLElement;
+    expect(editBtn).not.toBeNull();
+    editBtn.click(); // opens editor (appended to body); also closes the action menu
+
+    // buildOptionsEditor sets host.className = 'bd-opt-editor', so the popover
+    // element's class is 'bd-opt-editor'. Query the add button directly.
+    const addBtn = () => document.querySelector('.bd-opt-editor .bd-opt-add') as HTMLElement;
+    expect(addBtn()).not.toBeNull();
+
+    addBtn().click(); // first add — latest now has 2 columns
+    addBtn().click(); // second add — should compose on top of first add → 3 columns total
+
+    expect(latest).not.toBeNull();
+    expect(latest.columns.length).toBe(3); // started with 1 + two adds
+  });
+});
+
 describe('new-column popover — status seeds + creates with options', () => {
   it('picking Status reveals a States editor and Create button; Create adds a status field with options', () => {
     const board = fieldMenuBoard();

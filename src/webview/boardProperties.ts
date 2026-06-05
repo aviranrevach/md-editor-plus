@@ -1,5 +1,6 @@
 // src/webview/boardProperties.ts
 import type { Board, FieldDef, FieldType, ColumnDef } from './boardModel';
+import { COLOR_TOKENS_PUBLIC } from './boardModel';
 import { FIELD_TYPE_ICONS, FIELD_TYPE_LABELS } from './boardIcons';
 import { setViewColumns, hideFieldInView, showFieldInView } from './boardOps';
 import { buildOptionsEditor, openStatusOptionsEditor } from './boardStatusOptions';
@@ -279,8 +280,14 @@ export function openFieldActionMenu(
 
   addItem(ICON_EDIT, 'Rename', '', isLocked, () => options.onRename?.());
   if (field.type === 'status') {
+    let liveBoard = board;
     addItem(ICON_EDIT, 'Edit options', '', false, () => {
-      openStatusOptionsEditor(anchor, () => board, field.name, onChange);
+      openStatusOptionsEditor(
+        anchor,
+        () => liveBoard,
+        field.name,
+        (next) => { liveBoard = next; onChange(next); },
+      );
     });
   }
   if (viewName === 'table') {
@@ -681,12 +688,11 @@ export function promptNewField(
     const editorHost = document.createElement('div');
     pop.appendChild(editorHost);
 
-    const PAL = ['gray','blue','amber','emerald','red','purple','orange','teal','indigo','pink'] as const;
     const rerender = () => buildOptionsEditor(editorHost, {
       getOptions: () => working,
       onAdd: () => {
         const used = working.map((o) => o.color);
-        const color = PAL.find((c) => !used.includes(c)) ?? 'gray';
+        const color = COLOR_TOKENS_PUBLIC.find((c) => !used.includes(c)) ?? 'gray';
         working.push({ name: 'New', color });
         rerender();
       },
