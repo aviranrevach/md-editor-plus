@@ -753,9 +753,12 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     searchEl.style.display = '';
   }
 
+  // Capture phase: decide containment BEFORE the row handlers run. A row's
+  // mousedown re-renders the list (detaching the clicked node), so a bubble-phase
+  // check would see a now-detached target and wrongly close the picker.
   document.addEventListener('mousedown', e => {
     if (!el.contains(e.target as Node)) close();
-  });
+  }, true);
   // Close on scroll — the popover is anchored to a viewport position and
   // would otherwise drift away from its trigger. Ignore scrolls that
   // originate inside the picker itself (the list scrolls when items overflow).
