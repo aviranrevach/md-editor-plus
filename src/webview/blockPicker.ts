@@ -678,7 +678,7 @@ function freshBoardSource(id: string, activeView?: 'kanban' | 'table'): string {
   parts.push(
     `| Title    | Status | id |`,
     `|----------|--------|----|`,
-    `| New card | Todo   | c1 |`,
+    `| New card | Todo   | C1 |`,
     ``,
     `<!-- board:end -->`,
   );

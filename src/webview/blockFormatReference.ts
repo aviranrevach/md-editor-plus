@@ -26,10 +26,10 @@ function boardExample(view: 'kanban' | 'table'): string {
     ``,
     `| Title | Status | Owner | Due | id |`,
     `|---|---|---|---|---|`,
-    `| Write the spec | Doing | @maya | 2026-06-10 | c1 |`,
-    `| Review the PR | Todo |  |  | c2 |`,
+    `| Write the spec | Doing | @maya | 2026-06-10 | C1 |`,
+    `| Review the PR | Todo |  |  | C2 |`,
     ``,
-    `<!-- board:body id="c1" -->`,
+    `<!-- board:body id="C1" -->`,
     ``,
     `Longer notes for this card live here.`,
     ``,
@@ -46,7 +46,7 @@ const BOARD_RULES = [
   'You can have MORE THAN ONE `status` column. Extra `status` columns and any `tags` column carry their own options + colours via `field-options="Field=opt:colour|opt:colour;Other=a:blue|b:red"` (fields split by `;`, options by `|`, name and colour by `:`).',
   'A `tags` cell is a comma-separated list of tag names (a card can have several); each tag is its own coloured chip. A tag not listed in `field-options` is auto-coloured. Names in `columns`/`field-options`/tags must not contain `| ; : =` (tag names also drop `,`).',
   'Group the Table view by any status or tag column with a view marker placed right after `board:start`: `<!-- board:view name="table" group="FieldName" -->`.',
-  'Every card needs a unique `id` (c1, c2, …) used in BOTH its table row and its `<!-- board:body id="…" -->` block.',
+  'Every card needs a unique `id` (C1, C2, …) used in BOTH its table row and its `<!-- board:body id="…" -->` block.',
   'Dates as `YYYY-MM-DD`; people as `@name`. In table cells, escape pipes as `\\|` and use `<br>` for line breaks.',
 ];
 
