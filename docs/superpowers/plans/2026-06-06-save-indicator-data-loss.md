@@ -348,6 +348,16 @@ export function destroyEditor(): void {
 }
 ```
 
+- [ ] **Step 3b: Apply the same flush fix to the SOURCE (Code view) editor**
+
+The Code-view editor (`createSourceEditor`, ~line 239-263) has the identical bug: its `onUpdate` uses a raw `_sourceDebounceTimer` and `destroySourceEditor` (~line 278-282) clears it without firing. Editing in Code view then closing loses work the same way. Mirror the fix:
+
+- Add a module var alongside the source editor state (~line 223): replace `let _sourceDebounceTimer: ReturnType<typeof setTimeout> | null = null;` with `let _sourceEditDebounce: FlushableDebounce | null = null;`
+- In `createSourceEditor`'s `onUpdate` (lines 254-259), replace the raw-timer body with `if (_suppressSourceUpdate) return; _sourceEditDebounce?.schedule();` and add an `onBlur() { _sourceEditDebounce?.flush(); }` handler.
+- After the `new Editor({...})` assignment to `_sourceEditor`, build: `_sourceEditDebounce = createFlushableDebounce(() => { if (!_sourceEditor || _suppressSourceUpdate) return; onChange(getSourceMarkdown()); }, 500);`
+- In `destroySourceEditor`, replace `if (_sourceDebounceTimer) clearTimeout(_sourceDebounceTimer);` with `_sourceEditDebounce?.flush(); _sourceEditDebounce = null;`
+- Make `flushPendingEdit()` flush BOTH editors: `_editDebounce?.flush(); _sourceEditDebounce?.flush();`
+
 - [ ] **Step 4: Keep the editor mock in sync**
 
 In `tests/__mocks__/editorMock.js`, add inside the exported object:
@@ -601,6 +611,8 @@ In the `createEditor` callback (lines 930-935), add `applySaveEvent('localEdit')
       });
 ```
 
+Also drive the indicator from Code-view edits: in `ensureSourceEditor` (the `createSourceEditor(sourceEditorEl, currentMarkdown, (md) => { ... })` callback, ~line 155-159), add `applySaveEvent('localEdit');` as the first line of that callback body so typing in the Code view marks the document unsaved too.
+
 - [ ] **Step 5: Add the Cmd+S keybinding**
 
 In the `document.addEventListener('keydown', ...)` block (lines 945-954), add a branch after the existing Cmd+F branch (after line 953's closing `}`):
@@ -609,7 +621,9 @@ In the `document.addEventListener('keydown', ...)` block (lines 945-954), add a 
         if (mod && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
           flushPendingEdit();
-          const md = getCurrentMarkdown();
+          // Read the ACTIVE editor — in Code view the latest text lives in the
+          // source editor, not the preview one.
+          const md = sourceMode ? getSourceMarkdown() : getCurrentMarkdown();
           currentMarkdown = md;
           lastSentMarkdown = normalizeMd(md);
           vscode.postMessage({ type: 'save', markdown: md });
@@ -739,6 +753,10 @@ There is no DOM/vscode test harness in this repo, so the integration is verified
 - [ ] **Step 2: Dropped-keystroke regression (the original bug)**
   - Type a word and **immediately** close the tab (well under 1s).
   - Reopen → the word is present. (Flush-on-close fired the pending edit; dispose best-effort save persisted it.)
+
+- [ ] **Step 2b: Code-view (source) regression**
+  - Switch to Code view, type, and immediately close the tab. Reopen → the text is present.
+  - In Code view, type and press Cmd+S → indicator confirms `✓ Saved`; reopen shows the Code-view edit (not stale preview content).
 
 - [ ] **Step 3: Cmd+S feedback**
   - Type, then press Cmd+S (Ctrl+S on Windows/Linux). The indicator immediately shows `✓ Saved` with a brief pulse. File on disk is updated.
