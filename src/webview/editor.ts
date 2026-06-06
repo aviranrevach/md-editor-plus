@@ -28,11 +28,12 @@ import { createBubbleMenu } from './bubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
+import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 
 const lowlight = createLowlight(common);
 
 let _editor: Editor | null = null;
-let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _editDebounce: FlushableDebounce | null = null;
 let _frontmatter = '';
 let _onFrontmatterChange: ((info: { lines: number; kind: 'yaml' | 'toml' | 'none' }) => void) | null = null;
 let _mediaBaseUri = '';
@@ -130,14 +131,21 @@ export function createEditor(
       attributes: { spellcheck: 'true' },
     },
     content: body,
-    onUpdate({ editor }) {
-      if (_debounceTimer) clearTimeout(_debounceTimer);
-      _debounceTimer = setTimeout(() => {
-        const markdown = editor.storage.markdown.getMarkdown() as string;
-        onChange(_frontmatter + markdown);
-      }, 500);
+    onUpdate() {
+      _editDebounce?.schedule();
+    },
+    onBlur() {
+      // Losing focus is a natural save point — flush so the last keystrokes
+      // reach the host immediately instead of waiting on the debounce.
+      _editDebounce?.flush();
     },
   });
+
+  _editDebounce = createFlushableDebounce(() => {
+    if (!_editor) return;
+    const markdown = _editor.storage.markdown.getMarkdown() as string;
+    onChange(_frontmatter + markdown);
+  }, 500);
 
   createBubbleMenu(_editor);
   createBlockHandle(_editor);
@@ -185,8 +193,15 @@ export function getCurrentMarkdown(): string {
   return _frontmatter + markdown;
 }
 
+export function flushPendingEdit(): void {
+  _editDebounce?.flush();
+}
+
 export function destroyEditor(): void {
-  if (_debounceTimer) clearTimeout(_debounceTimer);
+  // Flush — NOT clear — so edits made in the last 500ms before close are sent
+  // to the host instead of being silently discarded.
+  _editDebounce?.flush();
+  _editDebounce = null;
   _editor?.destroy();
   _editor = null;
 }
