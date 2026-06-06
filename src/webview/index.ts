@@ -6,6 +6,7 @@ import { createEditor, updateContent, createSourceEditor, updateSourceContent, g
 import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { setAlwaysDarkDiagram } from './mermaidRenderer';
+import { setSmartTypographyEnabled } from './extensions/smartTypography';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
@@ -74,6 +75,7 @@ interface SavedDefaults {
   alwaysDarkSource?: boolean;
   sourceFullWidth?: boolean;
   shortenCodeSnippets?: boolean;
+  smartTypography?: boolean;
   outlineVisible?: boolean;
   readOnly?: boolean;
   sourceWordWrap?: boolean;
@@ -105,11 +107,12 @@ const FACTORY_DEFAULTS = {
   alwaysDarkSource:    false,
   sourceFullWidth:     false,
   shortenCodeSnippets: false,
+  smartTypography:     true,
 };
 
 const DEFAULT_KEYS = [
   'theme', 'font', 'textSize', 'pageWidth', 'fullWidth',
-  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets',
+  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets', 'smartTypography',
 ] as const;
 
 function injectStyles(): void {
@@ -175,6 +178,7 @@ function init(): void {
   const alwaysDarkSourceToggle = document.getElementById('always-dark-source-toggle') as HTMLElement;
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
+  const smartTypographyToggle = document.getElementById('smart-typography-toggle') as HTMLElement;
   const readOnlyActionBtn     = document.getElementById('act-toggle-readonly')     as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
@@ -218,6 +222,13 @@ function init(): void {
     refreshDefaultsButtons();
   }
 
+  function setSmartTypography(on: boolean): void {
+    setSmartTypographyEnabled(on);
+    smartTypographyToggle.classList.toggle('on', on);
+    smartTypographyToggle.setAttribute('aria-checked', String(on));
+    refreshDefaultsButtons();
+  }
+
   alwaysDarkCodeToggle.addEventListener('click', () => {
     setAlwaysDarkCode(!alwaysDarkCodeToggle.classList.contains('on'));
   });
@@ -232,6 +243,9 @@ function init(): void {
   });
   shortenSnippetsToggle.addEventListener('click', () => {
     setShortenSnippets(!shortenSnippetsToggle.classList.contains('on'));
+  });
+  smartTypographyToggle.addEventListener('click', () => {
+    setSmartTypography(!smartTypographyToggle.classList.contains('on'));
   });
 
   readOnlyActionBtn?.addEventListener('click', () => {
@@ -823,6 +837,7 @@ function init(): void {
     setAlwaysDarkSource(Boolean(d.alwaysDarkSource));
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
+    setSmartTypography(d.smartTypography ?? true); // default ON (unlike the Boolean()-defaulted toggles above)
     applyReadOnly(Boolean(d.readOnly));
     applySourceWordWrap(Boolean(d.sourceWordWrap));
   }
@@ -881,6 +896,7 @@ function init(): void {
       alwaysDarkSource:    alwaysDarkSourceToggle.classList.contains('on'),
       sourceFullWidth:     sourceFullWidthToggle.classList.contains('on'),
       shortenCodeSnippets: shortenSnippetsToggle.classList.contains('on'),
+      smartTypography:     smartTypographyToggle.classList.contains('on'),
     };
   }
 
