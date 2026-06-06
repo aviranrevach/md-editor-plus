@@ -20,7 +20,7 @@ function ensureListener(): void {
   window.addEventListener('message', (event: MessageEvent) => {
     const msg = event.data as {
       type?: string; requestId?: string;
-      relPath?: string; src?: string; canceled?: boolean; error?: string;
+      relPath?: string; src?: string; canceled?: boolean; error?: string; ok?: boolean;
     };
     if (!msg || typeof msg.requestId !== 'string') return;
     const p = pending.get(msg.requestId);
@@ -38,6 +38,10 @@ function ensureListener(): void {
       pending.delete(msg.requestId);
       if (msg.error) p.reject(new Error(msg.error));
       else p.resolve(msg.src ?? '');
+    } else if (msg.type === 'imageRevealed') {
+      pending.delete(msg.requestId);
+      if (msg.error) p.reject(new Error(msg.error));
+      else p.resolve('');
     }
   });
 }
@@ -91,4 +95,17 @@ export function pickProjectImage(): Promise<string | null> {
 // src — a web/data URL as-is, or a project file path turned into a relative link.
 export function embedImageFromClipboard(): Promise<string> {
   return request({ type: 'embedImageFromClipboard' }).then((v) => v ?? '');
+}
+
+// Ask the extension to reveal the asset (relative path) in the OS file manager.
+export function revealImage(relPath: string): Promise<void> {
+  return request({ type: 'revealImage', relPath }).then(() => undefined);
+}
+
+// Read the bytes of an already-resolved (webview-accessible) image URI. Used to
+// feed the current image into compressImage. Throws on a non-OK fetch.
+export async function fetchImageBytes(resolvedSrc: string): Promise<ArrayBuffer> {
+  const res = await fetch(resolvedSrc);
+  if (!res.ok) throw new Error(`couldn't read image (${res.status})`);
+  return res.arrayBuffer();
 }
