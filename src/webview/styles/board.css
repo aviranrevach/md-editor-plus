@@ -1703,3 +1703,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   background: var(--block-hover); color: var(--text-secondary); vertical-align: middle;
 }
 .bd-tags-create { color:#2b6cff; }
+
+/* Inline image thumbnails in text / Description cells */
+.bd-inline-thumb {
+  height: 20px; max-width: 40px; object-fit: cover;
+  border-radius: 3px; vertical-align: text-bottom; margin: 0 2px;
+  border: 1px solid var(--border);
+}

@@ -25,6 +25,27 @@ import { openBoardImagePicker } from './boardImagePicker';
 
 interface Group { key: string; cards: Card[]; }
 
+// Render a string into `host`, turning ![alt](src) links into small inline
+// thumbnails and leaving the rest as text. Returns true if any image rendered.
+function renderInlineWithImages(host: HTMLElement, value: string): boolean {
+  const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let last = 0;
+  let found = false;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > last) host.appendChild(document.createTextNode(value.slice(last, m.index)));
+    const img = document.createElement('img');
+    img.className = 'bd-inline-thumb';
+    img.src = resolveImageSrc(m[2].trim());
+    img.alt = m[1];
+    host.appendChild(img);
+    found = true;
+    last = m.index + m[0].length;
+  }
+  if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
+  return found;
+}
+
 // "Description" is a synthetic field that surfaces card.body as a table column.
 // It's not stored in board.fields — it's a virtual entry the table view + the
 // Properties popover treat as always-available.
@@ -957,7 +978,11 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
     const body = (card.body || '').trim();
     const preview = body.replace(/[\r\n]+/g, ' • ').slice(0, 200);
     if (preview) {
-      td.textContent = preview;
+      if (preview.includes('![')) {
+        renderInlineWithImages(td, preview);
+      } else {
+        td.textContent = preview;
+      }
     } else {
       const placeholder = document.createElement('span');
       placeholder.className = 'bd-cell-empty';
@@ -989,7 +1014,11 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
   switch (field.type) {
     case 'text':
     case 'person':
-      td.textContent = value;
+      if (value.includes('![')) {
+        renderInlineWithImages(td, value);
+      } else {
+        td.textContent = value;
+      }
       if (!ctx.readonly) {
         td.addEventListener('click', () => beginInlineText(td, card, field, ctx));
       }
