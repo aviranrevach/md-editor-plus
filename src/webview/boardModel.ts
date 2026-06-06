@@ -597,9 +597,15 @@ export function mintCardId(existingIds: Iterable<string>): string {
 
 export function serializeBoard(board: Board): string {
   // De-duplicate card ids: first occurrence wins; later occurrences get -N suffix.
+  // Empty ids are minted in the canonical C<n> scheme, continuing from the highest.
+  let maxN = 0;
+  for (const c of board.cards) {
+    const n = idNumber(c.id);
+    if (n !== null && n > maxN) maxN = n;
+  }
   const seen = new Set<string>();
   const normalizedCards = board.cards.map((c) => {
-    let id = c.id || `c-${Math.random().toString(36).slice(2, 6)}`;
+    let id = c.id || `C${++maxN}`;
     if (!seen.has(id)) {
       seen.add(id);
       return { ...c, id, values: { ...c.values, id } };

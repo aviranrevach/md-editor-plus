@@ -172,3 +172,26 @@ describe('serializeBoard — views', () => {
     expect(b2.views[0].extras).toEqual({ mystery: 'future' });
   });
 });
+
+describe('empty-id serialize fallback (c17)', () => {
+  it('mints an uppercase C<n> id for a card with no id', () => {
+    const board: Board = {
+      id: 'b1', name: 'B',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title', type: 'text', visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'id', type: 'text', visibleOnCard: false },
+      ],
+      cards: [
+        { id: 'C4', values: { id: 'C4', Title: 'Has id', Status: 'Todo' }, body: '' },
+        { id: '',   values: { id: '',   Title: 'No id',  Status: 'Todo' }, body: '' },
+      ],
+      orphanBodies: [], views: [], activeView: 'table',
+    };
+    const out = serializeBoard(board);
+    // continues from the highest number (4) -> C5
+    expect(out).toContain('| No id | Todo | C5 |');
+    expect(out).not.toMatch(/c-[a-z0-9]{4}/);
+  });
+});
