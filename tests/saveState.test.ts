@@ -21,10 +21,20 @@ describe('nextSaveState', () => {
   });
 
   it('conflictDetected always wins from any state', () => {
-    const states: SaveState[] = ['saved', 'unsaved', 'saving'];
+    const states: SaveState[] = ['saved', 'unsaved', 'saving', 'conflict'];
     for (const s of states) {
       expect(nextSaveState(s, 'conflictDetected')).toBe('conflict');
     }
+  });
+
+  it('conflictResolved is a no-op from non-conflict states', () => {
+    expect(nextSaveState('saved', 'conflictResolved')).toBe('saved');
+    expect(nextSaveState('unsaved', 'conflictResolved')).toBe('unsaved');
+    expect(nextSaveState('saving', 'conflictResolved')).toBe('saving');
+  });
+
+  it('conflictDetected is idempotent while already in conflict', () => {
+    expect(nextSaveState('conflict', 'conflictDetected')).toBe('conflict');
   });
 });
 
