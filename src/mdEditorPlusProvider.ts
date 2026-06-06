@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
-import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath } from './imageAssets';
+import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -585,32 +585,58 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         }
         return;
       }
-      if (msg.type === 'listWorkspaceImages') {
+      if (msg.type === 'pickProjectImage') {
         const m = msg as unknown as { requestId?: unknown };
         const requestId = typeof m.requestId === 'string' ? m.requestId : '';
         const reply = (extra: Record<string, unknown>) =>
-          void webviewPanel.webview.postMessage({ type: 'workspaceImages', requestId, ...extra });
-        if (!requestId) { reply({ error: 'bad listWorkspaceImages request' }); return; }
-        if (!document.uri.scheme.startsWith('file')) { reply({ images: [] }); return; }
+          void webviewPanel.webview.postMessage({ type: 'projectImagePicked', requestId, ...extra });
+        if (!requestId) { reply({ error: 'bad pickProjectImage request' }); return; }
         try {
-          const files = await vscode.workspace.findFiles(
-            '**/*.{png,jpg,jpeg,gif,webp,svg,bmp,avif,ico,PNG,JPG,JPEG,GIF,WEBP,SVG,BMP,AVIF,ICO}',
-            '{**/node_modules/**,**/.git/**,**/dist/**}',
-            300,
-          );
-          const docDir = path.dirname(document.uri.fsPath);
-          const images = files
-            .sort((a, b) => a.fsPath.localeCompare(b.fsPath))
-            .map((uri) => {
-              let rel = path.relative(docDir, uri.fsPath).split(path.sep).join('/');
-              if (!rel.startsWith('.')) rel = `./${rel}`;
-              return {
-                relPath: rel,
-                label: path.basename(uri.fsPath),
-                webviewUri: webviewPanel.webview.asWebviewUri(uri).toString(),
-              };
-            });
-          reply({ images });
+          const ws = vscode.workspace.getWorkspaceFolder(document.uri);
+          const docDir = vscode.Uri.joinPath(document.uri, '..');
+          const picked = await vscode.window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            defaultUri: ws?.uri ?? docDir,
+            filters: { Images: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'ico'] },
+            title: 'Pick an image from your project',
+            openLabel: 'Insert image',
+          });
+          if (!picked || !picked[0]) { reply({ canceled: true }); return; }
+          const docFolder = path.dirname(document.uri.fsPath);
+          let rel = path.relative(docFolder, picked[0].fsPath).split(path.sep).join('/');
+          if (!rel.startsWith('.')) rel = `./${rel}`;
+          reply({ relPath: rel });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+        return;
+      }
+      if (msg.type === 'embedImageFromClipboard') {
+        const m = msg as unknown as { requestId?: unknown };
+        const requestId = typeof m.requestId === 'string' ? m.requestId : '';
+        const reply = (extra: Record<string, unknown>) =>
+          void webviewPanel.webview.postMessage({ type: 'clipboardImageResolved', requestId, ...extra });
+        if (!requestId) { reply({ error: 'bad embedImageFromClipboard request' }); return; }
+        try {
+          const raw = (await vscode.env.clipboard.readText()).trim();
+          if (!raw) { reply({ error: 'Clipboard is empty.' }); return; }
+          // A web or data URL is used directly as the image source.
+          if (/^(https?:|data:image\/)/i.test(raw)) { reply({ src: raw }); return; }
+          // Otherwise treat the clipboard text as a path to a file in the project.
+          const docFolder = path.dirname(document.uri.fsPath);
+          const ws = vscode.workspace.getWorkspaceFolder(document.uri);
+          const candidates = resolveClipboardCandidates(raw, docFolder, ws?.uri.fsPath);
+          let found: string | null = null;
+          for (const c of candidates) {
+            try { await vscode.workspace.fs.stat(vscode.Uri.file(c)); found = c; break; } catch { /* next */ }
+          }
+          if (!found) { reply({ error: `No image found for “${raw}”.` }); return; }
+          if (!isImageFileName(found)) { reply({ error: 'That file is not an image.' }); return; }
+          let rel = path.relative(docFolder, found).split(path.sep).join('/');
+          if (!rel.startsWith('.')) rel = `./${rel}`;
+          reply({ src: rel });
         } catch (err) {
           reply({ error: (err as Error).message });
         }

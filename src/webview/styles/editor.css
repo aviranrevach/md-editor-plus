@@ -2015,6 +2015,23 @@ html.source-full-width #source-view {
 
 .block-picker-input::placeholder { color: var(--text-secondary); }
 
+/* In-window text field for drill-down items that need typed input (Embed link). */
+.block-picker-inline-field {
+  width: calc(100% - 16px);
+  box-sizing: border-box;
+  margin: 4px 8px 8px;
+  padding: 8px 10px;
+  background: var(--block-hover);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+.block-picker-inline-field:focus { border-color: var(--link); }
+.block-picker-inline-field::placeholder { color: var(--text-secondary); }
+
 .block-picker-section-label {
   font-size: 10px;
   font-weight: 700;

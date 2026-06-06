@@ -1,5 +1,5 @@
 import { Editor } from '@tiptap/core';
-import { openImagePicker } from './imagePicker';
+import { saveImageBytes, pickProjectImage, embedImageFromClipboard } from './imageUpload';
 
 export interface BlockDef {
   id: string;
@@ -12,10 +12,64 @@ export interface BlockDef {
   // Items with subItems must omit insert; items with insert must omit subItems.
   insert?: (editor: Editor, pos: number) => void;
   subItems?: BlockDef[];
+  // Instead of inserting on click, swap the picker list for a single text input
+  // (e.g. "Embed link" → type a URL). Stays inside the drilled-down window.
+  inlineInput?: {
+    placeholder: string;
+    submit: (editor: Editor, pos: number, value: string) => void;
+  };
   // For "convert this block" mode: matches the current top-level node,
   // and replaces it with a new node of this type preserving inline content.
   isActive?: (typeName: string, attrs: Record<string, unknown>) => boolean;
   convert?: (editor: Editor, blockPos: number) => void;
+}
+
+// Insert an image node at `pos`. Shared by every image sub-action.
+function insertImageAt(editor: Editor, pos: number, src: string): void {
+  if (!src) return;
+  editor.chain().focus().insertContentAt(pos, { type: 'image', attrs: { src, alt: '' } }).run();
+}
+
+// Upload from computer: open a hidden file input, save the bytes into the
+// per-note assets folder, then insert the returned relative link.
+function uploadImageFromComputer(editor: Editor, pos: number): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    try {
+      const src = await saveImageBytes(file.name, await file.arrayBuffer());
+      insertImageAt(editor, pos, src);
+    } catch (err) {
+      console.error('[md-editor-plus] image upload failed', err);
+    }
+  });
+  input.click();
+}
+
+// Browse project: native VS Code file picker (shows real folders).
+async function browseProjectImage(editor: Editor, pos: number): Promise<void> {
+  try {
+    const src = await pickProjectImage();
+    if (src) insertImageAt(editor, pos, src);
+  } catch (err) {
+    console.error('[md-editor-plus] browse project image failed', err);
+  }
+}
+
+// Embed the image link sitting on the clipboard (web/data URL or project path).
+async function embedClipboardImage(editor: Editor, pos: number): Promise<void> {
+  try {
+    const src = await embedImageFromClipboard();
+    if (src) insertImageAt(editor, pos, src);
+  } catch (err) {
+    console.error('[md-editor-plus] embed from clipboard failed', err);
+  }
 }
 
 // Replace the block at `blockPos` with a new node of `schemaNodeName`,
@@ -85,6 +139,10 @@ const ICO = {
   board: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM104,200H40V56h64Zm32-144v144H120V56Zm80,0V200H152V56Z"/></svg>`,
   whiteboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M240,192h-8V56a16,16,0,0,0-16-16H40A16,16,0,0,0,24,56V192H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM40,56H216V192H200V168a8,8,0,0,0-8-8H120a8,8,0,0,0-8,8v24H72V88H184v48a8,8,0,0,0,16,0V80a8,8,0,0,0-8-8H64a8,8,0,0,0-8,8V192H40ZM184,192H128V176h56Z"/></svg>`,
   trash: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16ZM96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm16 152a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Zm48 0a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Z"/></svg>`,
+  upload: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M74.34,85.66a8,8,0,0,1,0-11.32l48-48a8,8,0,0,1,11.32,0l48,48a8,8,0,0,1-11.32,11.32L136,51.31V152a8,8,0,0,1-16,0V51.31L85.66,85.66A8,8,0,0,1,74.34,85.66ZM216,144a8,8,0,0,0-8,8v48H48V152a8,8,0,0,0-16,0v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A8,8,0,0,0,216,144Z"/></svg>`,
+  folder: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V56H92.69l27.31,27.31A15.86,15.86,0,0,0,131.31,88H216Z"/></svg>`,
+  link: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M137.54,186.36a8,8,0,0,1,0,11.31l-9.94,10A56,56,0,0,1,48.38,128.4L72.5,104.28A56,56,0,0,1,149.31,102a8,8,0,1,1-10.64,12,40,40,0,0,0-54.85,1.63L59.7,139.72a40,40,0,0,0,56.58,56.58l9.94-9.94A8,8,0,0,1,137.54,186.36Zm70.08-138a56.08,56.08,0,0,0-79.22,0l-9.94,9.95a8,8,0,0,0,11.32,11.31l9.94-9.94a40,40,0,0,1,56.58,56.58L172.18,150.4A40,40,0,0,1,117.33,152,8,8,0,1,0,106.69,164a56,56,0,0,0,76.81-2.26l24.12-24.12A56.08,56.08,0,0,0,207.62,48.38Z"/></svg>`,
+  clipboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H163.74a47.92,47.92,0,0,0-71.48,0H56A16,16,0,0,0,40,48V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm-72,0a32,32,0,0,1,32,32H96A32,32,0,0,1,128,32Zm72,184H56V48H82.75A47.93,47.93,0,0,0,80,64v8a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V64a47.93,47.93,0,0,0-2.75-16H200Z"/></svg>`,
 };
 
 export const BLOCK_DEFS: BlockDef[] = [
@@ -183,12 +241,25 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Upload, pick from project, or paste a link',
     iconHtml: ICO.image,
     section: 'media',
+    aliases: ['img', 'picture', 'photo'],
     isActive: (t) => t === 'image',
-    insert: (editor, pos) => {
-      openImagePicker(editor, pos, (src) => {
-        editor.chain().focus().insertContentAt(pos, { type: 'image', attrs: { src, alt: '' } }).run();
-      });
-    },
+    subItems: [
+      { id: 'image-upload', label: 'Upload from computer', description: 'Pick a file from your computer',
+        iconHtml: ICO.upload, section: 'media',
+        insert: (editor, pos) => uploadImageFromComputer(editor, pos) },
+      { id: 'image-browse', label: 'Browse project', description: 'Pick an image already in your workspace',
+        iconHtml: ICO.folder, section: 'media',
+        insert: (editor, pos) => void browseProjectImage(editor, pos) },
+      { id: 'image-link', label: 'Embed link', description: 'Paste an image URL or a project path',
+        iconHtml: ICO.link, section: 'media',
+        inlineInput: {
+          placeholder: 'Paste image URL or project path, press Enter',
+          submit: (editor, pos, value) => insertImageAt(editor, pos, value.trim()),
+        } },
+      { id: 'image-clipboard', label: 'Embed from clipboard', description: 'Use the image link on your clipboard',
+        iconHtml: ICO.clipboard, section: 'media',
+        insert: (editor, pos) => void embedClipboardImage(editor, pos) },
+    ],
   },
   {
     id: 'callout',
@@ -500,6 +571,56 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     });
   }
 
+  function backToList(): void {
+    if (drillParent) {
+      input.placeholder = `Filter ${drillParent.label.toLowerCase()}…`;
+      filtered = drillParent.subItems ?? [];
+    } else {
+      input.placeholder = 'Filter blocks…';
+      filtered = BLOCK_DEFS;
+    }
+    input.value = '';
+    renderList(filtered);
+    input.focus();
+  }
+
+  // Swap the list for a single text field (e.g. Embed link → type a URL),
+  // staying inside the drilled-down window. Enter submits, Escape goes back.
+  function showInlineInput(block: BlockDef, pos: number): void {
+    if (!block.inlineInput) return;
+    const cfg = block.inlineInput;
+    list.innerHTML = '';
+
+    const back = document.createElement('div');
+    back.className = 'block-picker-back';
+    back.innerHTML = `<span class="block-picker-back-icon">‹</span><span class="block-picker-back-label">${block.label}</span>`;
+    back.addEventListener('mousedown', (e) => { e.preventDefault(); backToList(); });
+    list.appendChild(back);
+
+    const field = document.createElement('input');
+    field.type = 'text';
+    field.className = 'block-picker-inline-field';
+    field.placeholder = cfg.placeholder;
+    field.autocomplete = 'off';
+    field.spellcheck = false;
+    field.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const value = field.value.trim();
+        if (!value) return;
+        cfg.submit(editor, pos, value);
+        close();
+        setTimeout(() => { editor.commands.focus(); editor.commands.scrollIntoView(); }, 30);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        backToList();
+      }
+    });
+    list.appendChild(field);
+    setTimeout(() => field.focus(), 0);
+  }
+
   function select(block: BlockDef): void {
     if (block.subItems?.length) {
       drillParent = block;
@@ -508,6 +629,11 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       filtered = block.subItems;
       renderList(filtered);
       input.focus();
+      return;
+    }
+    if (block.inlineInput) {
+      const pos = context.activeBlock ? context.activeBlock.blockEnd : currentPos;
+      showInlineInput(block, pos);
       return;
     }
     // Convert mode: use the item's convert function if available. Falls back
