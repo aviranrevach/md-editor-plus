@@ -53,7 +53,7 @@ describe('board markdown pipeline (preprocess → markdown-it → DOM)', () => {
     const board = parseBoardSource(sourceFromDom!);
     expect(board.cards).toHaveLength(3);
     expect(board.cards.map((c) => c.values.Status)).toEqual(['Todo', 'Doing', 'Done']);
-    expect(board.cards.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
+    expect(board.cards.map((c) => c.id)).toEqual(['C1', 'C2', 'C3']);
   });
 
   it('preserves cards in a many-row board with multi-word column names', () => {
