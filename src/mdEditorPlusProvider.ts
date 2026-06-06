@@ -122,6 +122,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           alwaysDarkSource:    cfg.get<boolean>('alwaysDarkSource', false),
           sourceFullWidth:     cfg.get<boolean>('sourceFullWidth', false),
           shortenCodeSnippets: cfg.get<boolean>('shortenCodeSnippets', false),
+          smartTypography:     cfg.get<boolean>('smartTypography', true),
           outlineVisible:      cfg.get<boolean>('outlineVisible', false),
           readOnly:            cfg.get<boolean>('readOnly', false),
           sourceWordWrap:      cfg.get<boolean>('sourceWordWrap', false),
@@ -160,6 +161,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         alwaysDarkSource?: boolean;
         sourceFullWidth?: boolean;
         shortenCodeSnippets?: boolean;
+        smartTypography?: boolean;
       };
     }) => {
       // Webview signals it has registered its message listener. Only now is it
@@ -188,12 +190,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           cfg.update('alwaysDarkSource',    d.alwaysDarkSource,    target),
           cfg.update('sourceFullWidth',     d.sourceFullWidth,     target),
           cfg.update('shortenCodeSnippets', d.shortenCodeSnippets, target),
+          cfg.update('smartTypography',     d.smartTypography,     target),
         ]);
         await vscode.window.showInformationMessage('MD Editor Plus: current view saved as default');
       }
       if (msg.type === 'resetDefaults') {
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
-        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkDiagram','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets'];
+        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkDiagram','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets','smartTypography'];
         for (const k of keys) {
           // Clear at all scopes so the package.json defaults take over.
           await cfg.update(k, undefined, vscode.ConfigurationTarget.Global).then(() => {}, () => {});
@@ -664,6 +667,15 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         <span class="settings-row-icon">${iCode}</span>
         <span class="settings-row-label">Shorten Code Snippets</span>
         <button class="toggle-switch" id="shorten-snippets-toggle" role="switch" aria-checked="false"></button>
+      </div>
+    </div>
+    <div class="settings-divider"></div>
+    <div class="settings-section">
+      <div class="settings-label">Editing</div>
+      <div class="settings-row" data-tip="Replace typed sequences like -&gt; with → and -- with — as you type (never inside code)">
+        <span class="settings-row-icon">${iArrowsH}</span>
+        <span class="settings-row-label">Smart typography</span>
+        <button class="toggle-switch" id="smart-typography-toggle" role="switch" aria-checked="true"></button>
       </div>
     </div>
     <div class="settings-divider"></div>

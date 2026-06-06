@@ -178,6 +178,11 @@
           "type": "boolean",
           "default": false,
           "description": "Wrap long lines in the Code (source) view instead of horizontal scrolling"
+        },
+        "mdEditorPlus.smartTypography": {
+          "type": "boolean",
+          "default": true,
+          "description": "Smart typography: replace typed sequences like -> with arrows (→), -- with em dash (—), ... with ellipsis (…) as you type. Suppressed inside code."
         }
       }
     }
