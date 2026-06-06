@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
+import { ApplyingTracker } from './applyingTracker';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -65,7 +66,10 @@ function renderHtmlToPdf(chromePath: string, htmlPath: string, pdfPath: string):
 
 export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   private static readonly viewType = 'md-editor-plus.editor';
-  private _isApplyingEdit = false;
+  // Per-document echo suppression. Must NOT be a single shared flag: with
+  // multiple editors open, one document's applyEdit completing would otherwise
+  // clear suppression for another still mid-apply, leaking an echo update.
+  private readonly _applying = new ApplyingTracker();
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
 
@@ -180,7 +184,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
 
     const onDocChange = vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.uri.toString() !== document.uri.toString()) return;
-      if (this._isApplyingEdit) return;
+      if (this._applying.isApplying(document.uri.toString())) return;
       const text = document.getText();
       // Diagnostic for the empty-on-open data-loss bug: capture WHEN an empty
       // 'update' is about to be pushed to the webview, and what change caused it.
@@ -595,9 +599,15 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       new vscode.Range(0, 0, document.lineCount, 0),
       markdown
     );
-    this._isApplyingEdit = true;
-    await vscode.workspace.applyEdit(edit);
-    this._isApplyingEdit = false;
+    const key = document.uri.toString();
+    // try/finally so a failed applyEdit can't leave the document stuck in the
+    // "applying" state, which would silently swallow all future echo checks.
+    this._applying.begin(key);
+    try {
+      await vscode.workspace.applyEdit(edit);
+    } finally {
+      this._applying.end(key);
+    }
   }
 
   private _getHtml(webview: vscode.Webview, document: vscode.TextDocument): string {
