@@ -148,7 +148,7 @@ describe('buildPrompt — ask (custom prompt)', () => {
 describe('prompt grammar stays in sync with blockFormatReference', () => {
   it('kanban prompt embeds the reference board example', () => {
     const p = buildPrompt({ ...base, target: 'kanban' });
-    expect(p).toContain('| Write the spec | Doing | @maya | 2026-06-10 | c1 |');
+    expect(p).toContain('| Write the spec | Doing | @maya | 2026-06-10 | C1 |');
   });
   it('mermaid prompt embeds the reference mermaid example', () => {
     const p = buildPrompt({ ...base, target: 'mermaid' });
