@@ -49,6 +49,26 @@ function renderInlineWithImages(host: HTMLElement, value: string): boolean {
   return found;
 }
 
+// Fill an editable cell with `value`, wrapping each ![](…) link in a colored
+// token so image references stay visually distinct WHILE editing (not just right
+// after a paste). The spans' textContent is the raw markdown, so reading
+// host.textContent on commit reconstitutes the exact value.
+function fillCellForEditing(host: HTMLElement, value: string): void {
+  host.textContent = '';
+  const re = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > last) host.appendChild(document.createTextNode(value.slice(last, m.index)));
+    const token = document.createElement('span');
+    token.className = 'bd-cell-img-token';
+    token.textContent = m[0];
+    host.appendChild(token);
+    last = m.index + m[0].length;
+  }
+  if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
+}
+
 // Show a board <img> for `rawSrc`, resolved for the webview. On load failure,
 // swap in a visible "broken image" marker (so it's not invisible white space)
 // and log the raw + resolved src for diagnosis.
@@ -1254,11 +1274,11 @@ function beginInlineText(
   td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx,
 ): void {
   if (td.getAttribute('contenteditable') === 'true') return;
-  // Replace any rendered DOM (which may contain <img> thumbnails) with the raw
-  // markdown string so the user edits plain text and commit() reads it back
-  // losslessly — without this, textContent on a mixed text+<img> DOM drops the
-  // image links entirely.
-  td.textContent = card.values[field.name] ?? '';
+  // Replace any rendered DOM (which may contain <img> thumbnails) with editable
+  // text: plain text plus colored tokens for each ![](…) link, so image refs
+  // stay visible while editing. commit() reads td.textContent, and the tokens'
+  // textContent is the raw markdown, so the value round-trips losslessly.
+  fillCellForEditing(td, card.values[field.name] ?? '');
   td.setAttribute('contenteditable', 'true');
   td.classList.add('bd-cell-editing');
   const detachTypography = attachSmartTypography(td);
