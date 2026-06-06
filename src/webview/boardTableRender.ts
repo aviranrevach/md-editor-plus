@@ -19,6 +19,9 @@ import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInVie
 import { startDrag, dropIndicator } from './boardDragShared';
 import { openStatusOptionsEditor } from './boardStatusOptions';
 import { openTagsPicker } from './boardTagsPicker';
+import { resolveImageSrc } from './mediaResolve';
+import { parseImageLinks, appendImageLink } from './boardImageLinks';
+import { openBoardImagePicker } from './boardImagePicker';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -1053,6 +1056,46 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
         td.addEventListener('click', (e) => {
           e.stopPropagation();
           openTagsPicker(td, ctx.getBoard, field.name, card.id, ctx.mutate);
+        });
+      }
+      return;
+    }
+    case 'image': {
+      const links = parseImageLinks(value);
+      td.classList.add('bd-image-cell');
+      if (!links.length) {
+        const empty = document.createElement('span');
+        empty.className = 'bd-cell-empty';
+        empty.textContent = ctx.readonly ? '' : '🖼';
+        td.appendChild(empty);
+      } else {
+        const thumb = document.createElement('img');
+        thumb.className = 'bd-image-thumb';
+        thumb.src = resolveImageSrc(links[0].src);
+        thumb.alt = links[0].alt;
+        td.appendChild(thumb);
+        if (links.length > 1) {
+          const badge = document.createElement('span');
+          badge.className = 'bd-image-badge';
+          badge.textContent = `+${links.length - 1}`;
+          td.appendChild(badge);
+        }
+      }
+      if (!ctx.readonly) {
+        td.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openBoardImagePicker(td, (src) => {
+            const next = appendImageLink(value, src);
+            const cur = ctx.getBoard();
+            ctx.mutate({
+              ...cur,
+              cards: cur.cards.map(c =>
+                c.id === card.id
+                  ? { ...c, values: { ...c.values, [field.name]: next } }
+                  : c,
+              ),
+            });
+          });
         });
       }
       return;

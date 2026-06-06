@@ -1690,4 +1690,16 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-tags-opt, .bd-tags-create { display:flex; align-items:center; gap:8px; width:100%; border:0; background:transparent; padding:6px 8px; border-radius:7px; cursor:pointer; text-align:left; font:inherit; color:inherit; }
 .bd-tags-opt:hover, .bd-tags-create:hover { background:var(--board-hover,#f5f7fa); }
 .bd-tags-check { margin-left:auto; color:#2b6cff; }
+
+/* Image field cell */
+.bd-image-cell { cursor: pointer; }
+.bd-image-thumb {
+  height: 28px; max-width: 64px; object-fit: cover;
+  border-radius: 4px; vertical-align: middle; border: 1px solid var(--border);
+}
+.bd-image-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  font-size: 11px; border-radius: 10px;
+  background: var(--block-hover); color: var(--text-secondary); vertical-align: middle;
+}
 .bd-tags-create { color:#2b6cff; }
