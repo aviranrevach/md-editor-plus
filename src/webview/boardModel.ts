@@ -568,6 +568,32 @@ function serializeBodies(board: Board): string {
   return parts.join('\n');
 }
 
+/** Extract the trailing integer from a canonical `C<n>` or legacy `c<n>` id; null otherwise. */
+export function idNumber(id: string): number | null {
+  const m = /^[cC](\d+)$/.exec(id);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+/** Normalize a legacy lowercase `c<n>` id to the canonical uppercase `C<n>`. Idempotent. */
+export function normalizeLegacyId(id: string): string {
+  const m = /^c(\d+)$/.exec(id);
+  return m ? `C${m[1]}` : id;
+}
+
+/** Next free id in the canonical `C<n>` scheme, continuing from the highest existing number. */
+export function mintCardId(existingIds: Iterable<string>): string {
+  const used = new Set<string>();
+  let max = 0;
+  for (const id of existingIds) {
+    used.add(id);
+    const n = idNumber(id);
+    if (n !== null && n > max) max = n;
+  }
+  let n = max + 1;
+  while (used.has(`C${n}`)) n++;
+  return `C${n}`;
+}
+
 export function serializeBoard(board: Board): string {
   // De-duplicate card ids: first occurrence wins; later occurrences get -N suffix.
   const seen = new Set<string>();
