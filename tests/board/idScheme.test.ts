@@ -24,6 +24,10 @@ describe('normalizeLegacyId', () => {
     expect(normalizeLegacyId('c-ab12')).toBe('c-ab12');
     expect(normalizeLegacyId('')).toBe('');
   });
+  it('strips leading zeros to the canonical unpadded form', () => {
+    expect(normalizeLegacyId('c007')).toBe('C7');
+    expect(normalizeLegacyId('c0')).toBe('C0');
+  });
 });
 
 describe('mintCardId', () => {

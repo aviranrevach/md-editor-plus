@@ -578,7 +578,7 @@ export function idNumber(id: string): number | null {
 /** Normalize a legacy lowercase `c<n>` id to the canonical uppercase `C<n>`. Idempotent. */
 export function normalizeLegacyId(id: string): string {
   const m = /^c(\d+)$/.exec(id);
-  return m ? `C${m[1]}` : id;
+  return m ? `C${parseInt(m[1], 10)}` : id;
 }
 
 /** Next free id in the canonical `C<n>` scheme, continuing from the highest existing number. */
