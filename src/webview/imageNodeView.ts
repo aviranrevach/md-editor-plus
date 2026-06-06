@@ -59,7 +59,7 @@ function injectStyles(): void {
 interface NodeViewCtx {
   node: any;
   editor: Editor;
-  getPos: () => number;
+  getPos: () => number | undefined;
 }
 
 export function imageNodeViewFactory() {
@@ -71,10 +71,11 @@ class ImageNodeView {
   private img: HTMLImageElement;
   private node: any;
   private editor: Editor;
-  private getPos: () => number;
+  private getPos: () => number | undefined;
   private selected = false;
   private toolbar: HTMLElement | null = null;
   private submenu: HTMLElement | null = null;
+  private submenuOutsideListener: ((e: MouseEvent) => void) | null = null;
 
   constructor(ctx: NodeViewCtx) {
     injectStyles();
@@ -100,6 +101,7 @@ class ImageNodeView {
 
   private setWidth(width: number | null): void {
     const pos = this.getPos();
+    if (pos == null) return;
     this.editor.commands.command(({ tr }) => {
       tr.setNodeMarkup(pos, undefined, { ...this.node.attrs, width });
       return true;
@@ -108,6 +110,7 @@ class ImageNodeView {
 
   private setSrc(src: string, width: number | null): void {
     const pos = this.getPos();
+    if (pos == null) return;
     this.editor.commands.command(({ tr }) => {
       tr.setNodeMarkup(pos, undefined, { ...this.node.attrs, src, width });
       return true;
@@ -116,6 +119,7 @@ class ImageNodeView {
 
   private remove(): void {
     const pos = this.getPos();
+    if (pos == null) return;
     this.editor.commands.command(({ tr }) => {
       tr.delete(pos, pos + this.node.nodeSize);
       return true;
@@ -142,16 +146,16 @@ class ImageNodeView {
     const startW = this.img.getBoundingClientRect().width;
     const grows = corner === 'ne' || corner === 'se'; // dragging right edge grows
     const max = this.maxWidth();
+    let lastWidth = clampWidth(startW, IMAGE_MIN_WIDTH, max);
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX;
-      const next = clampWidth(startW + (grows ? dx : -dx), IMAGE_MIN_WIDTH, max);
-      this.img.style.width = `${next}px`;
+      lastWidth = clampWidth(startW + (grows ? dx : -dx), IMAGE_MIN_WIDTH, max);
+      this.img.style.width = `${lastWidth}px`;
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      const committed = clampWidth(this.img.getBoundingClientRect().width, IMAGE_MIN_WIDTH, max);
-      this.setWidth(committed);
+      this.setWidth(lastWidth);
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -169,6 +173,10 @@ class ImageNodeView {
   }
 
   private closeSubmenu(): void {
+    if (this.submenuOutsideListener) {
+      document.removeEventListener('mousedown', this.submenuOutsideListener, true);
+      this.submenuOutsideListener = null;
+    }
     this.submenu?.remove();
     this.submenu = null;
   }
@@ -189,8 +197,12 @@ class ImageNodeView {
         const file = input.files?.[0];
         input.remove();
         if (!file) return;
-        const src = await saveImageBytes(file.name, await file.arrayBuffer());
-        if (src) this.setSrc(src, null);
+        try {
+          const src = await saveImageBytes(file.name, await file.arrayBuffer());
+          if (src) this.setSrc(src, null);
+        } catch {
+          /* swallow: file read failure is best-effort */
+        }
       });
       input.click();
     });
@@ -204,6 +216,14 @@ class ImageNodeView {
     });
     anchor.appendChild(menu);
     this.submenu = menu;
+
+    const outsideListener = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (target && (menu.contains(target) || anchor.contains(target))) return;
+      this.closeSubmenu();
+    };
+    this.submenuOutsideListener = outsideListener;
+    document.addEventListener('mousedown', outsideListener, true);
   }
 
   private async compress(): Promise<void> {
@@ -211,7 +231,6 @@ class ImageNodeView {
     // Only local assets can be overwritten; skip http/data URLs.
     if (/^(?:https?:|data:)/i.test(rawSrc)) return;
     const resolved = resolveImageSrc(rawSrc);
-    const guessMime = `image/${extensionForMime(`image/${(rawSrc.split('.').pop() || '').toLowerCase()}`)}`;
     try {
       const bytes = await fetchImageBytes(resolved);
       // Derive input mime from the file extension.
@@ -230,7 +249,6 @@ class ImageNodeView {
       if (newSrc) this.setSrc(newSrc, this.node.attrs.width ?? null);
     } catch {
       /* swallow: compress is best-effort, never corrupts the asset */
-      void guessMime;
     }
   }
 
