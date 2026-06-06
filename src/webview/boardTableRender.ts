@@ -23,6 +23,8 @@ import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
 import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
+import { saveImageBytes } from './imageUpload';
+import { imageFilesFrom } from './extensions/imagePasteDrop';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -1306,11 +1308,47 @@ function beginInlineText(
     else if (e.key === 'Tab') { e.preventDefault(); commit(); }
   };
   const onBlur = () => commit();
+  // Pasting an image into a contenteditable cell would otherwise drop a raw,
+  // full-size <img> that gets discarded on commit (textContent ignores it).
+  // Intercept image paste, save the file, and insert a markdown link instead —
+  // which persists and re-renders as a small inline thumbnail.
+  const onPaste = (e: ClipboardEvent) => {
+    const imgs = imageFilesFrom(e.clipboardData);
+    if (!imgs.length) return; // let normal text paste proceed
+    e.preventDefault();
+    void (async () => {
+      for (const { name, file } of imgs) {
+        try {
+          const src = await saveImageBytes(name, await file.arrayBuffer());
+          if (!src) continue;
+          const snippet = `![](${src})`;
+          if (td.getAttribute('contenteditable') === 'true') {
+            // Insert at the cursor as plain text (so it stays markdown, not a DOM <img>).
+            document.execCommand('insertText', false, snippet);
+          } else {
+            // Cell already committed/blurred — append to the stored value so it's not lost.
+            const b = ctx.getBoard();
+            ctx.mutate({
+              ...b,
+              cards: b.cards.map(c => c.id === card.id
+                ? { ...c, values: { ...c.values, [field.name]: `${(c.values[field.name] ?? '').trim()} ${snippet}`.trim() } }
+                : c),
+            });
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[md-editor-plus] cell image paste failed', err);
+        }
+      }
+    })();
+  };
   function cleanup() {
     td.removeEventListener('keydown', onKey);
     td.removeEventListener('blur', onBlur);
+    td.removeEventListener('paste', onPaste);
     detachTypography();
   }
   td.addEventListener('keydown', onKey);
   td.addEventListener('blur', onBlur);
+  td.addEventListener('paste', onPaste);
 }
