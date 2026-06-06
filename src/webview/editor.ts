@@ -32,6 +32,7 @@ import ImagePasteDrop from './extensions/imagePasteDrop';
 import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 import { setMediaBaseUri, resolveImageSrc } from './mediaResolve';
 import { imageNodeToMarkdown, normalizeWidth } from './imageMarkdown';
+import { imageNodeViewFactory } from './imageNodeView';
 export { setMediaBaseUri };
 
 const lowlight = createLowlight(common);
@@ -72,6 +73,9 @@ const ResolvedImage = Image.extend({
         parse: {},
       },
     };
+  },
+  addNodeView() {
+    return imageNodeViewFactory();
   },
 });
 
