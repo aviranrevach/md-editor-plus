@@ -1729,3 +1729,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
      correct the width to fill the full card interior (padding-box width). */
   width: calc(100% + 22px);
 }
+
+.bd-image-empty { color: var(--text-secondary); opacity: .55; display: inline-flex; align-items: center; }
+.bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary);
+  opacity: .7; border: 1px dashed var(--border); border-radius: 4px; padding: 2px; }

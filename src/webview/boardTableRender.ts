@@ -21,8 +21,8 @@ import { attachSmartTypography } from './extensions/smartTypography';
 import { openStatusOptionsEditor } from './boardStatusOptions';
 import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
-import { parseImageLinks, appendImageLink } from './boardImageLinks';
-import { openBoardImagePicker } from './boardImagePicker';
+import { parseImageLinks } from './boardImageLinks';
+import { openBoardImageManager } from './boardImagePicker';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -45,6 +45,27 @@ function renderInlineWithImages(host: HTMLElement, value: string): boolean {
   }
   if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
   return found;
+}
+
+// Show a board <img> for `rawSrc`, resolved for the webview. On load failure,
+// swap in a visible "broken image" marker (so it's not invisible white space)
+// and log the raw + resolved src for diagnosis.
+function makeBoardThumb(rawSrc: string, alt: string, className: string): HTMLElement {
+  const img = document.createElement('img');
+  img.className = className;
+  img.alt = alt;
+  img.src = resolveImageSrc(rawSrc);
+  img.title = rawSrc;
+  img.addEventListener('error', () => {
+    // eslint-disable-next-line no-console
+    console.warn('[md-editor-plus] board image failed to load', { raw: rawSrc, resolved: img.src });
+    const broken = document.createElement('span');
+    broken.className = 'bd-image-broken';
+    broken.title = `couldn't load: ${rawSrc}`;
+    broken.innerHTML = `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V158.75l-26.07-26.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L40,149.37V56ZM40,172l52-52,80,80H40Z"/></svg>`;
+    img.replaceWith(broken);
+  });
+  return img;
 }
 
 // "Description" is a synthetic field that surfaces card.body as a table column.
@@ -1097,15 +1118,13 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
       td.classList.add('bd-image-cell');
       if (!links.length) {
         const empty = document.createElement('span');
-        empty.className = 'bd-cell-empty';
-        empty.textContent = ctx.readonly ? '' : '🖼';
+        empty.className = 'bd-cell-empty bd-image-empty';
+        if (!ctx.readonly) {
+          empty.innerHTML = `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V158.75l-26.07-26.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L40,149.37V56ZM40,172l52-52,80,80H40Zm176,28H194.63l-36-36,20-20L216,181.38V200ZM144,100a12,12,0,1,1,12,12A12,12,0,0,1,144,100Z"/></svg>`;
+        }
         td.appendChild(empty);
       } else {
-        const thumb = document.createElement('img');
-        thumb.className = 'bd-image-thumb';
-        thumb.src = resolveImageSrc(links[0].src);
-        thumb.alt = links[0].alt;
-        td.appendChild(thumb);
+        td.appendChild(makeBoardThumb(links[0].src, links[0].alt, 'bd-image-thumb'));
         if (links.length > 1) {
           const badge = document.createElement('span');
           badge.className = 'bd-image-badge';
@@ -1116,8 +1135,7 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
       if (!ctx.readonly) {
         td.addEventListener('click', (e) => {
           e.stopPropagation();
-          openBoardImagePicker(td, (src) => {
-            const next = appendImageLink(value, src);
+          openBoardImageManager(td, value, (next) => {
             const cur = ctx.getBoard();
             ctx.mutate({
               ...cur,

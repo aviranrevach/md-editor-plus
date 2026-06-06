@@ -1,4 +1,4 @@
-import { parseImageLinks, firstImageSrc, appendImageLink } from '../src/webview/boardImageLinks';
+import { parseImageLinks, firstImageSrc, appendImageLink, removeImageLinkAt } from '../src/webview/boardImageLinks';
 
 describe('parseImageLinks', () => {
   it('returns [] for a string with no images', () => {
@@ -33,5 +33,21 @@ describe('appendImageLink', () => {
   });
   it('appends with a separating space when the value already has one', () => {
     expect(appendImageLink('![](./a.png)', './b.png')).toBe('![](./a.png) ![](./b.png)');
+  });
+});
+
+describe('removeImageLinkAt', () => {
+  it('removes the link at the given index', () => {
+    expect(removeImageLinkAt('![](./a.png) ![](./b.png)', 0)).toBe('![](./b.png)');
+    expect(removeImageLinkAt('![](./a.png) ![](./b.png)', 1)).toBe('![](./a.png)');
+  });
+  it('returns empty string when removing the only link', () => {
+    expect(removeImageLinkAt('![](./a.png)', 0)).toBe('');
+  });
+  it('preserves alt text on the kept links', () => {
+    expect(removeImageLinkAt('![x](./a.png) ![y](./b.png)', 0)).toBe('![y](./b.png)');
+  });
+  it('returns input unchanged for out-of-range index', () => {
+    expect(removeImageLinkAt('![](./a.png)', 5)).toBe('![](./a.png)');
   });
 });

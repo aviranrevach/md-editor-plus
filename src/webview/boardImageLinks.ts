@@ -25,3 +25,12 @@ export function appendImageLink(value: string, src: string): string {
   const link = `![](${src})`;
   return value && value.trim().length ? `${value} ${link}` : link;
 }
+
+// Remove the image link at `index` (0-based, order from parseImageLinks),
+// returning the rebuilt space-joined value. Out-of-range index returns input unchanged.
+export function removeImageLinkAt(value: string, index: number): string {
+  const links = parseImageLinks(value);
+  if (index < 0 || index >= links.length) return value;
+  links.splice(index, 1);
+  return links.map((l) => `![${l.alt}](${l.src})`).join(' ');
+}
