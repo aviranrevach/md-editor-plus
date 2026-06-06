@@ -1,6 +1,8 @@
-import { saveImageBytes, pickProjectImage, embedImageFromClipboard } from './imageUpload';
+import { saveImageBytes, pickProjectImage, embedImageFromClipboard, revealImage, fetchImageBytes } from './imageUpload';
 import { resolveImageSrc } from './mediaResolve';
-import { parseImageLinks, appendImageLink, removeImageLinkAt } from './boardImageLinks';
+import { parseImageLinks, appendImageLink, removeImageLinkAt, replaceImageLinkAt } from './boardImageLinks';
+import { compressImage } from './imageCompress';
+import { sanitizeImageFileName, extensionForMime } from '../imageAssets';
 
 let stylesInjected = false;
 function injectStyles(): void {
@@ -11,7 +13,7 @@ function injectStyles(): void {
     .bd-image-mgr { position: fixed; z-index: 10000; min-width: 220px; max-width: 300px;
       background: var(--bg, #fff); color: inherit; border: 1px solid var(--border, rgba(0,0,0,.12));
       border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.18); padding: 8px; }
-    .bd-image-mgr-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .bd-image-mgr-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
     .bd-image-mgr-thumbwrap { position: relative; width: 56px; height: 56px; }
     .bd-image-mgr-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 6px;
       border: 1px solid var(--border); display: block; }
@@ -26,6 +28,9 @@ function injectStyles(): void {
       font: inherit; font-size: 13px; border-radius: 6px; cursor: pointer; text-align: left; }
     .bd-image-mgr-row:hover { background: var(--block-hover, rgba(0,0,0,.05)); }
     .bd-image-mgr-err { color: #c0392b; font-size: 12px; padding: 4px 10px; }
+    .bd-image-mgr-actions { position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; }
+    .bd-image-mgr-mini { width: 20px; height: 18px; border: none; border-radius: 4px; cursor: pointer; background: var(--bg, #fff); color: inherit; font-size: 11px; line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.25); padding: 0; }
+    .bd-image-mgr-mini:hover { background: var(--block-hover, rgba(0,0,0,.08)); }
   `;
   document.head.appendChild(style);
 }
@@ -58,6 +63,27 @@ export function openBoardImageManager(
   function onDocDown(e: MouseEvent): void { if (!el.contains(e.target as Node)) finish(); }
 
   function commit(next: string): void { value = next; onChange(value); render(); }
+
+  async function compressLink(index: number, src: string): Promise<void> {
+    if (/^(?:https?:|data:)/i.test(src)) return; // only local assets
+    try {
+      const ext = (src.split('.').pop() || 'png').toLowerCase();
+      const inputMime =
+        ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+        : ext === 'webp' ? 'image/webp'
+        : ext === 'png' ? 'image/png'
+        : `image/${ext}`;
+      const bytes = await fetchImageBytes(resolveImageSrc(src));
+      const result = await compressImage(bytes, inputMime, { quality: 0.8 });
+      if (!result.changed) return;
+      const stem = (src.split('/').pop() || 'image').replace(/\.[^.]+$/, '');
+      const name = sanitizeImageFileName(`${stem}.${extensionForMime(result.mime)}`);
+      const newSrc = await saveImageBytes(name, result.bytes);
+      if (newSrc) commit(replaceImageLinkAt(value, index, newSrc));
+    } catch (err) {
+      showError((err as Error).message);
+    }
+  }
 
   function showError(msg: string): void {
     const err = document.createElement('div');
@@ -96,6 +122,19 @@ export function openBoardImageManager(
         del.addEventListener('click', (e) => { e.stopPropagation(); commit(removeImageLinkAt(value, i)); });
         wrap.appendChild(img);
         wrap.appendChild(del);
+        const actions = document.createElement('div');
+        actions.className = 'bd-image-mgr-actions';
+        const mkBtn = (label: string, title: string, fn: () => void) => {
+          const b = document.createElement('button');
+          b.className = 'bd-image-mgr-mini';
+          b.textContent = label;
+          b.title = title;
+          b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+          actions.appendChild(b);
+        };
+        mkBtn('⤢', `Reveal in Finder: ${link.src}`, () => { void revealImage(link.src); });
+        mkBtn('🗜', `Compress: ${link.src}`, () => { void compressLink(i, link.src); });
+        wrap.appendChild(actions);
         grid.appendChild(wrap);
       });
       el.appendChild(grid);
