@@ -1124,11 +1124,17 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
         }
         td.appendChild(empty);
       } else {
-        td.appendChild(makeBoardThumb(links[0].src, links[0].alt, 'bd-image-thumb'));
-        if (links.length > 1) {
+        // Show several thumbnails side by side when there's room; collapse the
+        // overflow into a "+N" badge.
+        const MAX_THUMBS = 3;
+        const shown = Math.min(links.length, MAX_THUMBS);
+        for (let i = 0; i < shown; i++) {
+          td.appendChild(makeBoardThumb(links[i].src, links[i].alt, 'bd-image-thumb'));
+        }
+        if (links.length > shown) {
           const badge = document.createElement('span');
           badge.className = 'bd-image-badge';
-          badge.textContent = `+${links.length - 1}`;
+          badge.textContent = `+${links.length - shown}`;
           td.appendChild(badge);
         }
       }
