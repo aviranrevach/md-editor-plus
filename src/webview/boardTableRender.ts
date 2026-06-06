@@ -17,6 +17,7 @@ import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
+import { attachSmartTypography } from './extensions/smartTypography';
 import { openStatusOptionsEditor } from './boardStatusOptions';
 import { openTagsPicker } from './boardTagsPicker';
 
@@ -55,11 +56,13 @@ function beginHeaderRename(label: HTMLElement, fieldName: string, ctx: BoardRend
   sel?.addRange(range);
 
   let resolved = false;
+  const detachTypography = attachSmartTypography(label);
   const cleanup = (): void => {
     label.removeAttribute('contenteditable');
     label.classList.remove('bd-th-label-editing');
     label.removeEventListener('keydown', onKey);
     label.removeEventListener('blur', onBlur);
+    detachTypography();
   };
   const commit = (): void => {
     if (resolved) return;
@@ -1155,6 +1158,7 @@ function beginInlineText(
   if (td.getAttribute('contenteditable') === 'true') return;
   td.setAttribute('contenteditable', 'true');
   td.classList.add('bd-cell-editing');
+  const detachTypography = attachSmartTypography(td);
   td.focus();
   const range = document.createRange();
   range.selectNodeContents(td);
@@ -1200,6 +1204,7 @@ function beginInlineText(
   function cleanup() {
     td.removeEventListener('keydown', onKey);
     td.removeEventListener('blur', onBlur);
+    detachTypography();
   }
   td.addEventListener('keydown', onKey);
   td.addEventListener('blur', onBlur);
