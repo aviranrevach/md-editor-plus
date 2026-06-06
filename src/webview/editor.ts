@@ -23,6 +23,7 @@ import Board, { preprocessMarkdownBoards } from './extensions/board';
 import Toggle from './extensions/toggle';
 import BlockDirection from './extensions/blockDirection';
 import BlockOutline from './extensions/outline';
+import SmartTypography from './extensions/smartTypography';
 import { createBubbleMenu } from './bubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
@@ -121,6 +122,7 @@ export function createEditor(
       Toggle,
       BlockDirection,
       BlockOutline,
+      SmartTypography,
       SearchExtension,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
     ],

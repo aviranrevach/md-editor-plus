@@ -1,3 +1,5 @@
+import { Extension, InputRule } from '@tiptap/core';
+
 // Smart typography: Notion-style replacements as you type.
 //
 // Rule order matters. ProseMirror runs input rules in array order and applies
@@ -46,3 +48,46 @@ export function findSmartTypographyMatch(textBefore: string): SmartTypographyMat
   }
   return null;
 }
+
+// Module-level flag so the Visual-settings toggle can enable/disable replacement
+// at runtime without re-creating the editor. When off, every rule no-ops.
+let smartTypographyEnabled = true;
+
+export function setSmartTypographyEnabled(on: boolean): void {
+  smartTypographyEnabled = on;
+}
+
+export function isSmartTypographyEnabled(): boolean {
+  return smartTypographyEnabled;
+}
+
+export const SmartTypography = Extension.create({
+  name: 'smartTypography',
+
+  addInputRules() {
+    // Code BLOCKS are skipped automatically: ProseMirror's inputRules plugin
+    // bails when the cursor's parent node spec has `code: true`. Inline `code`
+    // is a MARK (parent is still a paragraph), so we guard that case manually.
+    return SMART_TYPOGRAPHY_RULES.map(
+      (rule) =>
+        new InputRule({
+          find: rule.find,
+          handler: ({ state, range }) => {
+            if (!smartTypographyEnabled) return null;
+
+            const codeMark = state.schema.marks.code;
+            if (codeMark) {
+              const $from = state.doc.resolve(range.from);
+              const marksHere = state.storedMarks ?? $from.marks();
+              if (codeMark.isInSet(marksHere)) return null;
+            }
+
+            state.tr.insertText(rule.replace, range.from, range.to);
+            return undefined;
+          },
+        }),
+    );
+  },
+});
+
+export default SmartTypography;
