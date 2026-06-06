@@ -341,10 +341,10 @@ body {
   line-height: 1;
   margin-inline-start: 8px;
 }
-.actions-panel .act-export-menu.submenu-open {
+.actions-panel .settings-action[data-submenu].submenu-open {
   background: var(--block-hover);
 }
-.actions-panel .act-export-menu.submenu-open .settings-action-caret {
+.actions-panel .settings-action[data-submenu].submenu-open .settings-action-caret {
   color: var(--text-primary);
 }
 
