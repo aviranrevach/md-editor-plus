@@ -557,6 +557,16 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           reply({ error: 'bad saveImage request' });
           return;
         }
+        if (!document.uri.scheme.startsWith('file')) {
+          reply({ error: 'cannot save images for an unsaved document — save the file first' });
+          return;
+        }
+        // Node's Buffer.from(..,'base64') silently truncates invalid input, which would
+        // write a corrupt file. Reject anything that isn't well-formed base64.
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(m.bytesBase64) || m.bytesBase64.length % 4 !== 0) {
+          reply({ error: 'invalid image data' });
+          return;
+        }
         try {
           const docDir = vscode.Uri.joinPath(document.uri, '..');
           const folderName = assetsFolderName(path.basename(document.uri.fsPath));
@@ -581,15 +591,15 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         const reply = (extra: Record<string, unknown>) =>
           void webviewPanel.webview.postMessage({ type: 'workspaceImages', requestId, ...extra });
         if (!requestId) { reply({ error: 'bad listWorkspaceImages request' }); return; }
+        if (!document.uri.scheme.startsWith('file')) { reply({ images: [] }); return; }
         try {
           const files = await vscode.workspace.findFiles(
-            '**/*.{png,jpg,jpeg,gif,webp,svg,bmp,avif,ico,PNG,JPG,JPEG,GIF,WEBP,SVG,BMP}',
+            '**/*.{png,jpg,jpeg,gif,webp,svg,bmp,avif,ico,PNG,JPG,JPEG,GIF,WEBP,SVG,BMP,AVIF,ICO}',
             '{**/node_modules/**,**/.git/**,**/dist/**}',
             300,
           );
           const docDir = path.dirname(document.uri.fsPath);
           const images = files
-            .slice()
             .sort((a, b) => a.fsPath.localeCompare(b.fsPath))
             .map((uri) => {
               let rel = path.relative(docDir, uri.fsPath).split(path.sep).join('/');
