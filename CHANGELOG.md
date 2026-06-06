@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Board image cells: thumbnails that wouldn't load, and no way to remove them** — image filenames with parentheses or other special characters (e.g. `Image (1).png`) produced a markdown link that got truncated at the first `)`, so the thumbnail silently failed to load (blank cell). Filenames are now URL-safe and the link parser tolerates parentheses. Clicking an image cell also now opens a small manager — your images as thumbnails, each removable, plus the add options — and a cell shows several thumbnails side by side (overflow collapses to `+N`). The empty state is a proper icon, and a thumbnail that still can't load shows a visible marker instead of blank space.
 - **Add image did nothing when clicked** — the **Image** block used the browser's `window.prompt` to ask for a URL, which VS Code webviews silently block, so picking *Image* from the block picker had no effect at all. Replaced with the in-webview picker described above (upload / browse / embed link).
 - **Data loss on close (the big one)** — edits made in the last moment before closing a tab could be lost: the editor buffered changes in a 500 ms debounce that was *discarded* on close instead of flushed, and edits only ever reached VS Code's in-memory copy, never disk, unless you manually saved. Now pending edits are flushed on blur / tab-close / window-hide (for both the Preview and Code editors), and the extension persists them to disk. Closing and reopening a file shows your latest edits.
 

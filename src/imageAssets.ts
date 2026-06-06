@@ -17,7 +17,10 @@ export function sanitizeImageFileName(raw: string): string {
   // Drop any directory portion (handles both / and \ separators).
   const baseOnly = raw.split(/[\\/]/).pop() ?? '';
   const cleaned = baseOnly
-    .replace(/[\\/:*?"<>|\s]+/g, '-')          // unsafe + whitespace runs -> dash
+    // Whitelist filename-safe chars; everything else (spaces, parens, brackets,
+    // #, unicode, …) becomes a dash. Parens especially MUST go: a `)` left in the
+    // path truncates the markdown `![](path)` link when it's parsed back.
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
     .replace(/-{2,}/g, '-')                    // collapse dash runs
     .replace(/^-+/, '')                         // no leading dash
     .replace(/-+(?=\.)/g, '')                   // no dash right before the extension
