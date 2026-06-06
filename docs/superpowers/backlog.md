@@ -7,14 +7,9 @@ Add new entries at the top of each section.
 
 ---
 
-## Image block controls — click an image for a menu (new feature, post-c21)
+## ~~Image block controls — click an image for a menu (new feature, post-c21)~~ [SHIPPED 2026-06-07]
 
-- Requested 2026-06-06. Clicking an inserted image should surface a small toolbar/menu (reuse the bubble-menu pattern) with:
-  - **See source** — show where the image is from (relative path / URL).
-  - **Switch** — replace it (reopen the same drill-down picker: upload/browse/link/clipboard).
-  - **Remove** — delete the image node.
-  - **Scale / resize** — store a `width` attr on the image; drag handles or a size menu. Round-trips as an HTML `<img width>` or markdown-compatible attribute.
-- **Compress** (stretch): re-encode/downscale large images before saving — pragmatic path is client-side `<canvas>` re-encode (free, no AI); AI compression is overkill for file-size reduction.
+Shipped in branch `feat/image-controls-menu-resize-compress`. Covers: click-to-reveal toolbar, S/M/L/Full size presets, corner drag-handles, Replace (drill-down picker), local Compress (canvas re-encode), Reveal in Finder, Remove. Sizes persist as HTML `<img width>`. Board image manager gained Compress + Reveal in Finder per thumbnail.
 
 ## c21 drag-drop — Finder drop opens a new tab instead of inserting
 

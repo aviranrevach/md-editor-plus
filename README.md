@@ -234,6 +234,14 @@ Filenames keep their original name, with a `-2` suffix added only if there's a c
 
 You can also **paste an image** straight from the clipboard (⌘V / Ctrl+V) anywhere in the body — it's saved into `<note>.assets/` as `pasted-<date>.<ext>` and inserted inline.
 
+**Click any image** to reveal an image toolbar:
+
+- **Size presets** — S / M / L / Full buttons resize the image instantly. Drag the corner handles for a precise width. Resized images are stored as a standard HTML `<img src="…" width="…">`, so they render at the correct size in GitHub, Obsidian, VS Code preview, and any other Markdown reader. Images you never resize stay as plain `![](src)` Markdown.
+- **Replace** — swaps the image via the same drill-down picker (upload / browse / link / clipboard).
+- **Compress** — re-encodes the image locally in the browser (canvas pass, no server round-trip). Useful for cutting file size before committing.
+- **Reveal in Finder** — opens the folder that contains the image file in the OS file browser.
+- **Remove** — deletes the image from the document.
+
 **In boards**, images work three ways: add an **Image column** (its cells show a thumbnail + a `+N` badge, click to add); any `![](…)` link inside a text or Description cell renders as an inline thumbnail; and a kanban card automatically gets a **cover** from the first image in its body.
 
 ### Task lists
