@@ -23,6 +23,8 @@ export const SMART_TYPOGRAPHY_RULES: SmartTypographyRule[] = [
   { find: /=>$/,  replace: '⇒' },
   { find: /--$/,  replace: '—' },
   { find: /\.\.\.$/, replace: '…' },
+  // Symbol shortcuts. Anchored at end only (no word boundary) — intentional:
+  // mid-token like "foo(r)" → "foo®" is desired and reversible via Backspace.
   { find: /\(c\)$/i,  replace: '©' },
   { find: /\(r\)$/i,  replace: '®' },
   { find: /\(tm\)$/i, replace: '™' },

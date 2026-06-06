@@ -32,10 +32,18 @@ describe('findSmartTypographyMatch — single mappings', () => {
 
 describe('findSmartTypographyMatch — ordering & double arrows', () => {
   it('prefers <=> (⇔) over => when both could match', () => {
-    expect(findSmartTypographyMatch('<=>')!.replacement).toBe('⇔');
+    const m = findSmartTypographyMatch('<=>');
+    expect(m!.replacement).toBe('⇔');
+    expect(m!.matchLength).toBe(3);
   });
 
-  it('prefers literal <-> (↔) over -> when both could match', () => {
+  it('(tm) maps to ™ with correct matchLength', () => {
+    const m = findSmartTypographyMatch('(tm)');
+    expect(m!.replacement).toBe('™');
+    expect(m!.matchLength).toBe(4);
+  });
+
+  it('handles a whole "<->" buffer (programmatic/paste), preferring ↔ over ->', () => {
     expect(findSmartTypographyMatch('<->')!.replacement).toBe('↔');
   });
 
