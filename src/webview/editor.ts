@@ -31,6 +31,7 @@ import SearchExtension from './searchExtension';
 import ImagePasteDrop from './extensions/imagePasteDrop';
 import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 import { setMediaBaseUri, resolveImageSrc } from './mediaResolve';
+import { imageNodeToMarkdown, normalizeWidth } from './imageMarkdown';
 export { setMediaBaseUri };
 
 const lowlight = createLowlight(common);
@@ -41,10 +42,36 @@ let _frontmatter = '';
 let _onFrontmatterChange: ((info: { lines: number; kind: 'yaml' | 'toml' | 'none' }) => void) | null = null;
 
 const ResolvedImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        // Read width off an <img> (from HTML round-trip) as a positive int.
+        parseHTML: (el: HTMLElement) => normalizeWidth(el.getAttribute('width')),
+        // Emitted into the editor DOM; the markdown serializer (below) handles files.
+        renderHTML: (attrs: { width?: number | null }) =>
+          attrs.width ? { width: String(attrs.width) } : {},
+      },
+    };
+  },
   renderHTML({ HTMLAttributes }) {
     const out: Record<string, unknown> = { ...HTMLAttributes };
     if (typeof out.src === 'string') out.src = resolveImageSrc(out.src);
     return ['img', mergeAttributes(this.options.HTMLAttributes, out)];
+  },
+  addStorage() {
+    return {
+      markdown: {
+        // Sized images persist as HTML <img width>; unsized stay ![](). This
+        // overrides tiptap-markdown's default image serializer (getMarkdownSpec
+        // merges {...default, ...thisStorage}).
+        serialize(state: any, node: any) {
+          state.write(imageNodeToMarkdown(node.attrs));
+        },
+        parse: {},
+      },
+    };
   },
 });
 
