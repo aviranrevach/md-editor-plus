@@ -469,6 +469,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
   const input = el.querySelector<HTMLInputElement>('.block-picker-input')!;
   const list  = el.querySelector<HTMLElement>('.block-picker-list')!;
+  const searchEl = el.querySelector<HTMLElement>('.block-picker-search')!;
 
   function currentSource(): BlockDef[] {
     return drillParent?.subItems ?? BLOCK_DEFS;
@@ -572,6 +573,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function backToList(): void {
+    searchEl.style.display = '';
     if (drillParent) {
       input.placeholder = `Filter ${drillParent.label.toLowerCase()}…`;
       filtered = drillParent.subItems ?? [];
@@ -589,6 +591,10 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   function showInlineInput(block: BlockDef, pos: number): void {
     if (!block.inlineInput) return;
     const cfg = block.inlineInput;
+    // Hide the filter bar so typing can only land in the URL field below —
+    // otherwise keystrokes hit the still-focused filter input and its `input`
+    // handler re-renders the list, wiping this field away.
+    searchEl.style.display = 'none';
     list.innerHTML = '';
 
     const back = document.createElement('div');
@@ -618,6 +624,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       }
     });
     list.appendChild(field);
+    field.focus();
     setTimeout(() => field.focus(), 0);
   }
 
@@ -700,6 +707,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     currentPos = insertPos;
     context = ctx;
     drillParent = null;
+    searchEl.style.display = '';
     // If the user clicked the dragger over a callout, drill straight into the
     // callout sub-list so they see the five type options with the current one
     // highlighted instead of the top-level Callout entry.
@@ -742,6 +750,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     drillParent = null;
     context = {};
     input.value = '';
+    searchEl.style.display = '';
   }
 
   document.addEventListener('mousedown', e => {
