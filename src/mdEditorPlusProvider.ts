@@ -232,7 +232,10 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       }
       if (msg.type === 'browseMarkdown') {
         const exts = MARKDOWN_EXTENSIONS.map((e) => e.replace(/^\./, ''));
-        const files = await vscode.workspace.findFiles(`**/*.{${exts.join(',')}}`);
+        const files = await vscode.workspace.findFiles(
+          `**/*.{${exts.join(',')}}`,
+          '{**/node_modules/**,**/.git/**,**/dist/**}',
+        );
         const BROWSE = '$(folder-opened) Browse on disk…';
         type Item = vscode.QuickPickItem & { uri?: vscode.Uri };
         const items: Item[] = [
@@ -252,7 +255,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           matchOnDetail: true,
         });
         if (!pick) return;
-        if (pick.label === BROWSE) {
+        if (!pick.uri) {
           const chosen = await vscode.window.showOpenDialog({
             canSelectFiles: true,
             canSelectFolders: false,
