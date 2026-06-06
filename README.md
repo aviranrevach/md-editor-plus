@@ -223,11 +223,12 @@ Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**.
 
 ### Images
 
-Pick **Image** from the block picker to open a small three-tab picker:
+Pick **Image** from the block picker to drill into four ways to add one (all inside the picker):
 
-- **Upload** — choose an image from your computer. It's copied into a per-note `<note>.assets/` folder next to your file and inserted as a clean relative link (`![](./Note.assets/photo.png)`), so it stays put when you reopen or move the file.
-- **Browse project** — reuse an image already in your workspace, shown as a thumbnail grid. It's referenced in place — no duplicate copy.
-- **Embed link** — paste an image URL to reference it directly.
+- **Upload from computer** — choose a file. It's copied into a per-note `<note>.assets/` folder next to your file and inserted as a clean relative link (`![](./Note.assets/photo.png)`), so it stays put when you reopen or move the file.
+- **Browse project** — opens the native file picker so you can pick an image already in your workspace (real folders and files). It's referenced in place — no duplicate copy.
+- **Embed link** — type or paste an image URL (or a project path) into the in-window field.
+- **Embed from clipboard** — use the image link already on your clipboard (a web/data URL, or a path to a file in the project).
 
 Filenames keep their original name, with a `-2` suffix added only if there's a clash.
 

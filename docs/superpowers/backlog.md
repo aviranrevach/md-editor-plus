@@ -7,6 +7,14 @@ Add new entries at the top of each section.
 
 ---
 
+## c1 image picker — "Embed link" still broken in the real host
+
+- Deferred from the c1 drill-down redesign (branch `fix/c1-image-picker-drilldown`).
+- Symptom: in the F5 Extension Development Host, choosing Image → **Embed link** shows nothing / doesn't insert, even after two fixes (hide filter bar; capture-phase outside-click). A jsdom regression test (`tests/blockPickerImage.test.ts`) reproduces the intended flow and PASSES, so the failure is environment-specific to the webview — needs live instrumentation (e.g. console logging in the running host) to find the real cause.
+- Upload / Browse project / Embed from clipboard were the working siblings; only Embed link is affected.
+
+---
+
 ## Board — tags & grouping follow-ups (deferred 2026-06-05)
 
 Deferred from `2026-06-05-board-grouping-design.md` and `2026-06-05-board-tags-design.md` (both shipped).

@@ -7,17 +7,10 @@ function bridge(): Bridge | undefined {
   return (window as unknown as { __mdViewerVscode?: Bridge }).__mdViewerVscode;
 }
 
-export interface WorkspaceImage {
-  relPath: string;
-  label: string;
-  webviewUri: string;
-}
-
-type Pending =
-  | { kind: 'image'; resolve: (relPath: string) => void; reject: (err: Error) => void }
-  | { kind: 'list'; resolve: (images: WorkspaceImage[]) => void; reject: (err: Error) => void };
-
-const pending = new Map<string, Pending>();
+// All image round-trips resolve to a string src (or null when the user cancels
+// a picker). Replies are correlated to the originating call by requestId.
+type PendingResolve = (value: string | null) => void;
+const pending = new Map<string, { resolve: PendingResolve; reject: (err: Error) => void }>();
 let counter = 0;
 let listenerInstalled = false;
 
@@ -25,21 +18,26 @@ function ensureListener(): void {
   if (listenerInstalled) return;
   listenerInstalled = true;
   window.addEventListener('message', (event: MessageEvent) => {
-    const msg = event.data as { type?: string; requestId?: string;
-      relPath?: string; images?: WorkspaceImage[]; error?: string };
+    const msg = event.data as {
+      type?: string; requestId?: string;
+      relPath?: string; src?: string; canceled?: boolean; error?: string;
+    };
     if (!msg || typeof msg.requestId !== 'string') return;
+    const p = pending.get(msg.requestId);
+    if (!p) return;
     if (msg.type === 'imageSaved') {
-      const p = pending.get(msg.requestId);
-      if (!p || p.kind !== 'image') return;
       pending.delete(msg.requestId);
       if (msg.error) p.reject(new Error(msg.error));
       else p.resolve(msg.relPath ?? '');
-    } else if (msg.type === 'workspaceImages') {
-      const p = pending.get(msg.requestId);
-      if (!p || p.kind !== 'list') return;
+    } else if (msg.type === 'projectImagePicked') {
       pending.delete(msg.requestId);
       if (msg.error) p.reject(new Error(msg.error));
-      else p.resolve(msg.images ?? []);
+      else if (msg.canceled) p.resolve(null);
+      else p.resolve(msg.relPath ?? null);
+    } else if (msg.type === 'clipboardImageResolved') {
+      pending.delete(msg.requestId);
+      if (msg.error) p.reject(new Error(msg.error));
+      else p.resolve(msg.src ?? '');
     }
   });
 }
@@ -47,6 +45,20 @@ function ensureListener(): void {
 function nextId(): string {
   counter += 1;
   return `img-${Date.now()}-${counter}`;
+}
+
+function request(message: Record<string, unknown>): Promise<string | null> {
+  ensureListener();
+  const vs = bridge();
+  if (!vs) return Promise.reject(new Error('no vscode bridge'));
+  const requestId = nextId();
+  return new Promise<string | null>((resolve, reject) => {
+    pending.set(requestId, { resolve, reject });
+    vs.postMessage({ ...message, requestId });
+    setTimeout(() => {
+      if (pending.delete(requestId)) reject(new Error(`${String(message.type)} timed out`));
+    }, 60000);
+  });
 }
 
 // Convert raw bytes to base64 without spread-overflowing the call stack on
@@ -63,31 +75,20 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
     : Buffer.from(binary, 'binary').toString('base64'); // jest/node fallback
 }
 
-// Send image bytes to the extension; resolves with the relative markdown path.
+// Upload: send image bytes to the extension; resolves with the relative path.
 export function saveImageBytes(name: string, buffer: ArrayBuffer): Promise<string> {
-  ensureListener();
-  const vs = bridge();
-  if (!vs) return Promise.reject(new Error('no vscode bridge'));
-  const requestId = nextId();
-  return new Promise<string>((resolve, reject) => {
-    pending.set(requestId, { kind: 'image', resolve, reject });
-    vs.postMessage({ type: 'saveImage', requestId, name, bytesBase64: arrayBufferToBase64(buffer) });
-    setTimeout(() => {
-      if (pending.delete(requestId)) reject(new Error('saveImage timed out'));
-    }, 15000);
-  });
+  return request({ type: 'saveImage', name, bytesBase64: arrayBufferToBase64(buffer) })
+    .then((v) => v ?? '');
 }
 
-export function listWorkspaceImages(): Promise<WorkspaceImage[]> {
-  ensureListener();
-  const vs = bridge();
-  if (!vs) return Promise.reject(new Error('no vscode bridge'));
-  const requestId = nextId();
-  return new Promise<WorkspaceImage[]>((resolve, reject) => {
-    pending.set(requestId, { kind: 'list', resolve, reject });
-    vs.postMessage({ type: 'listWorkspaceImages', requestId });
-    setTimeout(() => {
-      if (pending.delete(requestId)) reject(new Error('listWorkspaceImages timed out'));
-    }, 15000);
-  });
+// Browse project: opens the native VS Code file picker (shows real folders).
+// Resolves to a relative link, or null if the user cancels.
+export function pickProjectImage(): Promise<string | null> {
+  return request({ type: 'pickProjectImage' });
+}
+
+// Embed from clipboard: reads the clipboard text and resolves it to an image
+// src — a web/data URL as-is, or a project file path turned into a relative link.
+export function embedImageFromClipboard(): Promise<string> {
+  return request({ type: 'embedImageFromClipboard' }).then((v) => v ?? '');
 }
