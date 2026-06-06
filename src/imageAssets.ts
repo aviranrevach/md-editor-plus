@@ -19,7 +19,9 @@ export function sanitizeImageFileName(raw: string): string {
   const cleaned = baseOnly
     .replace(/[\\/:*?"<>|\s]+/g, '-')          // unsafe + whitespace runs -> dash
     .replace(/-{2,}/g, '-')                    // collapse dash runs
-    .replace(/^-+/, '');                        // no leading dash
+    .replace(/^-+/, '')                         // no leading dash
+    .replace(/-+(?=\.)/g, '')                   // no dash right before the extension
+    .replace(/-+$/, '');                        // no trailing dash (e.g. extension-less names)
   return cleaned.length ? cleaned : 'image.png';
 }
 
@@ -45,7 +47,7 @@ export function relativeAssetPath(folderName: string, fileName: string): string 
 }
 
 export function isImageFileName(name: string): boolean {
-  const m = /\.([a-z0-9]+)$/i.exec(name);
+  const m = /\.([a-z0-9]{1,5})$/i.exec(name);
   if (!m) return false;
   return (IMAGE_EXTENSIONS as readonly string[]).includes(m[1].toLowerCase());
 }

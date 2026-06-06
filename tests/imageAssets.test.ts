@@ -27,7 +27,7 @@ describe('sanitizeImageFileName', () => {
     expect(sanitizeImageFileName('C:\\pics\\shot.png')).toBe('shot.png');
   });
   it('replaces whitespace and unsafe chars with dashes and collapses runs', () => {
-    expect(sanitizeImageFileName('my   cool*pic?.png')).toBe('my-cool-pic-.png');
+    expect(sanitizeImageFileName('my   cool*pic?.png')).toBe('my-cool-pic.png');
   });
   it('falls back to "image.png" for an empty result', () => {
     expect(sanitizeImageFileName('   ')).toBe('image.png');
