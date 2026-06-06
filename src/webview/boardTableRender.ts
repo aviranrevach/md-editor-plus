@@ -29,7 +29,7 @@ interface Group { key: string; cards: Card[]; }
 // Render a string into `host`, turning ![alt](src) links into small inline
 // thumbnails and leaving the rest as text. Returns true if any image rendered.
 function renderInlineWithImages(host: HTMLElement, value: string): boolean {
-  const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const re = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/g;
   let last = 0;
   let found = false;
   let m: RegExpExecArray | null;

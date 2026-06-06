@@ -3,7 +3,9 @@
 
 export interface ImageLink { alt: string; src: string; }
 
-const IMAGE_LINK_RE = /!\[([^\]]*)\]\(([^)]+)\)/g;
+// The src matcher allows one level of balanced parens so paths like
+// `./a_(1).png` parse fully instead of truncating at the first `)`.
+const IMAGE_LINK_RE = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/g;
 
 export function parseImageLinks(value: string): ImageLink[] {
   const out: ImageLink[] = [];

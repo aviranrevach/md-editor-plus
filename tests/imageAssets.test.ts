@@ -34,6 +34,13 @@ describe('sanitizeImageFileName', () => {
   it('falls back to "image.png" for an empty result', () => {
     expect(sanitizeImageFileName('   ')).toBe('image.png');
   });
+  it('strips parentheses and brackets so they cannot truncate the markdown link', () => {
+    expect(sanitizeImageFileName('Image (1).png')).toBe('Image-1.png');
+    expect(sanitizeImageFileName('shot[2].png')).toBe('shot-2.png');
+  });
+  it('replaces other URL-unsafe chars (#, etc.) with dashes', () => {
+    expect(sanitizeImageFileName('a#b.png')).toBe('a-b.png');
+  });
 });
 
 describe('dedupeFileName', () => {

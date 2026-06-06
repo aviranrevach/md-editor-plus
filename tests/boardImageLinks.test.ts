@@ -16,6 +16,13 @@ describe('parseImageLinks', () => {
   it('parses images embedded mid-text', () => {
     expect(parseImageLinks('see ![x](./x.png) here')).toEqual([{ alt: 'x', src: './x.png' }]);
   });
+  it('keeps balanced parens inside the path instead of truncating', () => {
+    expect(parseImageLinks('![](./a_(1).png)')).toEqual([{ alt: '', src: './a_(1).png' }]);
+    expect(parseImageLinks('![](./a_(1).png) ![](./b.png)')).toEqual([
+      { alt: '', src: './a_(1).png' },
+      { alt: '', src: './b.png' },
+    ]);
+  });
 });
 
 describe('firstImageSrc', () => {
