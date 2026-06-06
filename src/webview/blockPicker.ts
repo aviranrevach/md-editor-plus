@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { openImagePicker } from './imagePicker';
 
 export interface BlockDef {
   id: string;
@@ -179,13 +180,14 @@ export const BLOCK_DEFS: BlockDef[] = [
   {
     id: 'image',
     label: 'Image',
-    description: 'Paste URL or drag & drop',
+    description: 'Upload, pick from project, or paste a link',
     iconHtml: ICO.image,
     section: 'media',
     isActive: (t) => t === 'image',
     insert: (editor, pos) => {
-      const url = window.prompt('Image URL:');
-      if (url) editor.chain().focus().insertContentAt(pos, { type: 'image', attrs: { src: url, alt: '' } }).run();
+      openImagePicker(editor, pos, (src) => {
+        editor.chain().focus().insertContentAt(pos, { type: 'image', attrs: { src, alt: '' } }).run();
+      });
     },
   },
   {

@@ -221,6 +221,16 @@ Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**.
 | **Media & blocks** | Image, Callout, Toggle, **Whiteboard** |
 | **Other** | Blockquote, Code block, Divider |
 
+### Images
+
+Pick **Image** from the block picker to open a small three-tab picker:
+
+- **Upload** — choose an image from your computer. It's copied into a per-note `<note>.assets/` folder next to your file and inserted as a clean relative link (`![](./Note.assets/photo.png)`), so it stays put when you reopen or move the file.
+- **Browse project** — reuse an image already in your workspace, shown as a thumbnail grid. It's referenced in place — no duplicate copy.
+- **Embed link** — paste an image URL to reference it directly.
+
+Filenames keep their original name, with a `-2` suffix added only if there's a clash.
+
 ### Task lists
 
 Render as actual checkboxes. Click to toggle. Your changes round-trip to standard `- [ ]` / `- [x]` Markdown.

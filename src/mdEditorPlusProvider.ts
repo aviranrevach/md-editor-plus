@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
+import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath } from './imageAssets';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -546,6 +547,74 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         const newUri = vscode.Uri.joinPath(dir, name);
         await vscode.workspace.fs.writeFile(newUri, Buffer.from(document.getText(), 'utf8'));
         await vscode.commands.executeCommand('vscode.openWith', newUri, 'md-editor-plus.editor');
+      }
+      if (msg.type === 'saveImage') {
+        const m = msg as unknown as { requestId?: unknown; name?: unknown; bytesBase64?: unknown };
+        const requestId = typeof m.requestId === 'string' ? m.requestId : '';
+        const reply = (extra: Record<string, unknown>) =>
+          void webviewPanel.webview.postMessage({ type: 'imageSaved', requestId, ...extra });
+        if (!requestId || typeof m.name !== 'string' || typeof m.bytesBase64 !== 'string') {
+          reply({ error: 'bad saveImage request' });
+          return;
+        }
+        if (!document.uri.scheme.startsWith('file')) {
+          reply({ error: 'cannot save images for an unsaved document — save the file first' });
+          return;
+        }
+        // Node's Buffer.from(..,'base64') silently truncates invalid input, which would
+        // write a corrupt file. Reject anything that isn't well-formed base64.
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(m.bytesBase64) || m.bytesBase64.length % 4 !== 0) {
+          reply({ error: 'invalid image data' });
+          return;
+        }
+        try {
+          const docDir = vscode.Uri.joinPath(document.uri, '..');
+          const folderName = assetsFolderName(path.basename(document.uri.fsPath));
+          const folderUri = vscode.Uri.joinPath(docDir, folderName);
+          await vscode.workspace.fs.createDirectory(folderUri);
+          let existing: string[] = [];
+          try {
+            existing = (await vscode.workspace.fs.readDirectory(folderUri)).map(([n]) => n);
+          } catch { /* empty/new folder */ }
+          const finalName = dedupeFileName(sanitizeImageFileName(m.name), existing);
+          const fileUri = vscode.Uri.joinPath(folderUri, finalName);
+          await vscode.workspace.fs.writeFile(fileUri, Buffer.from(m.bytesBase64, 'base64'));
+          reply({ relPath: relativeAssetPath(folderName, finalName) });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+        return;
+      }
+      if (msg.type === 'listWorkspaceImages') {
+        const m = msg as unknown as { requestId?: unknown };
+        const requestId = typeof m.requestId === 'string' ? m.requestId : '';
+        const reply = (extra: Record<string, unknown>) =>
+          void webviewPanel.webview.postMessage({ type: 'workspaceImages', requestId, ...extra });
+        if (!requestId) { reply({ error: 'bad listWorkspaceImages request' }); return; }
+        if (!document.uri.scheme.startsWith('file')) { reply({ images: [] }); return; }
+        try {
+          const files = await vscode.workspace.findFiles(
+            '**/*.{png,jpg,jpeg,gif,webp,svg,bmp,avif,ico,PNG,JPG,JPEG,GIF,WEBP,SVG,BMP,AVIF,ICO}',
+            '{**/node_modules/**,**/.git/**,**/dist/**}',
+            300,
+          );
+          const docDir = path.dirname(document.uri.fsPath);
+          const images = files
+            .sort((a, b) => a.fsPath.localeCompare(b.fsPath))
+            .map((uri) => {
+              let rel = path.relative(docDir, uri.fsPath).split(path.sep).join('/');
+              if (!rel.startsWith('.')) rel = `./${rel}`;
+              return {
+                relPath: rel,
+                label: path.basename(uri.fsPath),
+                webviewUri: webviewPanel.webview.asWebviewUri(uri).toString(),
+              };
+            });
+          reply({ images });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+        return;
       }
     });
 
