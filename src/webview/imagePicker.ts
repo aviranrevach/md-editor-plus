@@ -73,6 +73,7 @@ export function openImagePicker(editor: Editor, pos: number, onPick: (src: strin
   function renderUpload(): void {
     body.innerHTML = '<button class="image-picker-upload-btn">Choose an image…</button>';
     const btn = body.querySelector<HTMLButtonElement>('.image-picker-upload-btn')!;
+    el.querySelector('input[type=file]')?.remove();
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
@@ -158,7 +159,7 @@ export function openImagePicker(editor: Editor, pos: number, onPick: (src: strin
   try {
     const coords = editor.view.coordsAtPos(pos);
     left = Math.min(coords.left, window.innerWidth - 380);
-    top = coords.bottom + 6;
+    top = Math.min(coords.bottom + 6, window.innerHeight - 300);
   } catch { /* use fallback */ }
   el.style.left = `${Math.max(12, left)}px`;
   el.style.top = `${Math.max(12, top)}px`;
