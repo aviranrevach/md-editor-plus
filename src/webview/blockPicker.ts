@@ -1,7 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { saveImageBytes, pickProjectImage, embedImageFromClipboard } from './imageUpload';
 import {
-  BLOCK_ACTIONS,
   convertibleTargets,
   searchBlockActions,
   type ActionId,
@@ -536,21 +535,6 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       });
     }
 
-    // Convert mode (dragger opened over an existing block): offer a Delete
-    // action at the bottom. It targets the block captured when the picker was
-    // opened (context.activeBlock.blockPos) — reliable for atom nodes like
-    // boards, unlike re-sampling coordinates at click time.
-    if (!drillParent && context.activeBlock) {
-      const sep = document.createElement('div');
-      sep.className = 'block-picker-sep';
-      list.appendChild(sep);
-      const del = document.createElement('div');
-      del.className = 'block-picker-item block-picker-delete';
-      del.innerHTML = `<span class="block-picker-icon">${ICO.trash}</span><span class="block-picker-label">Delete</span>`;
-      del.addEventListener('mousedown', (e) => { e.preventDefault(); deleteActiveBlock(); });
-      list.appendChild(del);
-    }
-
     activeIdx = 0;
     updateActive();
   }
@@ -807,27 +791,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       showInlineInput(block, pos);
       return;
     }
-    // Convert mode: use the item's convert function if available. Falls back
-    // to insert (below the active block) when convert isn't defined for this
-    // block type — that way Image / Toggle / HR still work from the dragger.
-    if (context.activeBlock) {
-      if (isActiveItem(block)) {
-        // Already that type — nothing to do.
-        close();
-        return;
-      }
-      if (block.convert) {
-        block.convert(editor, context.activeBlock.blockPos);
-      } else if (block.insert) {
-        block.insert(editor, context.activeBlock.blockEnd);
-      }
-      close();
-      setTimeout(() => {
-        editor.commands.focus();
-        editor.commands.scrollIntoView();
-      }, 30);
-      return;
-    }
+    // Insert mode (+ button / ⌘/). Convert/Delete/Duplicate for an existing
+    // block are handled by the action menu (renderActionMenu), not here.
     block.insert?.(editor, currentPos);
     close();
     setTimeout(() => {
