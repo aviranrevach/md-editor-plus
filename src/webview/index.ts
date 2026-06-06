@@ -532,17 +532,24 @@ function init(): void {
   let submenuOpenTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuAnchor: HTMLElement | null = null;
+  let openSubmenuEl: HTMLElement | null = null;
 
+  function submenuElFor(trigger: HTMLElement): HTMLElement | null {
+    const name = trigger.dataset.submenu;
+    return name ? document.getElementById(`actions-submenu-${name}`) : null;
+  }
   function clearSubmenuTimers(): void {
     if (submenuOpenTimer) { clearTimeout(submenuOpenTimer); submenuOpenTimer = null; }
     if (submenuCloseTimer) { clearTimeout(submenuCloseTimer); submenuCloseTimer = null; }
   }
   function positionSubmenu(trigger: HTMLElement): void {
+    const sub = submenuElFor(trigger);
+    if (!sub) return;
     const triggerRect = trigger.getBoundingClientRect();
-    submenuExport.style.left = '0px';
-    submenuExport.style.top = '0px';
-    submenuExport.classList.remove('hidden');
-    const subRect = submenuExport.getBoundingClientRect();
+    sub.style.left = '0px';
+    sub.style.top = '0px';
+    sub.classList.remove('hidden');
+    const subRect = sub.getBoundingClientRect();
     // Default: align top edge of submenu with top edge of trigger row,
     // and position to the right of the parent actions panel.
     const panel = trigger.closest('.actions-panel') as HTMLElement | null;
@@ -556,20 +563,25 @@ function init(): void {
       top = Math.max(8, window.innerHeight - subRect.height - 8);
     }
     if (top < 8) top = 8;
-    submenuExport.style.left = `${left}px`;
-    submenuExport.style.top = `${top}px`;
+    sub.style.left = `${left}px`;
+    sub.style.top = `${top}px`;
   }
   function openSubmenu(trigger: HTMLElement): void {
     clearSubmenuTimers();
+    const sub = submenuElFor(trigger);
+    // Close any other submenu that's currently showing.
+    if (openSubmenuEl && openSubmenuEl !== sub) openSubmenuEl.classList.add('hidden');
     submenuAnchor = trigger;
-    document.querySelectorAll<HTMLElement>('.act-export-menu')
+    openSubmenuEl = sub;
+    document.querySelectorAll<HTMLElement>('[data-submenu]')
       .forEach((el) => el.classList.toggle('submenu-open', el === trigger));
     positionSubmenu(trigger);
   }
   function closeSubmenu(): void {
     clearSubmenuTimers();
-    submenuExport.classList.add('hidden');
-    document.querySelectorAll<HTMLElement>('.act-export-menu')
+    if (openSubmenuEl) openSubmenuEl.classList.add('hidden');
+    openSubmenuEl = null;
+    document.querySelectorAll<HTMLElement>('[data-submenu]')
       .forEach((el) => el.classList.remove('submenu-open'));
     submenuAnchor = null;
   }
@@ -585,8 +597,11 @@ function init(): void {
     submenuCloseTimer = setTimeout(closeSubmenu, 250);
   }
 
-  submenuExport.addEventListener('mouseenter', () => clearSubmenuTimers());
-  submenuExport.addEventListener('mouseleave', scheduleSubmenuClose);
+  // Keep any submenu open while the pointer is over it; close on leave.
+  document.querySelectorAll<HTMLElement>('.actions-submenu').forEach((sub) => {
+    sub.addEventListener('mouseenter', () => clearSubmenuTimers());
+    sub.addEventListener('mouseleave', scheduleSubmenuClose);
+  });
 
   function closeDotsPanel(): void {
     actionsPanelDots.classList.add('hidden');
@@ -615,19 +630,20 @@ function init(): void {
 
   // Wire up action buttons inside both panels (each panel has its own DOM)
   function bindActions(panel: HTMLElement): void {
-    const exportTrigger = panel.querySelector<HTMLElement>('.act-export-menu');
-    exportTrigger?.addEventListener('mouseenter', () => scheduleSubmenuOpen(exportTrigger));
-    exportTrigger?.addEventListener('mouseleave', scheduleSubmenuClose);
-    // Click as an accessibility fallback (keyboard/Enter, touch).
-    exportTrigger?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (submenuAnchor === exportTrigger) closeSubmenu();
-      else openSubmenu(exportTrigger);
+    panel.querySelectorAll<HTMLElement>('[data-submenu]').forEach((trigger) => {
+      trigger.addEventListener('mouseenter', () => scheduleSubmenuOpen(trigger));
+      trigger.addEventListener('mouseleave', scheduleSubmenuClose);
+      // Click as an accessibility fallback (keyboard/Enter, touch).
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (submenuAnchor === trigger) closeSubmenu();
+        else openSubmenu(trigger);
+      });
     });
-    // Hovering any other row in the panel should dismiss the submenu so it
-    // doesn't linger over the wrong row.
+    // Hovering any non-submenu row should dismiss an open submenu so it doesn't
+    // linger over the wrong row.
     panel.querySelectorAll<HTMLElement>('.settings-action').forEach((el) => {
-      if (el === exportTrigger) return;
+      if (el.hasAttribute('data-submenu')) return;
       el.addEventListener('mouseenter', scheduleSubmenuClose);
     });
     panel.querySelector<HTMLElement>('.act-refresh')?.addEventListener('click', () => {
@@ -690,6 +706,15 @@ function init(): void {
     const ctx = buildExportContext();
     const html = buildHtmlExport(editorEl, ctx);
     vscode.postMessage({ type: 'exportPdf', html, filename: ctx.filename });
+    closeAllActionsPanels();
+  });
+  const submenuOpen = document.getElementById('actions-submenu-open') as HTMLElement | null;
+  submenuOpen?.querySelector<HTMLElement>('.act-open-clipboard')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openFromClipboard' });
+    closeAllActionsPanels();
+  });
+  submenuOpen?.querySelector<HTMLElement>('.act-browse-markdown')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'browseMarkdown' });
     closeAllActionsPanels();
   });
 
