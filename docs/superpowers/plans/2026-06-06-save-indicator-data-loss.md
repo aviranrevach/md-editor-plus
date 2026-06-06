@@ -613,6 +613,8 @@ In the `createEditor` callback (lines 930-935), add `applySaveEvent('localEdit')
 
 Also drive the indicator from Code-view edits: in `ensureSourceEditor` (the `createSourceEditor(sourceEditorEl, currentMarkdown, (md) => { ... })` callback, ~line 155-159), add `applySaveEvent('localEdit');` as the first line of that callback body so typing in the Code view marks the document unsaved too.
 
+**Refinement (immediate dirty marking):** the `onChange` callbacks are DEBOUNCED (500ms), so marking `localEdit` there means the indicator shows "Saved" for up to 500ms — and the whole time the user is actively typing (the debounce keeps resetting). That makes the indicator lie. Fix: `createEditor`/`createSourceEditor` take an optional `onDirty?: () => void` called synchronously in `onUpdate` (every keystroke, before `schedule()`). The webview passes `() => applySaveEvent('localEdit')` as `onDirty` to both, and the `localEdit` call is REMOVED from the debounced `onChange` callbacks. `applySaveEvent` only re-renders when the state actually changes (or a flash is requested) to avoid per-keystroke DOM churn.
+
 - [ ] **Step 5: Add the Cmd+S keybinding**
 
 In the `document.addEventListener('keydown', ...)` block (lines 945-954), add a branch after the existing Cmd+F branch (after line 953's closing `}`):
