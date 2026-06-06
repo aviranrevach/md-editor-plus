@@ -5,7 +5,7 @@
 
 | Title | Status | id | Impact | Area |
 |---|---|---|---|---|
-| Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Todo | c8 | Urgent!! | General |
+| Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Done | c8 | Urgent!! | General |
 | Fix Add image feature | Todo | c1 | High | Add / Modify Block |
 | In some block types, clicking the dragger doesn't let you reach "Turn into", "Delete", "Duplicate", etc. | Todo | c2 | High | Add / Modify Block |
 | Pasting Image in - add image to workspace options (consider also in table / board table) | Todo | c10 | High | General |
