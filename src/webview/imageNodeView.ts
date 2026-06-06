@@ -280,7 +280,9 @@ class ImageNodeView {
     bar.appendChild(this.sep());
     bar.appendChild(this.button('Compress', () => { void this.compress(); }));
     bar.appendChild(this.button('Reveal', () => {
-      void revealImage(this.node.attrs.src as string);
+      const src = this.node.attrs.src as string;
+      if (/^(?:https?:|data:)/i.test(src)) return;
+      void revealImage(src);
     }));
     bar.appendChild(this.button('Remove', () => this.remove()));
 

@@ -132,7 +132,10 @@ export function openBoardImageManager(
           b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
           actions.appendChild(b);
         };
-        mkBtn('⤢', `Reveal in Finder: ${link.src}`, () => { void revealImage(link.src); });
+        mkBtn('⤢', `Reveal in Finder: ${link.src}`, () => {
+          if (/^(?:https?:|data:)/i.test(link.src)) return;
+          void revealImage(link.src);
+        });
         mkBtn('🗜', `Compress: ${link.src}`, () => { void compressLink(i, link.src); });
         wrap.appendChild(actions);
         grid.appendChild(wrap);

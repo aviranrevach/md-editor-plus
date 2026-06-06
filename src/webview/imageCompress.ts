@@ -65,8 +65,8 @@ export async function compressImage(
   if (!outBlob) return { bytes, mime: inputMime, changed: false };
   const outBytes = await outBlob.arrayBuffer();
 
-  // Never inflate when staying in the same format/extension.
-  if (outBytes.byteLength >= bytes.byteLength && outMime === inputMime) {
+  // Never inflate: if the re-encode didn't get smaller, keep the original.
+  if (outBytes.byteLength >= bytes.byteLength) {
     return { bytes, mime: inputMime, changed: false };
   }
   return { bytes: outBytes, mime: outMime, changed: true };
