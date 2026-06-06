@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Board card `id` is read-only and uses a canonical `C<n>` scheme** — the table's `id` column now always shows each card's real id (never blank), rendered read-only but still selectable/copyable, styled as a muted system field, and defaulting to a compact width. New ids follow an unpadded `C<n>` scheme (e.g. `C1`, `C18`) continuing from the highest existing number; legacy lowercase `c<n>` ids migrate to uppercase on open — table cells and their `<!-- board:body id="…" -->` anchors together, so every card stays linked to its description. Both card-creation paths (table and kanban inline-add) and the serialize fallback now share one canonical id minter.
+
 ## [0.5.4] - 2026-06-06
 
 ### Changed

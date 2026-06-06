@@ -5,8 +5,8 @@
 
 | Title | Status | id | Impact | Area |
 |---|---|---|---|---|
-| Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Todo | c8 | Urgent!! | General |
-| Fix Add image feature | Todo | c1 | High | Add / Modify Block |
+| Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Doing | c8 | Urgent!! | General |
+| Fix Add image feature. now it doesnt work at all when you click on it. | Todo | c1 | High | Add / Modify Block |
 | In some block types, clicking the dragger doesn't let you reach "Turn into", "Delete", "Duplicate", etc. | Todo | c2 | High | Add / Modify Block |
 | Pasting Image in - add image to workspace options (consider also in table / board table) | Todo | c10 | High | General |
 | Bug! Changing column size | Todo | c11 | High | Board table |
@@ -21,7 +21,12 @@
 | Main three dots menu duplicate should have two options- save in workspace, or download (saved in your download) | Todo | c14 | Medium | Main three dots menu |
 | Export pdf doesnt work, probably html too. | Todo | c15 | High | Main three dots menu |
 | Board table cells - the content of status clipped out of their cells when you are scaling down the window | Todo | c16 | Medium | Board table -> cell |
-| ID doesnt added automatically whe you unhide it. maybe should be read only | Todo | c17 | Urgent!! |  |
+| ID doesnt added automatically whe you unhide it. maybe should be read only | Done | c17 | Urgent!! |  |
+| Board table remove stroke on left dragger edge cell | Todo | c18 | Low | Board table |
+| Status is broken on boards (spotted on table view). doesnt allow you to change order, when you add new it was synched with another status- changing it would change the other one. plus on the main three dot menu- editing it from there is blocked altogether | Todo | c19 | High | Boards |
+| Filter on Boards- allow to show / hide specific items by status / tag etc | Todo | c20 | Low | Boards |
+| Handle pasting images from clipboard. can we drop the image in a folder in the workspace? ask the user? need to brainstorm | Todo | c21 | High | Images |
+| Allow images in table cells on board list. it can be a view of a link in mid text or something? brainstorm on this | Todo | c22 | High | Images |
 
 <!-- board:body id="c8" -->
 

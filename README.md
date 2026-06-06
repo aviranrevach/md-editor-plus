@@ -4,7 +4,9 @@
 
 Open any Markdown file and it renders as polished, block-based content. Click anywhere to edit, drag blocks to reorder, slash to insert. Your file stays plain Markdown on disk, so it works with every other tool in your pipeline.
 
-![MD Editor Plus](media/Md-editor-plus02.gif)\---
+[![MD Editor Plus](media/Md-editor-plus02.gif)](https://github.com/aviranrevach/md-editor-plus/raw/main/media/Md-editor-plus02.webm)
+
+---
 
 ## Why use it
 
@@ -115,7 +117,9 @@ To switch a single file back to VS Code's default editor, run **MD Editor Plus: 
 
 ## The toolbar
 
-![The MD Editor Plus toolbar](media/toolbar.png)The toolbar fades to 50% opacity when your cursor isn't near it, so it stays out of the way while you write. Bring the mouse within \~150 px of the top of the page and it lights back up.
+![The MD Editor Plus toolbar](media/toolbar.png)
+
+The toolbar fades to 50% opacity when your cursor isn't near it, so it stays out of the way while you write. Bring the mouse within \~150 px of the top of the page and it lights back up.
 
 | Element | Behavior |
 | --- | --- |
@@ -279,12 +283,14 @@ flowchart LR
 
 ### Boards (Kanban / Table)
 
-![Kanban board](media/kanban-board.gif)Type `/board kanban` or `/board table` to drop a project board. Two views over the same data:
+![Kanban board](media/kanban-board.gif)
+
+Type `/board kanban` or `/board table` to drop a project board. Two views over the same data:
 
 - **Kanban view** — columns of cards. Drag cards between columns, drag columns to reorder. Add columns from the right edge, add cards from the bottom of any column. Double-click a column header to rename. Per-column color swatch from a **10-color palette** (gray, blue, amber, emerald, red, purple, orange, teal, indigo, pink).
-- **Table view** — a true database table. Sort by column, resize columns, drag to reorder. Show / hide properties from the Properties popover. Inline-edit every cell. The Description column is a synthetic field that maps to the card body text. **Group by any status or tag column** (column ⋯ → *Group by this*) — rows stack into colored, collapsible sections in that field's color and order, with a *Remove grouping* control.
+- **Table view** — a true database table. Sort by column, resize columns, drag to reorder. Show / hide properties from the Properties popover. Inline-edit every cell. The Description column is a synthetic field that maps to the card body text. Each card carries an auto-assigned **`id`** (`C1`, `C2`, …) shown read-only and copyable in a compact column — it's the link between a row and its description, so it's never editable. **Group by any status or tag column** (column ⋯ → *Group by this*) — rows stack into colored, collapsible sections in that field's color and order, with a *Remove grouping* control.
 
-![Table board](media/table-board.png)**Field types** — `text`, `status`, `date`, `person`, `tags`, with type-aware editors.
+**Field types** — `text`, `status`, `date`, `person`, `tags`, with type-aware editors.
 
 - **Multiple status columns** — beyond the built-in Status, add as many `status` columns as you like (e.g. *Impact*, *Priority*). Each owns its own set of states with colors, editable from **Edit options** (the column ⋯, the property ⋯, or right when you create the column). Picking a state sets that column, independently of Status.
 - **Colored, managed tags** — `tags` columns are a multi-select set with colors. Click a cell for a **checklist picker** (toggle tags on/off, or type to create). New tags auto-pick a stable color you can change later; rename / recolor / delete the whole set from **Edit options**, and renames/deletes propagate across every card. Existing tags light up with colors automatically.
@@ -428,7 +434,3 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 [MIT](LICENSE)
-
----
-
-Made by **Aviran Revach** [GitHub](https://github.com/aviranrevach)
