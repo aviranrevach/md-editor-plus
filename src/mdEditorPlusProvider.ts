@@ -119,16 +119,25 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     // Writes the (already-applied, in-memory) document to disk. Gated on conflict:
     // while a conflict banner is up the webview suppresses edits AND pauses us, so
     // we never overwrite an external change with the user's un-reconciled version.
-    const saveToDisk = async (flash = false): Promise<void> => {
+    // The 'saved' message is emitted by onDidSaveTextDocument (single source of
+    // truth) so it can't race a duplicate; flashNextSave carries the Cmd+S pulse.
+    const saveToDisk = async (): Promise<void> => {
       if (conflictPaused) return;
-      if (!document.isDirty) { postSaveState('saved', flash); return; }
+      if (!document.isDirty) {
+        // Nothing to write — onDidSaveTextDocument won't fire, so emit here.
+        postSaveState('saved', flashNextSave);
+        flashNextSave = false;
+        return;
+      }
       postSaveState('saving');
       try {
         const ok = await document.save();
-        postSaveState(ok ? 'saved' : 'failed', ok && flash);
+        if (!ok) { postSaveState('failed'); flashNextSave = false; }
+        // on success: onDidSaveTextDocument posts 'saved' (with flashNextSave)
       } catch (err) {
         console.error('[md-editor-plus] save failed', err);
         postSaveState('failed');
+        flashNextSave = false;
       }
     };
 
@@ -183,7 +192,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
 
     const onDocSave = vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc.uri.toString() !== document.uri.toString()) return;
-      postSaveState('saved');
+      postSaveState('saved', flashNextSave);
+      flashNextSave = false;
     });
 
     webviewPanel.webview.onDidReceiveMessage(async (msg: {
@@ -220,7 +230,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       if (msg.type === 'save') {
         if (msg.markdown !== undefined) await this._applyEdit(document, msg.markdown);
         cancelAutoSave();
-        await saveToDisk(true);
+        flashNextSave = true;
+        await saveToDisk();
         return;
       }
       if (msg.type === 'conflictPause') {
