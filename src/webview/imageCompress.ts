@@ -20,3 +20,54 @@ export function scaleToFit(w: number, h: number, maxDim: number): { w: number; h
   const ratio = maxDim / longest;
   return { w: Math.max(1, Math.round(w * ratio)), h: Math.max(1, Math.round(h * ratio)) };
 }
+
+export interface CompressResult {
+  bytes: ArrayBuffer;
+  mime: string;
+  changed: boolean; // false => caller should keep the original asset as-is
+}
+
+// Re-encode image bytes through an offscreen canvas at `quality`, optionally
+// capping the longest side to `maxDim`. Never inflates: if the result isn't
+// smaller (and the format is unchanged), returns the original with changed=false.
+export async function compressImage(
+  bytes: ArrayBuffer,
+  inputMime: string,
+  opts: { quality?: number; maxDim?: number } = {},
+): Promise<CompressResult> {
+  const outMime = outputMimeForCompress(inputMime);
+  if (!outMime) return { bytes, mime: inputMime, changed: false };
+  const quality = opts.quality ?? 0.8;
+  const maxDim = opts.maxDim ?? 0;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(new Blob([bytes], { type: inputMime }));
+  } catch {
+    return { bytes, mime: inputMime, changed: false };
+  }
+  const { w, h } = scaleToFit(bitmap.width, bitmap.height, maxDim);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    bitmap.close?.();
+    return { bytes, mime: inputMime, changed: false };
+  }
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+
+  const outBlob: Blob | null = await new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b), outMime, quality),
+  );
+  if (!outBlob) return { bytes, mime: inputMime, changed: false };
+  const outBytes = await outBlob.arrayBuffer();
+
+  // Never inflate when staying in the same format/extension.
+  if (outBytes.byteLength >= bytes.byteLength && outMime === inputMime) {
+    return { bytes, mime: inputMime, changed: false };
+  }
+  return { bytes: outBytes, mime: outMime, changed: true };
+}
