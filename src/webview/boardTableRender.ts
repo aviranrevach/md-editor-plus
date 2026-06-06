@@ -1288,6 +1288,12 @@ function beginInlineText(
             : c,
         ),
       });
+    } else {
+      // No change → mutate (and its re-render) won't fire, so restore the
+      // rendered display ourselves; otherwise the cell is stuck showing the
+      // raw `![](…)` markdown instead of the thumbnail.
+      td.textContent = '';
+      if (next.includes('![')) renderInlineWithImages(td, next); else td.textContent = next;
     }
   };
   const cancel = () => {
