@@ -1225,6 +1225,11 @@ function beginInlineText(
   td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx,
 ): void {
   if (td.getAttribute('contenteditable') === 'true') return;
+  // Replace any rendered DOM (which may contain <img> thumbnails) with the raw
+  // markdown string so the user edits plain text and commit() reads it back
+  // losslessly — without this, textContent on a mixed text+<img> DOM drops the
+  // image links entirely.
+  td.textContent = card.values[field.name] ?? '';
   td.setAttribute('contenteditable', 'true');
   td.classList.add('bd-cell-editing');
   td.focus();
@@ -1258,9 +1263,13 @@ function beginInlineText(
   const cancel = () => {
     if (resolved) return;
     resolved = true;
-    td.textContent = card.values[field.name] ?? '';
     td.removeAttribute('contenteditable');
     td.classList.remove('bd-cell-editing');
+    // Restore the rendered display (thumbnails) rather than leaving raw markdown
+    // text — commit triggers ctx.mutate which re-renders, but cancel does not.
+    const v = card.values[field.name] ?? '';
+    td.textContent = '';
+    if (v.includes('![')) renderInlineWithImages(td, v); else td.textContent = v;
     cleanup();
   };
   const onKey = (e: KeyboardEvent) => {
