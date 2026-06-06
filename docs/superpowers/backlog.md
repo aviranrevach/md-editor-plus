@@ -7,6 +7,19 @@ Add new entries at the top of each section.
 
 ---
 
+## Image block controls — click an image for a menu (new feature, post-c21)
+
+- Requested 2026-06-06. Clicking an inserted image should surface a small toolbar/menu (reuse the bubble-menu pattern) with:
+  - **See source** — show where the image is from (relative path / URL).
+  - **Switch** — replace it (reopen the same drill-down picker: upload/browse/link/clipboard).
+  - **Remove** — delete the image node.
+  - **Scale / resize** — store a `width` attr on the image; drag handles or a size menu. Round-trips as an HTML `<img width>` or markdown-compatible attribute.
+- **Compress** (stretch): re-encode/downscale large images before saving — pragmatic path is client-side `<canvas>` re-encode (free, no AI); AI compression is overkill for file-size reduction.
+
+## c21 drag-drop — Finder drop opens a new tab instead of inserting
+
+- The VS Code workbench intercepts OS file-drops onto the webview and opens the file as a tab before our `handleDrop` runs. Paste (⌘V) is unaffected. Possible fix: claim the drop in the webview via window-level `dragover`/`drop` `preventDefault` so the event reaches ProseMirror — needs testing in the real host (may be blocked by the webview sandbox).
+
 ## c1 image picker — "Embed link" still broken in the real host
 
 - Deferred from the c1 drill-down redesign (branch `fix/c1-image-picker-drilldown`).

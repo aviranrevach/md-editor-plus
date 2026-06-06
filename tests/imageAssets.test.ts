@@ -4,6 +4,8 @@ import {
   dedupeFileName,
   relativeAssetPath,
   isImageFileName,
+  extensionForMime,
+  pastedImageName,
 } from '../src/imageAssets';
 
 describe('assetsFolderName', () => {
@@ -64,5 +66,32 @@ describe('isImageFileName', () => {
   it('rejects non-images', () => {
     expect(isImageFileName('notes.md')).toBe(false);
     expect(isImageFileName('noext')).toBe(false);
+  });
+});
+
+describe('extensionForMime', () => {
+  it('maps common image mime types to extensions', () => {
+    expect(extensionForMime('image/png')).toBe('png');
+    expect(extensionForMime('image/jpeg')).toBe('jpg');
+    expect(extensionForMime('image/gif')).toBe('gif');
+    expect(extensionForMime('image/webp')).toBe('webp');
+    expect(extensionForMime('image/svg+xml')).toBe('svg');
+  });
+  it('is case-insensitive', () => {
+    expect(extensionForMime('IMAGE/PNG')).toBe('png');
+  });
+  it('falls back to png for unknown types', () => {
+    expect(extensionForMime('image/heic')).toBe('png');
+    expect(extensionForMime('application/octet-stream')).toBe('png');
+  });
+});
+
+describe('pastedImageName', () => {
+  it('builds a zero-padded pasted-<date>.<ext> name', () => {
+    // Month is 0-indexed: 5 === June
+    expect(pastedImageName('image/png', new Date(2026, 5, 6))).toBe('pasted-2026-06-06.png');
+  });
+  it('uses the mime-derived extension', () => {
+    expect(pastedImageName('image/jpeg', new Date(2026, 0, 1))).toBe('pasted-2026-01-01.jpg');
   });
 });

@@ -232,6 +232,8 @@ Pick **Image** from the block picker to drill into four ways to add one (all ins
 
 Filenames keep their original name, with a `-2` suffix added only if there's a clash.
 
+You can also **paste an image** straight from the clipboard (⌘V / Ctrl+V) anywhere in the body — it's saved into `<note>.assets/` as `pasted-<date>.<ext>` and inserted inline.
+
 ### Task lists
 
 Render as actual checkboxes. Click to toggle. Your changes round-trip to standard `- [ ]` / `- [x]` Markdown.

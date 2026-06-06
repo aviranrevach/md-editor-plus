@@ -51,3 +51,30 @@ export function isImageFileName(name: string): boolean {
   if (!m) return false;
   return (IMAGE_EXTENSIONS as readonly string[]).includes(m[1].toLowerCase());
 }
+
+// Map an image MIME type to a file extension. Falls back to "png" for
+// anything unrecognized (clipboard images are almost always png/jpeg).
+export function extensionForMime(mime: string): string {
+  const map: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'image/bmp': 'bmp',
+    'image/avif': 'avif',
+    'image/x-icon': 'ico',
+    'image/vnd.microsoft.icon': 'ico',
+  };
+  return map[mime.toLowerCase()] ?? 'png';
+}
+
+// Name for a clipboard image (which carries no filename): pasted-YYYY-MM-DD.<ext>.
+// The extension side de-dupes (adds -2, -3, …) when the name already exists.
+export function pastedImageName(mime: string, date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `pasted-${y}-${m}-${d}.${extensionForMime(mime)}`;
+}

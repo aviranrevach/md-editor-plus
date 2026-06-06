@@ -28,6 +28,7 @@ import { createBubbleMenu } from './bubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
+import ImagePasteDrop from './extensions/imagePasteDrop';
 import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 
 const lowlight = createLowlight(common);
@@ -126,6 +127,7 @@ export function createEditor(
       BlockOutline,
       SmartTypography,
       SearchExtension,
+      ImagePasteDrop,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
     ],
     editorProps: {
