@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Add image — three ways in** — the **Image** block now opens a small picker with three tabs instead of doing nothing: **Upload** an image from your computer (it's copied into a per-note `<note>.assets/` folder right next to your file), **Browse project** to reuse an image already in your workspace (shown as a thumbnail grid, referenced in place — no duplicate copy), or **Embed link** to point at an image URL. Uploaded files get a clean relative link (`![](./Note.assets/photo.png)`), so your Markdown stays portable and the image survives closing and reopening the file. Filenames are kept readable, with a `-2` suffix only when there's a name clash.
 - **Save status indicator + auto-save** — a condensed indicator sits next to the filename and always tells you the truth about your file: `• Unsaved` the instant you type, `⟳ Saving…` while it writes, and `✓ Saved` at rest (it shows `✓ Saved` from the moment a file opens). Edits now **auto-save to disk ~1 second after you stop typing** — no action needed. Pressing **⌘S / Ctrl+S** saves immediately and gives the indicator a brief confirming pulse. Works in both Preview and Code views (⌘S saves whichever view is active).
 - **External-edit safety** — if the file changes on disk (git, sync, another app) while you have unsaved edits, **auto-save pauses** and the existing conflict banner (Reload from disk / Keep my version) lets you choose — your version is never silently overwritten.
 
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Add image did nothing when clicked** — the **Image** block used the browser's `window.prompt` to ask for a URL, which VS Code webviews silently block, so picking *Image* from the block picker had no effect at all. Replaced with the in-webview picker described above (upload / browse / embed link).
 - **Data loss on close (the big one)** — edits made in the last moment before closing a tab could be lost: the editor buffered changes in a 500 ms debounce that was *discarded* on close instead of flushed, and edits only ever reached VS Code's in-memory copy, never disk, unless you manually saved. Now pending edits are flushed on blur / tab-close / window-hide (for both the Preview and Code editors), and the extension persists them to disk. Closing and reopening a file shows your latest edits.
 
 ## [0.5.4] - 2026-06-06
