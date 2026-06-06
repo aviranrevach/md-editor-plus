@@ -837,7 +837,7 @@ function init(): void {
     setAlwaysDarkSource(Boolean(d.alwaysDarkSource));
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
-    setSmartTypography(d.smartTypography ?? true);
+    setSmartTypography(d.smartTypography ?? true); // default ON (unlike the Boolean()-defaulted toggles above)
     applyReadOnly(Boolean(d.readOnly));
     applySourceWordWrap(Boolean(d.sourceWordWrap));
   }

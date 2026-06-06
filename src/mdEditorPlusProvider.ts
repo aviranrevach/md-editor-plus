@@ -675,7 +675,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       <div class="settings-row" data-tip="Replace typed sequences like -&gt; with → and -- with — as you type (never inside code)">
         <span class="settings-row-icon">${iArrowsH}</span>
         <span class="settings-row-label">Smart typography</span>
-        <button class="toggle-switch" id="smart-typography-toggle" role="switch" aria-checked="true"></button>
+        <button class="toggle-switch" id="smart-typography-toggle" role="switch" aria-checked="false"></button>
       </div>
     </div>
     <div class="settings-divider"></div>
