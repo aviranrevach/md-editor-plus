@@ -2,7 +2,7 @@ import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
-import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor } from './editor';
+import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
 import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { setAlwaysDarkDiagram } from './mermaidRenderer';
@@ -13,6 +13,7 @@ import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { initBoardSidePanel } from './boardSidePanel';
 import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
+import { nextSaveState, describeSaveState, SaveState, SaveEvent } from './saveState';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -82,7 +83,8 @@ interface SavedDefaults {
 }
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
-type HostMessage = InitMessage | UpdateMessage;
+interface SaveStateMessage { type: 'saveState'; state: 'saving' | 'saved' | 'failed'; flash?: boolean }
+type HostMessage = InitMessage | UpdateMessage | SaveStateMessage;
 
 type WidthMode  = 'normal' | 'full';
 type TextSize   = 's' | 'm' | 'l' | 'xl';
@@ -156,7 +158,7 @@ function init(): void {
       currentMarkdown = md;
       lastSentMarkdown = normalizeMd(md);
       vscode.postMessage({ type: 'edit', markdown: md });
-    });
+    }, () => applySaveEvent('localEdit'));
     sourceEditorReady = true;
   }
 
@@ -282,13 +284,41 @@ function init(): void {
     <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
   `;
   document.body.appendChild(conflictBanner);
+
+  let saveState: SaveState = 'saved';
+  const saveIndicatorEl = document.getElementById('save-indicator');
+  let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function renderSaveIndicator(flash: boolean): void {
+    if (!saveIndicatorEl) return;
+    const v = describeSaveState(saveState);
+    saveIndicatorEl.textContent = `${v.glyph} ${v.label}`;
+    saveIndicatorEl.className = `save-indicator ${v.cssClass}${flash ? ' save-ind-flash' : ''}`;
+    if (flash) {
+      if (flashTimer) clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => saveIndicatorEl.classList.remove('save-ind-flash'), 1000);
+    }
+  }
+
+  function applySaveEvent(event: SaveEvent, flash = false): void {
+    const prev = saveState;
+    saveState = nextSaveState(saveState, event);
+    if (saveState !== prev || flash) renderSaveIndicator(flash);
+  }
+
+  renderSaveIndicator(false); // show "✓ Saved" from the moment the file opens
+
   function showConflictBanner(): void {
     conflictBanner.classList.add('visible');
     document.documentElement.classList.add('conflict-active');
+    applySaveEvent('conflictDetected');
+    vscode.postMessage({ type: 'conflictPause', paused: true });
   }
   function hideConflictBanner(): void {
     conflictBanner.classList.remove('visible');
     document.documentElement.classList.remove('conflict-active');
+    applySaveEvent('conflictResolved');
+    vscode.postMessage({ type: 'conflictPause', paused: false });
   }
   conflictBanner.querySelector('#conflict-reload')?.addEventListener('click', () => {
     if (pendingExternalMarkdown === null) { hideConflictBanner(); return; }
@@ -932,7 +962,7 @@ function init(): void {
         lastSentMarkdown = normalizeMd(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);
         vscode.postMessage({ type: 'edit', markdown });
-      });
+      }, () => applySaveEvent('localEdit'));
       editorReady = true;
       initBoardSidePanel();
 
@@ -950,6 +980,16 @@ function init(): void {
           closeAllActionsPanels();
           closeSettingsPanel();
           findBar?.open();
+        }
+        if (mod && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          flushPendingEdit();
+          // Read the ACTIVE editor — in Code view the latest text lives in the
+          // source editor, not the preview one.
+          const md = sourceMode ? getSourceMarkdown() : getCurrentMarkdown();
+          currentMarkdown = md;
+          lastSentMarkdown = normalizeMd(md);
+          vscode.postMessage({ type: 'save', markdown: md });
         }
       });
 
@@ -982,6 +1022,15 @@ function init(): void {
         console.error('[md-editor-plus] INIT FAILED', err);
         document.body.innerHTML = '<pre style="padding:20px;color:#c44">md-editor-plus init failed:\n\n' + String(err && (err as Error).stack || err) + '</pre>';
       }
+    }
+
+    if (msg.type === 'saveState') {
+      const event: SaveEvent =
+        msg.state === 'saving' ? 'saveStarted' :
+        msg.state === 'saved'  ? 'saveSucceeded' :
+                                 'saveFailed';
+      applySaveEvent(event, Boolean(msg.flash));
+      return;
     }
 
     if (msg.type === 'update' && editorReady) {
@@ -1017,6 +1066,14 @@ function init(): void {
   // exists — VS Code drops messages to a webview that isn't listening yet,
   // leaving the editor uninitialized and the page blank. Must be the last
   // thing init() does, so the listener above is guaranteed registered first.
+
+  // Never lose the last keystrokes: flush the pending edit on any teardown signal.
+  window.addEventListener('blur', () => flushPendingEdit());
+  window.addEventListener('pagehide', () => flushPendingEdit());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingEdit();
+  });
+
   vscode.postMessage({ type: 'ready' });
 }
 

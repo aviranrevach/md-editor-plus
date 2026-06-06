@@ -4,6 +4,7 @@ module.exports = {
   createEditor: () => ({ setEditable: () => {} }),
   setReadOnly: () => {},
   updateContent: () => {},
+  flushPendingEdit: () => {},
   destroyEditor: () => {},
   getCurrentMarkdown: () => '',
   setMediaBaseUri: () => {},

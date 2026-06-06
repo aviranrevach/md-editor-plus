@@ -28,11 +28,12 @@ import { createBubbleMenu } from './bubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
+import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 
 const lowlight = createLowlight(common);
 
 let _editor: Editor | null = null;
-let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _editDebounce: FlushableDebounce | null = null;
 let _frontmatter = '';
 let _onFrontmatterChange: ((info: { lines: number; kind: 'yaml' | 'toml' | 'none' }) => void) | null = null;
 let _mediaBaseUri = '';
@@ -85,6 +86,7 @@ export function createEditor(
   element: HTMLElement,
   initialMarkdown: string,
   onChange: OnChangeCallback,
+  onDirty?: () => void,
 ): Editor {
   const split = splitFrontmatter(initialMarkdown);
   _frontmatter = split.frontmatter;
@@ -130,14 +132,22 @@ export function createEditor(
       attributes: { spellcheck: 'true' },
     },
     content: body,
-    onUpdate({ editor }) {
-      if (_debounceTimer) clearTimeout(_debounceTimer);
-      _debounceTimer = setTimeout(() => {
-        const markdown = editor.storage.markdown.getMarkdown() as string;
-        onChange(_frontmatter + markdown);
-      }, 500);
+    onUpdate() {
+      onDirty?.();
+      _editDebounce?.schedule();
+    },
+    onBlur() {
+      // Losing focus is a natural save point — flush so the last keystrokes
+      // reach the host immediately instead of waiting on the debounce.
+      _editDebounce?.flush();
     },
   });
+
+  _editDebounce = createFlushableDebounce(() => {
+    if (!_editor) return;
+    const markdown = _editor.storage.markdown.getMarkdown() as string;
+    onChange(_frontmatter + markdown);
+  }, 500);
 
   createBubbleMenu(_editor);
   createBlockHandle(_editor);
@@ -185,8 +195,16 @@ export function getCurrentMarkdown(): string {
   return _frontmatter + markdown;
 }
 
+export function flushPendingEdit(): void {
+  _editDebounce?.flush();
+  _sourceEditDebounce?.flush();
+}
+
 export function destroyEditor(): void {
-  if (_debounceTimer) clearTimeout(_debounceTimer);
+  // Flush — NOT clear — so edits made in the last 500ms before close are sent
+  // to the host instead of being silently discarded.
+  _editDebounce?.flush();
+  _editDebounce = null;
   _editor?.destroy();
   _editor = null;
 }
@@ -205,7 +223,7 @@ import { createSourceBubbleMenu } from './sourceBubbleMenu';
 const SourceDocument = Document.extend({ content: 'codeBlock' });
 
 let _sourceEditor: Editor | null = null;
-let _sourceDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _sourceEditDebounce: FlushableDebounce | null = null;
 let _suppressSourceUpdate = false;
 
 function buildSourceContent(markdown: string): object {
@@ -225,6 +243,7 @@ export function createSourceEditor(
   element: HTMLElement,
   initialMarkdown: string,
   onChange: OnChangeCallback,
+  onDirty?: () => void,
 ): Editor {
   _sourceEditor = new Editor({
     element,
@@ -236,13 +255,22 @@ export function createSourceEditor(
       SearchExtension,
     ],
     content: buildSourceContent(initialMarkdown),
-    onUpdate({ editor }) {
+    onUpdate() {
       if (_suppressSourceUpdate) return;
-      const md = editor.state.doc.firstChild?.textContent ?? '';
-      if (_sourceDebounceTimer) clearTimeout(_sourceDebounceTimer);
-      _sourceDebounceTimer = setTimeout(() => onChange(md), 500);
+      onDirty?.();
+      _sourceEditDebounce?.schedule();
+    },
+    onBlur() {
+      // Flush on blur so Code-view edits reach the host immediately. Guard on
+      // the suppress flag for symmetry with onUpdate — a blur during a
+      // programmatic setContent must not push content back as a user edit.
+      if (!_suppressSourceUpdate) _sourceEditDebounce?.flush();
     },
   });
+  _sourceEditDebounce = createFlushableDebounce(() => {
+    if (!_sourceEditor || _suppressSourceUpdate) return;
+    onChange(getSourceMarkdown());
+  }, 500);
   createSourceBubbleMenu(_sourceEditor);
   return _sourceEditor;
 }
@@ -252,8 +280,13 @@ export function updateSourceContent(markdown: string): void {
   const current = _sourceEditor.state.doc.firstChild?.textContent ?? '';
   if (current === markdown) return;
   _suppressSourceUpdate = true;
-  _sourceEditor.commands.setContent(buildSourceContent(markdown), false);
-  _suppressSourceUpdate = false;
+  try {
+    _sourceEditor.commands.setContent(buildSourceContent(markdown), false);
+  } finally {
+    // Always clear the flag — if setContent throws and we leak `true`, every
+    // subsequent Code-view keystroke would be silently dropped (data loss).
+    _suppressSourceUpdate = false;
+  }
 }
 
 export function getSourceMarkdown(): string {
@@ -261,7 +294,8 @@ export function getSourceMarkdown(): string {
 }
 
 export function destroySourceEditor(): void {
-  if (_sourceDebounceTimer) clearTimeout(_sourceDebounceTimer);
+  _sourceEditDebounce?.flush();
+  _sourceEditDebounce = null;
   _sourceEditor?.destroy();
   _sourceEditor = null;
 }

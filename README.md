@@ -78,6 +78,7 @@ From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Cla
 
 ### Workflow & UX
 
+- **Auto-save + save status** — a condensed indicator by the filename always shows where you stand: `• Unsaved` the instant you type, `⟳ Saving…` while it writes, `✓ Saved` at rest. Edits auto-save to disk ~1 s after you stop typing; **⌘S / Ctrl+S** saves immediately with a confirming pulse. If the file changes on disk while you have unsaved edits, auto-save pauses and the conflict banner lets you choose — nothing is silently overwritten.
 - **Find in page** — ⌘F / Ctrl+F (or **Find in page** in the `⋯` menu) opens a Notion-style find bar: every match highlights with a live `3 / 12` count, Enter / Shift+Enter (or ↑ ↓) jumps between them, Esc closes. Works in both Preview and Code views. A match hidden inside a collapsed toggle auto-expands and scrolls into view, and search reaches **inside boards** too — card titles, body previews, field/tag values, column names — scrolling the matching card into view.
 - **Code / Preview toggle** — switch between rendered blocks and raw Markdown without leaving the editor
 - **Auto-fading toolbar** — drops to 50% opacity when your cursor is away, lights up when you approach

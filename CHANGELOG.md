@@ -6,9 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Save status indicator + auto-save** — a condensed indicator sits next to the filename and always tells you the truth about your file: `• Unsaved` the instant you type, `⟳ Saving…` while it writes, and `✓ Saved` at rest (it shows `✓ Saved` from the moment a file opens). Edits now **auto-save to disk ~1 second after you stop typing** — no action needed. Pressing **⌘S / Ctrl+S** saves immediately and gives the indicator a brief confirming pulse. Works in both Preview and Code views (⌘S saves whichever view is active).
+- **External-edit safety** — if the file changes on disk (git, sync, another app) while you have unsaved edits, **auto-save pauses** and the existing conflict banner (Reload from disk / Keep my version) lets you choose — your version is never silently overwritten.
+
 ### Changed
 
 - **Board card `id` is read-only and uses a canonical `C<n>` scheme** — the table's `id` column now always shows each card's real id (never blank), rendered read-only but still selectable/copyable, styled as a muted system field, and defaulting to a compact width. New ids follow an unpadded `C<n>` scheme (e.g. `C1`, `C18`) continuing from the highest existing number; legacy lowercase `c<n>` ids migrate to uppercase on open — table cells and their `<!-- board:body id="…" -->` anchors together, so every card stays linked to its description. Both card-creation paths (table and kanban inline-add) and the serialize fallback now share one canonical id minter.
+
+### Fixed
+
+- **Data loss on close (the big one)** — edits made in the last moment before closing a tab could be lost: the editor buffered changes in a 500 ms debounce that was *discarded* on close instead of flushed, and edits only ever reached VS Code's in-memory copy, never disk, unless you manually saved. Now pending edits are flushed on blur / tab-close / window-hide (for both the Preview and Code editors), and the extension persists them to disk. Closing and reopening a file shows your latest edits.
 
 ## [0.5.4] - 2026-06-06
 
