@@ -195,6 +195,7 @@ export function getCurrentMarkdown(): string {
 
 export function flushPendingEdit(): void {
   _editDebounce?.flush();
+  _sourceEditDebounce?.flush();
 }
 
 export function destroyEditor(): void {
@@ -220,7 +221,7 @@ import { createSourceBubbleMenu } from './sourceBubbleMenu';
 const SourceDocument = Document.extend({ content: 'codeBlock' });
 
 let _sourceEditor: Editor | null = null;
-let _sourceDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _sourceEditDebounce: FlushableDebounce | null = null;
 let _suppressSourceUpdate = false;
 
 function buildSourceContent(markdown: string): object {
@@ -251,13 +252,19 @@ export function createSourceEditor(
       SearchExtension,
     ],
     content: buildSourceContent(initialMarkdown),
-    onUpdate({ editor }) {
+    onUpdate() {
       if (_suppressSourceUpdate) return;
-      const md = editor.state.doc.firstChild?.textContent ?? '';
-      if (_sourceDebounceTimer) clearTimeout(_sourceDebounceTimer);
-      _sourceDebounceTimer = setTimeout(() => onChange(md), 500);
+      _sourceEditDebounce?.schedule();
+    },
+    onBlur() {
+      // Flush on blur so Code-view edits reach the host immediately.
+      _sourceEditDebounce?.flush();
     },
   });
+  _sourceEditDebounce = createFlushableDebounce(() => {
+    if (!_sourceEditor || _suppressSourceUpdate) return;
+    onChange(getSourceMarkdown());
+  }, 500);
   createSourceBubbleMenu(_sourceEditor);
   return _sourceEditor;
 }
@@ -276,7 +283,8 @@ export function getSourceMarkdown(): string {
 }
 
 export function destroySourceEditor(): void {
-  if (_sourceDebounceTimer) clearTimeout(_sourceDebounceTimer);
+  _sourceEditDebounce?.flush();
+  _sourceEditDebounce = null;
   _sourceEditor?.destroy();
   _sourceEditor = null;
 }
