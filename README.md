@@ -238,6 +238,10 @@ You can also **paste an image** straight from the clipboard (⌘V / Ctrl+V) anyw
 
 Render as actual checkboxes. Click to toggle. Your changes round-trip to standard `- [ ]` / `- [x]` Markdown.
 
+### Smart typography
+
+Type `->` and `<-` and they become `→` and `←` as you go — Notion-style. Also `<->` → `↔`, `=>` → `⇒`, `--` → `—`, `...` → `…`, and `(c)` / `(r)` / `(tm)` → `©` / `®` / `™`. Works in the document body **and** in board table cells, card titles, and column names. Code stays untouched, and you can turn it off in Visual settings (the **Aa** menu).
+
 ### Tables
 
 Insert from the block picker, then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table.
