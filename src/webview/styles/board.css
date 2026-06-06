@@ -1734,6 +1734,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   width: calc(100% + 22px);
 }
 
-.bd-image-empty { color: var(--text-secondary); opacity: .55; display: inline-flex; align-items: center; }
-.bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary);
-  opacity: .7; border: 1px dashed var(--border); border-radius: 4px; padding: 2px; }
+/* Empty / broken image placeholders: just a faint icon, no bordered box around it. */
+.bd-image-empty { color: var(--text-secondary); opacity: .4; display: inline-flex; align-items: center; }
+.bd-image-empty svg { width: 16px; height: 16px; }
+.bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary); opacity: .5; }
