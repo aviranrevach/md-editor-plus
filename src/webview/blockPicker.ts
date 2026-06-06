@@ -600,9 +600,13 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     });
 
     if (targets.length) {
-      const sep = document.createElement('div');
-      sep.className = 'block-picker-sep';
-      list.appendChild(sep);
+      // Only divide from the actions above if any were actually rendered —
+      // avoids a stray leading separator when the query matches targets only.
+      if (actions.length) {
+        const sep = document.createElement('div');
+        sep.className = 'block-picker-sep';
+        list.appendChild(sep);
+      }
       targets.forEach((t) => {
         makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
       });
@@ -787,8 +791,9 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       return;
     }
     if (block.inlineInput) {
-      const pos = context.activeBlock ? context.activeBlock.blockEnd : currentPos;
-      showInlineInput(block, pos);
+      // select() only runs in insert mode (the dragger uses the action menu),
+      // so the insert position is always currentPos.
+      showInlineInput(block, currentPos);
       return;
     }
     // Insert mode (+ button / ⌘/). Convert/Delete/Duplicate for an existing
