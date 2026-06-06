@@ -585,6 +585,30 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         }
         return;
       }
+      if (msg.type === 'revealImage') {
+        const m = msg as unknown as { requestId?: unknown; relPath?: unknown };
+        const requestId = typeof m.requestId === 'string' ? m.requestId : '';
+        const reply = (extra: Record<string, unknown>) =>
+          void webviewPanel.webview.postMessage({ type: 'imageRevealed', requestId, ...extra });
+        if (!requestId || typeof m.relPath !== 'string') {
+          reply({ error: 'bad revealImage request' });
+          return;
+        }
+        if (!document.uri.scheme.startsWith('file')) {
+          reply({ error: 'save the file first' });
+          return;
+        }
+        try {
+          const clean = m.relPath.replace(/^\.\//, '');
+          const docDir = vscode.Uri.joinPath(document.uri, '..');
+          const target = vscode.Uri.joinPath(docDir, clean);
+          await vscode.commands.executeCommand('revealFileInOS', target);
+          reply({ ok: true });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+        return;
+      }
       if (msg.type === 'pickProjectImage') {
         const m = msg as unknown as { requestId?: unknown };
         const requestId = typeof m.requestId === 'string' ? m.requestId : '';
