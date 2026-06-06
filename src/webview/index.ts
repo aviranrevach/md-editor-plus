@@ -528,7 +528,7 @@ function init(): void {
     toolbarEl.classList.toggle('panel-open', open);
   }
 
-  const submenuExport = document.getElementById('actions-submenu-export') as HTMLElement;
+  const submenuExport = document.getElementById('actions-submenu-export') as HTMLElement | null;
   let submenuOpenTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuAnchor: HTMLElement | null = null;

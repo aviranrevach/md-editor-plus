@@ -348,7 +348,7 @@ body {
   color: var(--text-primary);
 }
 
-/* Cascading submenu — floats next to the Export item in the actions panel.
+/* Cascading submenus — float next to their trigger row in the actions panel.
    Same visual treatment as the parent panel for continuity. */
 .actions-submenu {
   position: fixed;
