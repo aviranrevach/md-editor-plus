@@ -173,3 +173,31 @@ describe('boardOps.hideFieldInView — auto-clear sort/group', () => {
     expect(b.views[0].groupBy).toBeUndefined();
   });
 });
+
+describe('addCard id scheme (c17)', () => {
+  function board(ids: string[]): Board {
+    return {
+      id: 'b1', name: 'B',
+      columns: [{ name: 'Todo', color: 'blue' }],
+      fields: [
+        { name: 'Title', type: 'text', visibleOnCard: true },
+        { name: 'Status', type: 'status', visibleOnCard: true },
+        { name: 'id', type: 'text', visibleOnCard: false },
+      ],
+      cards: ids.map(id => ({ id, values: { id, Title: '', Status: 'Todo' }, body: '' })),
+      orphanBodies: [], views: [], activeView: 'table',
+    };
+  }
+
+  it('mints an uppercase C<n> id continuing from the highest', () => {
+    const b = board(['C1', 'C2']);
+    const newId = ops.addCard(b);
+    expect(newId).toBe('C3');
+    expect(b.cards[b.cards.length - 1].values.id).toBe('C3');
+  });
+
+  it('continues past legacy lowercase ids', () => {
+    const b = board(['c8']);
+    expect(ops.addCard(b)).toBe('C9');
+  });
+});

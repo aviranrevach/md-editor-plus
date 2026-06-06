@@ -1,4 +1,5 @@
 import type { Board, ViewDef } from './boardModel';
+import { mintCardId } from './boardModel';
 
 function ensureView(board: Board, viewName: string): ViewDef {
   let v = board.views.find(x => x.name === viewName);
@@ -82,16 +83,15 @@ export function addCard(board: Board, presets: Partial<Record<string, string>> =
   for (const f of board.fields) {
     values[f.name] = presets[f.name] ?? '';
   }
+  // Always keep values.id in sync with the card id (the loop above may overwrite it).
+  values.id = id;
   if (!('Status' in presets) && !values.Status) values.Status = board.columns[0]?.name ?? '';
   board.cards.push({ id, values, body: '' });
   return id;
 }
 
 function nextCardId(board: Board): string {
-  const used = new Set(board.cards.map(c => c.id));
-  let i = board.cards.length + 1;
-  while (used.has(`c${i}`)) i++;
-  return `c${i}`;
+  return mintCardId(board.cards.map(c => c.id));
 }
 
 export function moveCard(board: Board, fromId: string, beforeId: string | null): void {
