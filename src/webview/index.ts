@@ -155,11 +155,10 @@ function init(): void {
       return;
     }
     createSourceEditor(sourceEditorEl, currentMarkdown, (md) => {
-      applySaveEvent('localEdit');
       currentMarkdown = md;
       lastSentMarkdown = normalizeMd(md);
       vscode.postMessage({ type: 'edit', markdown: md });
-    });
+    }, () => applySaveEvent('localEdit'));
     sourceEditorReady = true;
   }
 
@@ -302,8 +301,9 @@ function init(): void {
   }
 
   function applySaveEvent(event: SaveEvent, flash = false): void {
+    const prev = saveState;
     saveState = nextSaveState(saveState, event);
-    renderSaveIndicator(flash);
+    if (saveState !== prev || flash) renderSaveIndicator(flash);
   }
 
   renderSaveIndicator(false); // show "✓ Saved" from the moment the file opens
@@ -958,12 +958,11 @@ function init(): void {
       applyDefaults(msg.defaults ?? {});
       refreshDefaultsButtons();
       const editorInstance = createEditor(editorEl, msg.markdown, (markdown) => {
-        applySaveEvent('localEdit');
         currentMarkdown = markdown;
         lastSentMarkdown = normalizeMd(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);
         vscode.postMessage({ type: 'edit', markdown });
-      });
+      }, () => applySaveEvent('localEdit'));
       editorReady = true;
       initBoardSidePanel();
 
