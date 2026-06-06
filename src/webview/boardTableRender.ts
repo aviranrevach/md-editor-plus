@@ -274,7 +274,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
     colgroup.appendChild(gutterCol);
     for (const f of visibleFields) {
       const col = document.createElement('col');
-      col.style.width = `${widths[f.name] ?? 160}px`;
+      col.style.width = `${widths[f.name] ?? (f.name === 'id' ? 64 : 160)}px`;
       colgroup.appendChild(col);
     }
     table.appendChild(colgroup);
