@@ -1500,10 +1500,33 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table-group td { background: var(--bg-secondary, transparent); padding: 4px 10px; font: 500 12px ui-sans-serif, sans-serif; }
 .bd-group-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bd-group-left { display: inline-flex; align-items: center; gap: 6px; }
-.bd-group-caret { color: var(--text-secondary, #888); font-size: 10px; cursor: pointer; }
+.bd-group-caret { display: inline-flex; align-items: center; color: var(--text-secondary, #888); cursor: pointer; padding: 2px; border-radius: 4px; }
+.bd-group-caret svg { width: 14px; height: 14px; display: block; }
+.bd-group-caret:hover { background: rgba(0, 0, 0, 0.06); }
 .bd-group-chip { font-weight: 500; }
-.bd-group-count { color: var(--text-secondary, #888); font-size: 11px; margin-left: 4px; opacity: 0.7; }
-.bd-group-add   { color: var(--link, #2563eb); background: transparent; border: none; cursor: pointer; font: 500 12px ui-sans-serif, sans-serif; padding: 2px 6px; }
+/* Count badge — a small circular counter. Sits tight against the title and
+   inherits the group's text color (the colored chip foreground). */
+.bd-group-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  margin-left: -2px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.07); color: inherit;
+  font: 600 11px ui-sans-serif, sans-serif;
+}
+/* Add-row — fully subtle: type only at rest (neutral color at low opacity),
+   a soft fill appears only on hover. No border, no resting background. */
+.bd-group-add {
+  color: var(--board-text, #37352f); opacity: 0.5;
+  background: transparent; border: none;
+  border-radius: 6px; cursor: pointer;
+  font: 500 11px ui-sans-serif, sans-serif; padding: 3px 9px;
+  transition: background 0.12s, opacity 0.12s;
+}
+.bd-group-add:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+/* Dark theme: tint with translucent white so the badge/hover read on dark bands. */
+.dark .bd-group-caret:hover { background: rgba(255, 255, 255, 0.10); }
+.dark .bd-group-count { background: rgba(255, 255, 255, 0.12); }
+.dark .bd-group-add:hover { background: rgba(255, 255, 255, 0.08); }
 
 /* ── Table add-row ──────────────────────────────────────────────────────── */
 .bd-table-addrow td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); cursor: pointer; }
@@ -1646,7 +1669,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-opt-swatch.color-indigo, .bd-opt-pchip.color-indigo { background: var(--board-chip-indigo-dot); }
 .bd-opt-swatch.color-pink,   .bd-opt-pchip.color-pink   { background: var(--board-chip-pink-dot); }
 
-/* Grouped-table: tint the whole group band in the group's color. */
+/* Grouped-table: tint the whole group band in the group's color. The class sits
+   on the group <td>, so the fill bleeds edge-to-edge (the cell's padding insets
+   the content, not the color). Two classes beat `.bd-table-group td`. */
 .bd-group-band.color-gray    { background: var(--board-chip-gray-bg); }
 .bd-group-band.color-blue    { background: var(--board-chip-blue-bg); }
 .bd-group-band.color-amber   { background: var(--board-chip-amber-bg); }

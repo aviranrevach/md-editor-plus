@@ -390,12 +390,17 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         // Caret lives outside the chip — clicking it (or the chip) collapses.
         const caretEl = document.createElement('span');
         caretEl.className = 'bd-group-caret';
-        caretEl.textContent = collapsedGroups.has(g.key) ? '▸' : '▾';
+        // Phosphor caret-right (collapsed) / caret-down (expanded).
+        caretEl.innerHTML = collapsedGroups.has(g.key)
+          ? `<svg viewBox="0 0 256 256" fill="currentColor"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></svg>`
+          : `<svg viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>`;
 
         // Color from the grouped field: status option color, tag hash, else neutral.
+        // The band class goes on the <td> (not the inner row) so the fill bleeds
+        // edge-to-edge — the cell's padding then insets the content, not the color.
         const gc = groupColor(b, v.groupBy!, g.key);
         const chipColor = gc ?? 'gray';
-        if (gc) row.classList.add('bd-group-band', `color-${gc}`);
+        if (gc) td.classList.add('bd-group-band', `color-${gc}`);
         const chip = document.createElement('span');
         chip.className = `board-column-chip color-${chipColor} bd-group-chip`;
         const dot = document.createElement('span');
@@ -405,6 +410,8 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
         nameSpan.className = 'board-column-name';
         nameSpan.textContent = g.key;
         chip.appendChild(nameSpan);
+        // Count badge — inside the chip, right after the name, so it sits tight
+        // against the title and inherits the group's text color.
         const countSpan = document.createElement('span');
         countSpan.className = 'bd-group-count';
         countSpan.textContent = String(g.cards.length);
