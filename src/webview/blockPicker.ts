@@ -1,5 +1,12 @@
 import { Editor } from '@tiptap/core';
 import { saveImageBytes, pickProjectImage, embedImageFromClipboard } from './imageUpload';
+import {
+  BLOCK_ACTIONS,
+  convertibleTargets,
+  searchBlockActions,
+  type ActionId,
+} from './blockActions';
+import { parseBoardSource, duplicateBoardSource } from './boardModel';
 
 export interface BlockDef {
   id: string;
@@ -143,6 +150,8 @@ const ICO = {
   folder: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V56H92.69l27.31,27.31A15.86,15.86,0,0,0,131.31,88H216Z"/></svg>`,
   link: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M137.54,186.36a8,8,0,0,1,0,11.31l-9.94,10A56,56,0,0,1,48.38,128.4L72.5,104.28A56,56,0,0,1,149.31,102a8,8,0,1,1-10.64,12,40,40,0,0,0-54.85,1.63L59.7,139.72a40,40,0,0,0,56.58,56.58l9.94-9.94A8,8,0,0,1,137.54,186.36Zm70.08-138a56.08,56.08,0,0,0-79.22,0l-9.94,9.95a8,8,0,0,0,11.32,11.31l9.94-9.94a40,40,0,0,1,56.58,56.58L172.18,150.4A40,40,0,0,1,117.33,152,8,8,0,1,0,106.69,164a56,56,0,0,0,76.81-2.26l24.12-24.12A56.08,56.08,0,0,0,207.62,48.38Z"/></svg>`,
   clipboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H163.74a47.92,47.92,0,0,0-71.48,0H56A16,16,0,0,0,40,48V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm-72,0a32,32,0,0,1,32,32H96A32,32,0,0,1,128,32Zm72,184H56V48H82.75A47.93,47.93,0,0,0,80,64v8a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V64a47.93,47.93,0,0,0-2.75-16H200Z"/></svg>`,
+  turnInto: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H59.31l34.35,34.34a8,8,0,0,1-11.32,11.32l-48-48a8,8,0,0,1,0-11.32l48-48a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>`,
+  copy: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>`,
 };
 
 export const BLOCK_DEFS: BlockDef[] = [
@@ -450,6 +459,12 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   let filtered: BlockDef[] = BLOCK_DEFS;
   let drillParent: BlockDef | null = null;
   let context: PickerContext = {};
+  let actionMode = false;   // opened over a block (dragger) -> show action menu
+  let turnIntoOpen = false; // inside the flat "Turn into" target list
+  // Each rendered row registers its activation callback here, indexed to match
+  // the DOM order used by arrow-key navigation. Lets Enter activate any row
+  // type (action OR convert target) without a per-type branch in keydown.
+  let activeRows: Array<() => void> = [];
 
   function isActiveItem(block: BlockDef): boolean {
     const ab = context.activeBlock;
@@ -552,6 +567,155 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       return true;
     }).run();
     close();
+  }
+
+  // Build one selectable row. `activate` is what runs on click or Enter.
+  function makeRow(iconHtml: string, label: string, activate: () => void,
+                   opts: { caret?: boolean; current?: boolean; danger?: boolean } = {}): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'block-picker-item';
+    if (opts.current) row.classList.add('current');
+    if (opts.danger) row.classList.add('block-picker-delete');
+    row.dataset.idx = String(activeRows.length);
+    const check = opts.current ? '<span class="block-picker-current-mark">✓</span>' : '';
+    const caret = opts.caret ? '<span class="block-picker-caret">›</span>' : '';
+    row.innerHTML = `<span class="block-picker-icon">${iconHtml}</span><span class="block-picker-label">${label}</span>${check}${caret}`;
+    row.addEventListener('mousedown', (e) => { e.preventDefault(); activate(); });
+    list.appendChild(row);
+    activeRows.push(activate);
+    return row;
+  }
+
+  function runAction(id: ActionId): void {
+    if (id === 'turn-into') { openTurnInto(); return; }
+    if (id === 'delete')    { deleteActiveBlock(); return; }
+    if (id === 'duplicate') { duplicateActiveBlock(); return; }
+  }
+
+  const ACTION_ICONS: Record<ActionId, string> = {
+    'turn-into': ICO.turnInto,
+    'duplicate': ICO.copy,
+    'delete':    ICO.trash,
+  };
+
+  // The dragger action menu. Empty search -> grouped (Turn into › / Duplicate /
+  // Delete). Non-empty -> matching actions + flattened convert targets.
+  function renderActionMenu(): void {
+    list.innerHTML = '';
+    activeRows = [];
+    const { actions, targets } = searchBlockActions(input.value, BLOCK_DEFS);
+
+    actions.forEach((a) => {
+      makeRow(ACTION_ICONS[a.id], a.label, () => runAction(a.id),
+        { caret: a.id === 'turn-into' && !input.value.trim(), danger: a.id === 'delete' });
+      if (a.id === 'turn-into' && !input.value.trim() && actions.length > 1) {
+        const sep = document.createElement('div');
+        sep.className = 'block-picker-sep';
+        list.appendChild(sep);
+      }
+    });
+
+    if (targets.length) {
+      const sep = document.createElement('div');
+      sep.className = 'block-picker-sep';
+      list.appendChild(sep);
+      targets.forEach((t) => {
+        makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
+      });
+    }
+
+    if (!activeRows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'block-picker-empty';
+      empty.textContent = 'No matching actions';
+      list.appendChild(empty);
+    }
+    activeIdx = 0;
+    updateActive();
+  }
+
+  // The flat "Turn into" target list (reached via the Turn into row).
+  function renderTurnInto(): void {
+    list.innerHTML = '';
+    activeRows = [];
+    const back = document.createElement('div');
+    back.className = 'block-picker-back';
+    back.innerHTML = `<span class="block-picker-back-icon">‹</span><span class="block-picker-back-label">Turn into</span>`;
+    back.addEventListener('mousedown', (e) => { e.preventDefault(); closeTurnInto(); });
+    list.appendChild(back);
+
+    const q = input.value.toLowerCase().trim();
+    const items = convertibleTargets(BLOCK_DEFS).filter(
+      t => !q || t.label.toLowerCase().includes(q) ||
+           t.description.toLowerCase().includes(q) ||
+           (t.aliases ?? []).some(a => a.toLowerCase().includes(q)),
+    );
+    items.forEach((t) => {
+      makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
+    });
+    activeIdx = 0;
+    updateActive();
+  }
+
+  function openTurnInto(): void {
+    turnIntoOpen = true;
+    input.value = '';
+    input.placeholder = 'Turn into…';
+    renderTurnInto();
+    input.focus();
+  }
+
+  function closeTurnInto(): void {
+    turnIntoOpen = false;
+    input.value = '';
+    input.placeholder = 'Search actions…';
+    renderActionMenu();
+    input.focus();
+  }
+
+  // Convert the active block into the target type, or no-op if it already is.
+  function convertActive(target: BlockDef): void {
+    const ab = context.activeBlock;
+    if (!ab) { close(); return; }
+    if (isActiveItem(target)) { close(); return; }
+    if (target.convert) target.convert(editor, ab.blockPos);
+    close();
+    setTimeout(() => { editor.commands.focus(); editor.commands.scrollIntoView(); }, 30);
+  }
+
+  // Collect every board id currently in the document, so a duplicated board
+  // gets an id that doesn't clash with any existing one.
+  function collectBoardIds(): string[] {
+    const ids: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'board') {
+        try { ids.push(parseBoardSource(node.attrs.source as string).id); }
+        catch { /* malformed source — skip */ }
+      }
+      return true;
+    });
+    return ids;
+  }
+
+  function duplicateActiveBlock(): void {
+    const ab = context.activeBlock;
+    if (!ab) { close(); return; }
+    editor.chain().focus().command(({ tr, dispatch }) => {
+      const node = tr.doc.nodeAt(ab.blockPos);
+      if (!node) return false;
+      const insertAt = ab.blockPos + node.nodeSize;
+      let copy;
+      if (node.type.name === 'board') {
+        const newSource = duplicateBoardSource(node.attrs.source as string, collectBoardIds());
+        copy = node.type.create({ ...node.attrs, source: newSource }, node.content, node.marks);
+      } else {
+        copy = node.copy(node.content);
+      }
+      if (dispatch) tr.insert(insertAt, copy);
+      return true;
+    }).run();
+    close();
+    setTimeout(() => { editor.commands.focus(); editor.commands.scrollIntoView(); }, 30);
   }
 
   function renderRow(block: BlockDef, idx: number): HTMLElement {
@@ -673,6 +837,11 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   input.addEventListener('input', () => {
+    if (actionMode) {
+      if (turnIntoOpen) renderTurnInto();
+      else renderActionMenu();
+      return;
+    }
     filtered = filterBlocks(input.value, currentSource());
     renderList(filtered);
   });
@@ -680,7 +849,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   input.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      activeIdx = Math.min(activeIdx + 1, filtered.length - 1);
+      const max = actionMode ? activeRows.length - 1 : filtered.length - 1;
+      activeIdx = Math.min(activeIdx + 1, max);
       updateActive();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -688,9 +858,16 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       updateActive();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filtered[activeIdx]) select(filtered[activeIdx]);
+      if (actionMode) {
+        activeRows[activeIdx]?.();
+      } else if (filtered[activeIdx]) {
+        select(filtered[activeIdx]);
+      }
     } else if (e.key === 'Escape') {
-      if (drillParent) {
+      if (actionMode && turnIntoOpen) {
+        e.preventDefault();
+        closeTurnInto();
+      } else if (drillParent) {
         drillParent = null;
         input.placeholder = 'Filter blocks…';
         input.value = '';
@@ -707,27 +884,23 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     currentPos = insertPos;
     context = ctx;
     drillParent = null;
+    turnIntoOpen = false;
     searchEl.style.display = '';
-    // If the user clicked the dragger over a callout, drill straight into the
-    // callout sub-list so they see the five type options with the current one
-    // highlighted instead of the top-level Callout entry.
-    if (ctx.activeBlock?.typeName === 'callout') {
-      const calloutItem = BLOCK_DEFS.find((b) => b.id === 'callout');
-      if (calloutItem?.subItems?.length) {
-        drillParent = calloutItem;
-        input.placeholder = `Filter ${calloutItem.label.toLowerCase()}…`;
-        filtered = calloutItem.subItems;
-        input.value = '';
-        renderList(filtered);
-        el.classList.add('open');
-        positionPopover(anchorEl);
-        return;
-      }
-    }
-    input.placeholder = 'Filter blocks…';
-    filtered = BLOCK_DEFS;
     input.value = '';
-    renderList(BLOCK_DEFS);
+
+    if (ctx.activeBlock) {
+      // Dragger over a block: show the consistent action menu (Turn into /
+      // Duplicate / Delete) for every block type. No more callout auto-drill.
+      actionMode = true;
+      input.placeholder = 'Search actions…';
+      renderActionMenu();
+    } else {
+      // + button / ⌘/ : insert a new block.
+      actionMode = false;
+      input.placeholder = 'Filter blocks…';
+      filtered = BLOCK_DEFS;
+      renderList(BLOCK_DEFS);
+    }
     el.classList.add('open');
     positionPopover(anchorEl);
   }
@@ -748,6 +921,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   function close(): void {
     el.classList.remove('open');
     drillParent = null;
+    actionMode = false;
+    turnIntoOpen = false;
     context = {};
     input.value = '';
     searchEl.style.display = '';
