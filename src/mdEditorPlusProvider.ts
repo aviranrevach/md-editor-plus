@@ -103,6 +103,39 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
 
     const mediaBaseUri = webviewPanel.webview.asWebviewUri(docDir).toString().replace(/\/?$/, '/');
 
+    const AUTO_SAVE_MS = 1000;
+    let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+    let conflictPaused = false;
+
+    const postSaveState = (state: 'saving' | 'saved' | 'failed', flash = false): void => {
+      void webviewPanel.webview.postMessage({ type: 'saveState', state, flash });
+    };
+
+    const cancelAutoSave = (): void => {
+      if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    };
+
+    // Writes the (already-applied, in-memory) document to disk. Gated on conflict:
+    // while a conflict banner is up the webview suppresses edits AND pauses us, so
+    // we never overwrite an external change with the user's un-reconciled version.
+    const saveToDisk = async (flash = false): Promise<void> => {
+      if (conflictPaused) return;
+      if (!document.isDirty) { postSaveState('saved', flash); return; }
+      postSaveState('saving');
+      try {
+        const ok = await document.save();
+        postSaveState(ok ? 'saved' : 'failed', ok && flash);
+      } catch (err) {
+        console.error('[md-editor-plus] save failed', err);
+        postSaveState('failed');
+      }
+    };
+
+    const scheduleAutoSave = (): void => {
+      cancelAutoSave();
+      autoSaveTimer = setTimeout(() => { autoSaveTimer = null; void saveToDisk(); }, AUTO_SAVE_MS);
+    };
+
     const sendInit = () => {
       const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
       webviewPanel.webview.postMessage({
@@ -147,9 +180,15 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       });
     });
 
+    const onDocSave = vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (doc.uri.toString() !== document.uri.toString()) return;
+      postSaveState('saved');
+    });
+
     webviewPanel.webview.onDidReceiveMessage(async (msg: {
       type: string;
       markdown?: string;
+      paused?: boolean;
       defaults?: {
         theme?: string;
         font?: string;
@@ -174,6 +213,19 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       }
       if (msg.type === 'edit' && msg.markdown !== undefined) {
         await this._applyEdit(document, msg.markdown);
+        scheduleAutoSave();
+        return;
+      }
+      if (msg.type === 'save') {
+        if (msg.markdown !== undefined) await this._applyEdit(document, msg.markdown);
+        cancelAutoSave();
+        await saveToDisk(true);
+        return;
+      }
+      if (msg.type === 'conflictPause') {
+        conflictPaused = Boolean(msg.paused);
+        if (conflictPaused) cancelAutoSave();
+        return;
       }
       if (msg.type === 'saveDefaults' && msg.defaults) {
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
@@ -488,7 +540,12 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     });
 
     webviewPanel.onDidDispose(() => {
+      cancelAutoSave();
       onDocChange.dispose();
+      onDocSave.dispose();
+      // Safety net for the close path: if the webview flushed a final edit into
+      // the document but the 1s auto-save hadn't fired yet, persist it now.
+      if (document.isDirty && !conflictPaused) { void document.save(); }
     });
 
     // 'init' is sent in response to the webview's 'ready' handshake above —
@@ -569,6 +626,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     </div>
     <button class="toolbar-icon" id="outline-btn" data-tip="Outline (⌘⇧O)">${iOutline}</button>
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
+    <span class="save-indicator" id="save-indicator" aria-live="polite"></span>
     <span class="toolbar-spacer"></span>
     <button class="toolbar-icon" id="refresh-btn" data-tip="Reload from disk">${iRefresh}</button>
     <button class="toolbar-icon" id="settings-btn" data-tip="Display settings">${iAa}</button>
