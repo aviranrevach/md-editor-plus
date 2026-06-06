@@ -2041,6 +2041,13 @@ html.source-full-width #source-view {
   padding: 8px 10px 4px;
 }
 
+.block-picker-empty {
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
 .block-picker-list {
   display: flex;
   flex-direction: column;
