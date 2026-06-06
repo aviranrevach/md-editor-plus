@@ -430,7 +430,7 @@ export function parseBoardSource(source: string): Board {
   for (let i = 0; i < matches.length; i++) {
     const start = matches[i].end;
     const stop = i + 1 < matches.length ? matches[i + 1].index : body.length;
-    bodyById.set(matches[i].id, body.slice(start, stop).replace(/^\n+/, '').replace(/\n+$/, '\n'));
+    bodyById.set(normalizeLegacyId(matches[i].id), body.slice(start, stop).replace(/^\n+/, '').replace(/\n+$/, '\n'));
   }
 
   const cards: Card[] = [];
@@ -440,7 +440,8 @@ export function parseBoardSource(source: string): Board {
       table.header.forEach((h, idx) => {
         values[h] = row[idx] ?? '';
       });
-      const id = values.id || '';
+      const id = normalizeLegacyId(values.id || '');
+      values.id = id;
       cards.push({ id, values, body: bodyById.get(id) ?? '' });
     }
   }

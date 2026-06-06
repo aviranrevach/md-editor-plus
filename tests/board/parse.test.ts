@@ -89,9 +89,9 @@ describe('parseBoardSource — table rows', () => {
     const board = parseBoardSource(source);
     expect(board.cards).toEqual([
       {
-        id: 'c1',
+        id: 'C1',
         values: {
-          id: 'c1',
+          id: 'C1',
           Title: 'First card',
           Status: 'Doing',
           Owner: '@aviran',
@@ -101,9 +101,9 @@ describe('parseBoardSource — table rows', () => {
         body: '',
       },
       {
-        id: 'c2',
+        id: 'C2',
         values: {
-          id: 'c2',
+          id: 'C2',
           Title: 'Second card',
           Status: 'Todo',
           Owner: '',
