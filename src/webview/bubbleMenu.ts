@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
-import { PluginKey } from '@tiptap/pm/state';
+import { PluginKey, NodeSelection } from '@tiptap/pm/state';
 import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { summarizeSelection, locateAnchors, truncateAnchor } from './aiSelection';
@@ -329,6 +329,9 @@ export function createBubbleMenu(editor: Editor): void {
         // Keep the menu visible while the URL input is showing, even if focus
         // moved out of the editor.
         if (linkRow.style.display !== 'none') return true;
+        // A selected image (or any node selection) gets its own menu — don't
+        // clash by also showing the text-formatting menu over it.
+        if (state.selection instanceof NodeSelection) return false;
         return !state.selection.empty;
       },
       updateDelay:  250,

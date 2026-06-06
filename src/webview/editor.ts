@@ -25,6 +25,7 @@ import BlockDirection from './extensions/blockDirection';
 import BlockOutline from './extensions/outline';
 import SmartTypography from './extensions/smartTypography';
 import { createBubbleMenu } from './bubbleMenu';
+import { createImageBubbleMenu } from './imageBubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
@@ -167,6 +168,7 @@ export function createEditor(
   }, 500);
 
   createBubbleMenu(_editor);
+  createImageBubbleMenu(_editor);
   createBlockHandle(_editor);
   notifyFrontmatterChange();
   return _editor;
