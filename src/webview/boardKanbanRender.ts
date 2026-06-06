@@ -5,7 +5,7 @@
 // that happens inside the board's root element.
 
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
-import { COLOR_TOKENS_PUBLIC } from './boardModel';
+import { COLOR_TOKENS_PUBLIC, mintCardId } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
@@ -369,7 +369,7 @@ function startInlineNewCard(
       return;
     }
     committed = true;
-    const id = `c-${Math.random().toString(36).slice(2, 6)}`;
+    const id = mintCardId(board.cards.map(c => c.id));
     const newCard: Card = {
       id,
       values: { id, Title: title, Status: columnName },

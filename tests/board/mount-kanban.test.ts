@@ -154,4 +154,42 @@ describe('mountKanban — smoke tests', () => {
 
     ops.destroy();
   });
+
+  it('inline add-card uses canonical C<n> id (continues from highest existing)', async () => {
+    // Board whose highest canonical id is C2 — the next card must be C3.
+    const board = makeBoard({
+      cards: [
+        { id: 'C1', values: { id: 'C1', Title: 'Alpha', Status: 'Todo'  }, body: '' },
+        { id: 'C2', values: { id: 'C2', Title: 'Beta',  Status: 'Doing' }, body: '' },
+      ],
+    });
+
+    let capturedBoard: Board | null = null;
+    const ctx = makeCtx(board, {
+      mutate: (next: Board) => { capturedBoard = next; },
+    });
+    const ops = mountKanban(ctx);
+
+    // Click the first ".board-add-card" button (in the Todo column).
+    const addBtn = ctx.root.querySelector<HTMLButtonElement>('.board-add-card');
+    expect(addBtn).not.toBeNull();
+    addBtn!.click();
+
+    // The inline draft input should now exist.
+    const input = ctx.root.querySelector<HTMLInputElement>('.board-card.is-new input');
+    expect(input).not.toBeNull();
+
+    // Type a title and commit with Enter.
+    input!.value = 'New card title';
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    // mutate() should have been called synchronously on Enter.
+    expect(capturedBoard).not.toBeNull();
+    const newCard = capturedBoard!.cards.find(c => c.values['Title'] === 'New card title');
+    expect(newCard).toBeDefined();
+    expect(newCard!.id).toMatch(/^C\d+$/);
+    expect(newCard!.id).toBe('C3');
+
+    ops.destroy();
+  });
 });
