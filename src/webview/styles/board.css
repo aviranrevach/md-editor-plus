@@ -1696,4 +1696,36 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-tags-opt, .bd-tags-create { display:flex; align-items:center; gap:8px; width:100%; border:0; background:transparent; padding:6px 8px; border-radius:7px; cursor:pointer; text-align:left; font:inherit; color:inherit; }
 .bd-tags-opt:hover, .bd-tags-create:hover { background:var(--board-hover,#f5f7fa); }
 .bd-tags-check { margin-left:auto; color:#2b6cff; }
+
+/* Image field cell */
+.bd-image-cell { cursor: pointer; }
+.bd-image-thumb {
+  height: 28px; max-width: 64px; object-fit: cover;
+  border-radius: 4px; vertical-align: middle; border: 1px solid var(--border);
+}
+.bd-image-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  font-size: 11px; border-radius: 10px;
+  background: var(--block-hover); color: var(--text-secondary); vertical-align: middle;
+}
 .bd-tags-create { color:#2b6cff; }
+
+/* Inline image thumbnails in text / Description cells */
+.bd-inline-thumb {
+  height: 20px; max-width: 40px; object-fit: cover;
+  border-radius: 3px; vertical-align: text-bottom; margin: 0 2px;
+  border: 1px solid var(--border);
+}
+
+/* ===== Kanban card cover image ===== */
+/* Card padding is 9px (top/bottom) × 11px (left/right).
+   Negative margin pulls the cover flush to the card edges on top and sides;
+   8px positive bottom margin separates it from the title below. */
+.board-card-cover {
+  display: block; width: 100%; height: 96px; object-fit: cover;
+  border-radius: 8px 8px 0 0; /* match .board-card's 8px corners so no sliver shows */
+  margin: -9px -11px 8px;
+  /* The image is wider than the content box (negative h/v margins), so we
+     correct the width to fill the full card interior (padding-box width). */
+  width: calc(100% + 22px);
+}

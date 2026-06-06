@@ -646,7 +646,7 @@ export function promptNewField(
   list.className = 'board-add-field-type-list';
   pop.appendChild(list);
 
-  const types: FieldType[] = ['text', 'status', 'date', 'person', 'tags'];
+  const types: FieldType[] = ['text', 'status', 'date', 'person', 'tags', 'image'];
   for (const t of types) {
     const row = document.createElement('button');
     row.type = 'button';

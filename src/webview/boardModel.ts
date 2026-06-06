@@ -2,7 +2,7 @@ export type ColorToken =
   | 'gray' | 'blue' | 'amber' | 'emerald' | 'red' | 'purple'
   | 'orange' | 'teal' | 'indigo' | 'pink';
 
-export type FieldType = 'text' | 'status' | 'date' | 'person' | 'tags';
+export type FieldType = 'text' | 'status' | 'date' | 'person' | 'tags' | 'image';
 
 export interface FieldDef {
   name: string;
@@ -322,7 +322,7 @@ function parseFieldTypes(raw: string): Map<string, FieldType> {
   const out = new Map<string, FieldType>();
   for (const pair of raw.split(',')) {
     const [n, t] = pair.split('=').map((s) => s.trim());
-    if (n && t && ['text', 'status', 'date', 'person', 'tags'].includes(t)) {
+    if (n && t && ['text', 'status', 'date', 'person', 'tags', 'image'].includes(t)) {
       out.set(n, t as FieldType);
     }
   }

@@ -30,6 +30,8 @@ import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
 import ImagePasteDrop from './extensions/imagePasteDrop';
 import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
+import { setMediaBaseUri, resolveImageSrc } from './mediaResolve';
+export { setMediaBaseUri };
 
 const lowlight = createLowlight(common);
 
@@ -37,24 +39,6 @@ let _editor: Editor | null = null;
 let _editDebounce: FlushableDebounce | null = null;
 let _frontmatter = '';
 let _onFrontmatterChange: ((info: { lines: number; kind: 'yaml' | 'toml' | 'none' }) => void) | null = null;
-let _mediaBaseUri = '';
-
-export function setMediaBaseUri(uri: string): void {
-  _mediaBaseUri = uri || '';
-}
-
-// Resolve a relative image src against the document's directory so the VS Code
-// webview can actually load it. Absolute URLs, data: URIs and protocol-relative
-// URLs pass through untouched.
-function resolveImageSrc(src: string): string {
-  if (!src || !_mediaBaseUri) return src;
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src)) return src;
-  try {
-    return new URL(src, _mediaBaseUri).href;
-  } catch {
-    return src;
-  }
-}
 
 const ResolvedImage = Image.extend({
   renderHTML({ HTMLAttributes }) {

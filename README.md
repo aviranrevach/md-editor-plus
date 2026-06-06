@@ -234,6 +234,8 @@ Filenames keep their original name, with a `-2` suffix added only if there's a c
 
 You can also **paste an image** straight from the clipboard (⌘V / Ctrl+V) anywhere in the body — it's saved into `<note>.assets/` as `pasted-<date>.<ext>` and inserted inline.
 
+**In boards**, images work three ways: add an **Image column** (its cells show a thumbnail + a `+N` badge, click to add); any `![](…)` link inside a text or Description cell renders as an inline thumbnail; and a kanban card automatically gets a **cover** from the first image in its body.
+
 ### Task lists
 
 Render as actual checkboxes. Click to toggle. Your changes round-trip to standard `- [ ]` / `- [x]` Markdown.
