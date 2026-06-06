@@ -57,10 +57,6 @@ export function setSmartTypographyEnabled(on: boolean): void {
   smartTypographyEnabled = on;
 }
 
-export function isSmartTypographyEnabled(): boolean {
-  return smartTypographyEnabled;
-}
-
 export const SmartTypography = Extension.create({
   name: 'smartTypography',
 
@@ -73,12 +69,14 @@ export const SmartTypography = Extension.create({
         new InputRule({
           find: rule.find,
           handler: ({ state, range }) => {
+            // Return null (not bare return) so Tiptap treats this as a no-op and does not dispatch.
             if (!smartTypographyEnabled) return null;
 
             const codeMark = state.schema.marks.code;
             if (codeMark) {
               const $from = state.doc.resolve(range.from);
               const marksHere = state.storedMarks ?? $from.marks();
+              // Return null (not bare return) so Tiptap treats this as a no-op and does not dispatch.
               if (codeMark.isInSet(marksHere)) return null;
             }
 
