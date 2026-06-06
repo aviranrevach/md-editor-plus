@@ -7,6 +7,8 @@
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
 import { COLOR_TOKENS_PUBLIC, mintCardId } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { resolveImageSrc } from './mediaResolve';
+import { firstImageSrc } from './boardImageLinks';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
@@ -450,6 +452,15 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
   const el = document.createElement('div');
   el.className = 'board-card';
   el.dataset.cardId = card.id;
+
+  const coverSrc = firstImageSrc(card.body);
+  if (coverSrc) {
+    const cover = document.createElement('img');
+    cover.className = 'board-card-cover';
+    cover.src = resolveImageSrc(coverSrc);
+    cover.alt = '';
+    el.appendChild(cover);
+  }
 
   const title = document.createElement('div');
   title.className = 'board-card-title';
