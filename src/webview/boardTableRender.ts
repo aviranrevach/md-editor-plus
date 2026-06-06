@@ -1329,8 +1329,30 @@ function beginInlineText(
           if (!src) continue;
           const snippet = `![](${src})`;
           if (td.getAttribute('contenteditable') === 'true') {
-            // Insert at the cursor as plain text (so it stays markdown, not a DOM <img>).
-            document.execCommand('insertText', false, snippet);
+            // Insert the link at the cursor as a COLORED token so it's obvious the
+            // paste worked. It's still plain text under the hood (the span's
+            // textContent is the markdown), so commit reads it back losslessly,
+            // and it becomes the thumbnail on re-render.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount) {
+              const r = sel.getRangeAt(0);
+              r.deleteContents();
+              const token = document.createElement('span');
+              token.className = 'bd-cell-img-token';
+              token.textContent = snippet;
+              const space = document.createTextNode(' ');
+              const frag = document.createDocumentFragment();
+              frag.appendChild(token);
+              frag.appendChild(space);
+              r.insertNode(frag);
+              const after = document.createRange();
+              after.setStartAfter(space);
+              after.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(after);
+            } else {
+              document.execCommand('insertText', false, snippet);
+            }
           } else {
             // Cell already committed/blurred — append to the stored value so it's not lost.
             const b = ctx.getBoard();

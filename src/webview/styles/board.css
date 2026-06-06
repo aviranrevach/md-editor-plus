@@ -1710,6 +1710,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 }
 .bd-tags-create { color:#2b6cff; }
 
+/* A pasted image link shown while editing a cell — colored so it's clearly
+   "an image was added" rather than stray text. Renders as a thumbnail on commit. */
+.bd-cell-img-token { color: var(--link); font-style: italic; }
+
 /* Inline image thumbnails in text / Description cells */
 .bd-inline-thumb {
   height: 20px; max-width: 40px; object-fit: cover;
