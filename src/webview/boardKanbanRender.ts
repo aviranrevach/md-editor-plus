@@ -7,6 +7,7 @@
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
 import { COLOR_TOKENS_PUBLIC, mintCardId } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { attachSmartTypography } from './extensions/smartTypography';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
@@ -355,6 +356,7 @@ function startInlineNewCard(
   input.className = 'board-card-title-input';
   input.type = 'text';
   input.placeholder = 'Type a name…';
+  attachSmartTypography(input);
   draft.appendChild(input);
   list.appendChild(draft);
   // Hide the add button while editing so the draft is the visible action.
@@ -559,6 +561,7 @@ function startInlineTitleEdit(
   input.type = 'text';
   input.value = original;
   titleEl.replaceWith(input);
+  attachSmartTypography(input);
   input.focus();
   input.select();
 

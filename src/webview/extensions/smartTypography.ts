@@ -57,6 +57,59 @@ export function setSmartTypographyEnabled(on: boolean): void {
   smartTypographyEnabled = on;
 }
 
+// ---------------------------------------------------------------------------
+// Plain-DOM surfaces (board table cells, card titles, field rename, etc.)
+//
+// These are <input>/<textarea> or bare contenteditable elements — NOT Tiptap
+// editors — so the InputRule above never fires there. attachSmartTypography
+// reuses the same rules on a plain element by listening for `input` and
+// rewriting the text just before the caret. Returns a detach function.
+// ---------------------------------------------------------------------------
+
+function applyToInput(el: HTMLInputElement | HTMLTextAreaElement): void {
+  const caret = el.selectionStart;
+  // Only act on a collapsed caret (no selection range to clobber).
+  if (caret === null || caret !== el.selectionEnd) return;
+  const match = findSmartTypographyMatch(el.value.slice(0, caret));
+  if (!match) return;
+  const start = caret - match.matchLength;
+  el.value = el.value.slice(0, start) + match.replacement + el.value.slice(caret);
+  const pos = start + match.replacement.length;
+  el.setSelectionRange(pos, pos);
+}
+
+function applyToContentEditable(root: HTMLElement): void {
+  const sel = window.getSelection();
+  if (!sel || !sel.isCollapsed || sel.rangeCount === 0) return;
+  const node = sel.focusNode;
+  if (!node || node.nodeType !== Node.TEXT_NODE || !root.contains(node)) return;
+  const offset = sel.focusOffset;
+  const text = node.textContent ?? '';
+  const match = findSmartTypographyMatch(text.slice(0, offset));
+  if (!match) return;
+  const start = offset - match.matchLength;
+  node.textContent = text.slice(0, start) + match.replacement + text.slice(offset);
+  const pos = start + match.replacement.length;
+  const range = document.createRange();
+  range.setStart(node, pos);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+export function attachSmartTypography(el: HTMLElement): () => void {
+  const handler = (): void => {
+    if (!smartTypographyEnabled) return;
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      applyToInput(el);
+    } else {
+      applyToContentEditable(el);
+    }
+  };
+  el.addEventListener('input', handler);
+  return () => el.removeEventListener('input', handler);
+}
+
 export const SmartTypography = Extension.create({
   name: 'smartTypography',
 
