@@ -23,6 +23,8 @@ import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
 import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
+import { saveImageBytes } from './imageUpload';
+import { imageFilesFrom } from './extensions/imagePasteDrop';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -45,6 +47,26 @@ function renderInlineWithImages(host: HTMLElement, value: string): boolean {
   }
   if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
   return found;
+}
+
+// Fill an editable cell with `value`, wrapping each ![](…) link in a colored
+// token so image references stay visually distinct WHILE editing (not just right
+// after a paste). The spans' textContent is the raw markdown, so reading
+// host.textContent on commit reconstitutes the exact value.
+function fillCellForEditing(host: HTMLElement, value: string): void {
+  host.textContent = '';
+  const re = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > last) host.appendChild(document.createTextNode(value.slice(last, m.index)));
+    const token = document.createElement('span');
+    token.className = 'bd-cell-img-token';
+    token.textContent = m[0];
+    host.appendChild(token);
+    last = m.index + m[0].length;
+  }
+  if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
 }
 
 // Show a board <img> for `rawSrc`, resolved for the webview. On load failure,
@@ -1252,11 +1274,11 @@ function beginInlineText(
   td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx,
 ): void {
   if (td.getAttribute('contenteditable') === 'true') return;
-  // Replace any rendered DOM (which may contain <img> thumbnails) with the raw
-  // markdown string so the user edits plain text and commit() reads it back
-  // losslessly — without this, textContent on a mixed text+<img> DOM drops the
-  // image links entirely.
-  td.textContent = card.values[field.name] ?? '';
+  // Replace any rendered DOM (which may contain <img> thumbnails) with editable
+  // text: plain text plus colored tokens for each ![](…) link, so image refs
+  // stay visible while editing. commit() reads td.textContent, and the tokens'
+  // textContent is the raw markdown, so the value round-trips losslessly.
+  fillCellForEditing(td, card.values[field.name] ?? '');
   td.setAttribute('contenteditable', 'true');
   td.classList.add('bd-cell-editing');
   const detachTypography = attachSmartTypography(td);
@@ -1286,6 +1308,12 @@ function beginInlineText(
             : c,
         ),
       });
+    } else {
+      // No change → mutate (and its re-render) won't fire, so restore the
+      // rendered display ourselves; otherwise the cell is stuck showing the
+      // raw `![](…)` markdown instead of the thumbnail.
+      td.textContent = '';
+      if (next.includes('![')) renderInlineWithImages(td, next); else td.textContent = next;
     }
   };
   const cancel = () => {
@@ -1306,11 +1334,69 @@ function beginInlineText(
     else if (e.key === 'Tab') { e.preventDefault(); commit(); }
   };
   const onBlur = () => commit();
+  // Pasting an image into a contenteditable cell would otherwise drop a raw,
+  // full-size <img> that gets discarded on commit (textContent ignores it).
+  // Intercept image paste, save the file, and insert a markdown link instead —
+  // which persists and re-renders as a small inline thumbnail.
+  const onPaste = (e: ClipboardEvent) => {
+    const imgs = imageFilesFrom(e.clipboardData);
+    if (!imgs.length) return; // let normal text paste proceed
+    e.preventDefault();
+    void (async () => {
+      for (const { name, file } of imgs) {
+        try {
+          const src = await saveImageBytes(name, await file.arrayBuffer());
+          if (!src) continue;
+          const snippet = `![](${src})`;
+          if (td.getAttribute('contenteditable') === 'true') {
+            // Insert the link at the cursor as a COLORED token so it's obvious the
+            // paste worked. It's still plain text under the hood (the span's
+            // textContent is the markdown), so commit reads it back losslessly,
+            // and it becomes the thumbnail on re-render.
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount) {
+              const r = sel.getRangeAt(0);
+              r.deleteContents();
+              const token = document.createElement('span');
+              token.className = 'bd-cell-img-token';
+              token.textContent = snippet;
+              const space = document.createTextNode(' ');
+              const frag = document.createDocumentFragment();
+              frag.appendChild(token);
+              frag.appendChild(space);
+              r.insertNode(frag);
+              const after = document.createRange();
+              after.setStartAfter(space);
+              after.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(after);
+            } else {
+              document.execCommand('insertText', false, snippet);
+            }
+          } else {
+            // Cell already committed/blurred — append to the stored value so it's not lost.
+            const b = ctx.getBoard();
+            ctx.mutate({
+              ...b,
+              cards: b.cards.map(c => c.id === card.id
+                ? { ...c, values: { ...c.values, [field.name]: `${(c.values[field.name] ?? '').trim()} ${snippet}`.trim() } }
+                : c),
+            });
+          }
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error('[md-editor-plus] cell image paste failed', err);
+        }
+      }
+    })();
+  };
   function cleanup() {
     td.removeEventListener('keydown', onKey);
     td.removeEventListener('blur', onBlur);
+    td.removeEventListener('paste', onPaste);
     detachTypography();
   }
   td.addEventListener('keydown', onKey);
   td.addEventListener('blur', onBlur);
+  td.addEventListener('paste', onPaste);
 }

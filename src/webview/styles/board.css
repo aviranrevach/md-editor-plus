@@ -1479,8 +1479,8 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-table thead th:first-child { width: 14px; padding: 0; text-align: center; vertical-align: middle; }
 .bd-table-gutter { width: 14px; }
 .bd-table-empty { padding: 60px 0; text-align: center; color: var(--text-secondary); font-size: 13px; }
-.bd-cell-editing { background: var(--bg); outline: 2px solid var(--link); outline-offset: -2px; }
-.bd-table-cell { cursor: text; }
+.bd-cell-editing { background: var(--bg); outline: 2px solid var(--link); outline-offset: -2px; caret-color: var(--board-text, var(--text-primary)); }
+.bd-table-cell { cursor: text; caret-color: var(--board-text, var(--text-primary)); }
 .bd-cell-status, .bd-cell-date, .bd-cell-tags { cursor: pointer; }
 .bd-cell-empty { color: var(--text-secondary, #888); font-size: 12px; }
 .bd-cell-id { cursor: default; color: var(--text-secondary, #888); }
@@ -1709,6 +1709,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   background: var(--block-hover); color: var(--text-secondary); vertical-align: middle;
 }
 .bd-tags-create { color:#2b6cff; }
+
+/* A pasted image link shown while editing a cell — colored so it's clearly
+   "an image was added" rather than stray text. Renders as a thumbnail on commit. */
+.bd-cell-img-token { color: var(--link); font-style: italic; }
 
 /* Inline image thumbnails in text / Description cells */
 .bd-inline-thumb {
