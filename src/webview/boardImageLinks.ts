@@ -36,3 +36,12 @@ export function removeImageLinkAt(value: string, index: number): string {
   links.splice(index, 1);
   return links.map((l) => `![${l.alt}](${l.src})`).join(' ');
 }
+
+// Replace the src of the image link at `index` (keeping its alt), returning the
+// rebuilt space-joined value. Out-of-range index returns input unchanged.
+export function replaceImageLinkAt(value: string, index: number, newSrc: string): string {
+  const links = parseImageLinks(value);
+  if (index < 0 || index >= links.length) return value;
+  links[index] = { alt: links[index].alt, src: newSrc };
+  return links.map((l) => `![${l.alt}](${l.src})`).join(' ');
+}

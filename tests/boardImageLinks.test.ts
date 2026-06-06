@@ -1,4 +1,4 @@
-import { parseImageLinks, firstImageSrc, appendImageLink, removeImageLinkAt } from '../src/webview/boardImageLinks';
+import { parseImageLinks, firstImageSrc, appendImageLink, removeImageLinkAt, replaceImageLinkAt } from '../src/webview/boardImageLinks';
 
 describe('parseImageLinks', () => {
   it('returns [] for a string with no images', () => {
@@ -56,5 +56,17 @@ describe('removeImageLinkAt', () => {
   });
   it('returns input unchanged for out-of-range index', () => {
     expect(removeImageLinkAt('![](./a.png)', 5)).toBe('![](./a.png)');
+  });
+});
+
+describe('replaceImageLinkAt', () => {
+  it('replaces the src at an index, keeping alt and the other links', () => {
+    const v = '![a](./1.png) ![b](./2.png)';
+    expect(replaceImageLinkAt(v, 1, './2.webp')).toBe('![a](./1.png) ![b](./2.webp)');
+  });
+  it('returns input unchanged for an out-of-range index', () => {
+    const v = '![](./1.png)';
+    expect(replaceImageLinkAt(v, 5, './x.png')).toBe(v);
+    expect(replaceImageLinkAt(v, -1, './x.png')).toBe(v);
   });
 });
