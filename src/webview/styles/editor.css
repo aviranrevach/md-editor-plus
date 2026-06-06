@@ -97,6 +97,34 @@ body {
   box-shadow: var(--seg-active-shadow);
 }
 
+/* ── Save indicator ─────────────────────────────────────────────────── */
+.save-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 2px;
+  color: var(--toolbar-fg-muted, #8a8a8a);
+  white-space: nowrap;
+  user-select: none;
+  transition: color 120ms ease, opacity 120ms ease;
+}
+.save-ind-saved    { color: var(--save-ok, #2e9e5b); }
+.save-ind-unsaved  { color: var(--save-warn, #c9821f); }
+.save-ind-saving   { color: var(--toolbar-fg-muted, #8a8a8a); }
+.save-ind-conflict { color: var(--save-danger, #c44); }
+
+/* Deliberate Cmd+S gets a brief acknowledging pulse. */
+.save-ind-flash { animation: save-ind-pulse 1s ease; }
+@keyframes save-ind-pulse {
+  0%   { transform: scale(1);    opacity: 1; }
+  25%  { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
 /* ────────────────────────────────────────────────────────────────────────
    Header / chrome responsiveness — see
    docs/superpowers/specs/2026-05-28-header-responsiveness-design.md.
