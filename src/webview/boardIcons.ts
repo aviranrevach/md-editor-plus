@@ -26,6 +26,12 @@ export const FIELD_TYPE_ICONS: Record<FieldType, string> = {
     `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
       <path d="M3 6h10M3 10h10M6 3v10M10 3v10"/>
     </svg>`,
+  image:
+    `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="2.5" y="3.5" width="11" height="9" rx="1"/>
+      <circle cx="6" cy="6.5" r="1"/>
+      <path d="M3 12l3.5-3.5 2.5 2.5 2-2 2 2"/>
+    </svg>`,
 };
 
 export const ICON_PLUS =
@@ -54,4 +60,5 @@ export const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   date: 'Date',
   person: 'Person',
   tags: 'Tags',
+  image: 'Image',
 };
