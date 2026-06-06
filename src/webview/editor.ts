@@ -86,6 +86,7 @@ export function createEditor(
   element: HTMLElement,
   initialMarkdown: string,
   onChange: OnChangeCallback,
+  onDirty?: () => void,
 ): Editor {
   const split = splitFrontmatter(initialMarkdown);
   _frontmatter = split.frontmatter;
@@ -132,6 +133,7 @@ export function createEditor(
     },
     content: body,
     onUpdate() {
+      onDirty?.();
       _editDebounce?.schedule();
     },
     onBlur() {
@@ -241,6 +243,7 @@ export function createSourceEditor(
   element: HTMLElement,
   initialMarkdown: string,
   onChange: OnChangeCallback,
+  onDirty?: () => void,
 ): Editor {
   _sourceEditor = new Editor({
     element,
@@ -254,6 +257,7 @@ export function createSourceEditor(
     content: buildSourceContent(initialMarkdown),
     onUpdate() {
       if (_suppressSourceUpdate) return;
+      onDirty?.();
       _sourceEditDebounce?.schedule();
     },
     onBlur() {
@@ -276,8 +280,13 @@ export function updateSourceContent(markdown: string): void {
   const current = _sourceEditor.state.doc.firstChild?.textContent ?? '';
   if (current === markdown) return;
   _suppressSourceUpdate = true;
-  _sourceEditor.commands.setContent(buildSourceContent(markdown), false);
-  _suppressSourceUpdate = false;
+  try {
+    _sourceEditor.commands.setContent(buildSourceContent(markdown), false);
+  } finally {
+    // Always clear the flag — if setContent throws and we leak `true`, every
+    // subsequent Code-view keystroke would be silently dropped (data loss).
+    _suppressSourceUpdate = false;
+  }
 }
 
 export function getSourceMarkdown(): string {
