@@ -1138,28 +1138,35 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
     case 'image': {
       const links = parseImageLinks(value);
       td.classList.add('bd-image-cell');
+      // Inner flex wrapper so the <td> stays a real table cell (vertical-align:
+      // middle keeps the content centered in tall rows); the wrapper handles the
+      // horizontal thumbnail layout.
+      const inner = document.createElement('div');
+      inner.className = 'bd-image-cell-inner';
       if (!links.length) {
         const empty = document.createElement('span');
         empty.className = 'bd-cell-empty bd-image-empty';
         if (!ctx.readonly) {
-          empty.innerHTML = `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V158.75l-26.07-26.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L40,149.37V56ZM40,172l52-52,80,80H40Zm176,28H194.63l-36-36,20-20L216,181.38V200ZM144,100a12,12,0,1,1,12,12A12,12,0,0,1,144,100Z"/></svg>`;
+          // Bold (fill) phosphor image glyph — a solid icon, no bordered box.
+          empty.innerHTML = `<svg width="18" height="18" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM156,88a12,12,0,1,1-12,12A12,12,0,0,1,156,88Zm60,112H40V160.69l46.34-46.35a8,8,0,0,1,11.32,0h0L165,181.66a8,8,0,0,0,11.32-11.32l-17.66-17.65L173,138.34a8,8,0,0,1,11.31,0L216,170.07V200Z"/></svg>`;
         }
-        td.appendChild(empty);
+        inner.appendChild(empty);
       } else {
         // Show several thumbnails side by side when there's room; collapse the
         // overflow into a "+N" badge.
         const MAX_THUMBS = 3;
         const shown = Math.min(links.length, MAX_THUMBS);
         for (let i = 0; i < shown; i++) {
-          td.appendChild(makeBoardThumb(links[i].src, links[i].alt, 'bd-image-thumb'));
+          inner.appendChild(makeBoardThumb(links[i].src, links[i].alt, 'bd-image-thumb'));
         }
         if (links.length > shown) {
           const badge = document.createElement('span');
           badge.className = 'bd-image-badge';
           badge.textContent = `+${links.length - shown}`;
-          td.appendChild(badge);
+          inner.appendChild(badge);
         }
       }
+      td.appendChild(inner);
       if (!ctx.readonly) {
         td.addEventListener('click', (e) => {
           e.stopPropagation();

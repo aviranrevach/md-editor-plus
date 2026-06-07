@@ -1698,7 +1698,10 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-tags-check { margin-left:auto; color:#2b6cff; }
 
 /* Image field cell */
-.bd-image-cell { cursor: pointer; display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+/* Keep the <td> a normal table cell so it inherits vertical-align:middle and the
+   icon/thumbs stay centered in tall rows; the inner wrapper lays out thumbs. */
+.bd-image-cell { cursor: pointer; vertical-align: middle; }
+.bd-image-cell-inner { display: inline-flex; align-items: center; gap: 4px; flex-wrap: nowrap; max-width: 100%; overflow: hidden; vertical-align: middle; }
 .bd-image-thumb {
   height: 26px; width: 26px; object-fit: cover; flex: 0 0 auto;
   border-radius: 4px; border: 1px solid var(--border);
@@ -1734,7 +1737,8 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   width: calc(100% + 22px);
 }
 
-/* Empty / broken image placeholders: just a faint icon, no bordered box around it. */
-.bd-image-empty { color: var(--text-secondary); opacity: .4; display: inline-flex; align-items: center; }
-.bd-image-empty svg { width: 16px; height: 16px; }
-.bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary); opacity: .5; }
+/* Empty / broken image placeholders: just the bold icon — no border/box, no
+   background. Centered within the cell via the inner wrapper. */
+.bd-image-empty { color: var(--text-secondary); opacity: .55; display: inline-flex; align-items: center; border: none; background: none; }
+.bd-image-empty svg { width: 18px; height: 18px; display: block; }
+.bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary); opacity: .55; border: none; background: none; }
