@@ -1704,7 +1704,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-image-cell-inner { display: inline-flex; align-items: center; gap: 4px; flex-wrap: nowrap; max-width: 100%; overflow: hidden; vertical-align: middle; }
 .bd-image-thumb {
   height: 26px; width: 26px; object-fit: cover; flex: 0 0 auto;
-  border-radius: 4px; border: 1px solid var(--border);
+  border-radius: 4px;
 }
 .bd-image-badge {
   display: inline-block; margin-left: 6px; padding: 1px 6px;
@@ -1721,7 +1721,6 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-inline-thumb {
   height: 20px; max-width: 40px; object-fit: cover;
   border-radius: 3px; vertical-align: text-bottom; margin: 0 2px;
-  border: 1px solid var(--border);
 }
 
 /* ===== Kanban card cover image ===== */
