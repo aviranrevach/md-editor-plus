@@ -59,11 +59,11 @@ const Toggle = Node.create({
       return {
         dom,
         contentDOM: content,
-        ignoreMutation(mutation: MutationRecord) {
+        ignoreMutation(mutation: { type: string; attributeName?: string | null; target?: globalThis.Node }) {
           if (mutation.type === 'attributes' && mutation.attributeName === 'open') {
             return true;
           }
-          if (summary.contains(mutation.target as Node)) return true;
+          if (mutation.target && summary.contains(mutation.target)) return true;
           return false;
         },
         update(updatedNode) {
