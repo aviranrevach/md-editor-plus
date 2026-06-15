@@ -95,6 +95,22 @@ function makeBoardThumb(rawSrc: string, alt: string, className: string): HTMLEle
 // Properties popover treat as always-available.
 export const DESCRIPTION_FIELD: FieldDef = { name: 'Description', type: 'text', visibleOnCard: false };
 
+// c16 auto-fit: the board table is `table-layout: fixed`, so a status column is
+// pinned to its configured width and a wider pill (e.g. "Urgent!!") spills past
+// the cell (cells are `overflow: visible`). Given the measured pill widths in a
+// column, return the width that fits the widest one — but never shrink below the
+// user's configured width, so a manual widen is respected. `cellPadding` is the
+// cell's horizontal padding (10px left + 10px right in board.css).
+export function fitStatusColumnWidth(
+  pillWidths: number[],
+  configuredWidth: number,
+  cellPadding = 20,
+): number {
+  if (pillWidths.length === 0) return configuredWidth;
+  const widest = Math.max(...pillWidths);
+  return Math.max(configuredWidth, Math.ceil(widest + cellPadding));
+}
+
 // Pending-header-rename setter (filled by mountTable). Lets external code
 // (e.g. the chrome's "+ Add property" button) request that the next render
 // of the table renderer enter inline-rename on a specific column header.
@@ -623,6 +639,8 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
     root.appendChild(table);
 
+    autofitStatusColumns(table, visibleFields, widths);
+
     if (pendingFocus.id) {
       const tr = root.querySelector<HTMLElement>(`tr.bd-table-row[data-card-id="${pendingFocus.id}"]`);
       const td = tr?.querySelector<HTMLElement>(`.bd-table-cell[data-field="${pendingFocus.field}"]`);
@@ -780,6 +798,34 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       root.classList.remove('bd-table-host');
     },
   };
+}
+
+// c16: after the table mounts, widen each status column so its widest pill fits
+// instead of spilling past the fixed-width cell. The pill keeps its natural
+// width even in a too-narrow column (the chip is inline-flex with no width
+// constraint), so measuring offsetWidth gives the real width to fit. `widths`
+// holds user-configured widths; fitStatusColumnWidth never shrinks below them.
+function autofitStatusColumns(
+  table: HTMLTableElement,
+  visibleFields: FieldDef[],
+  widths: Record<string, number>,
+): void {
+  const cols = table.querySelectorAll<HTMLTableColElement>('colgroup col');
+  const rows = table.querySelectorAll<HTMLElement>('tbody tr.bd-table-row');
+  visibleFields.forEach((f, i) => {
+    if (f.type !== 'status') return;
+    const colIdx = i + 1; // +1 for the gutter column
+    const col = cols[colIdx];
+    if (!col) return;
+    const pillWidths: number[] = [];
+    rows.forEach((tr) => {
+      const cell = tr.children[colIdx] as HTMLElement | undefined;
+      const chip = cell?.querySelector<HTMLElement>('.board-column-chip');
+      if (chip) pillWidths.push(chip.getBoundingClientRect().width);
+    });
+    const configured = widths[f.name] ?? 160;
+    col.style.width = `${fitStatusColumnWidth(pillWidths, configured)}px`;
+  });
 }
 
 /** The color token for a group key, or null for a neutral band. */

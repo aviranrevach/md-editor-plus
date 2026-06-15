@@ -252,6 +252,9 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 18px;
+  /* Keep the pill on one line — the table auto-fits the status column to the
+     widest pill (c16), so the label must measure as a single unwrapped run. */
+  white-space: nowrap;
 }
 .board-column-chip-dot {
   width: 7px;
