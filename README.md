@@ -234,11 +234,11 @@ Filenames keep their original name, with a `-2` suffix added only if there's a c
 
 You can also **paste an image** straight from the clipboard (⌘V / Ctrl+V) anywhere in the body — it's saved into `<note>.assets/` as `pasted-<date>.<ext>` and inserted inline.
 
-**Click any image** to reveal an image toolbar:
+**Click any image** to reveal a small toolbar in the same style as the text bubble menu — one row of actions (Replace · Compress · Reveal · Remove) and one row of sizes (S · M · L · Full):
 
-- **Size presets** — S / M / L / Full buttons resize the image instantly. Drag the corner handles for a precise width. Resized images are stored as a standard HTML `<img src="…" width="…">`, so they render at the correct size in GitHub, Obsidian, VS Code preview, and any other Markdown reader. Images you never resize stay as plain `![](src)` Markdown.
-- **Replace** — swaps the image via the same drill-down picker (upload / browse / link / clipboard).
-- **Compress** — re-encodes the image locally in the browser (canvas pass, no server round-trip). Useful for cutting file size before committing.
+- **Size presets** — S / M / L / Full set the width instantly. For a precise width, drag the **resize grips** on the left/right edges of the image (Notion-style). Resized images are stored as a standard HTML `<img src="…" width="…">`, so they render at the correct size in GitHub, Obsidian, VS Code preview, and any other Markdown reader. Images you never resize stay as plain `![](src)` Markdown.
+- **Replace** — swaps the image via the same drill-down picker (upload / browse / clipboard).
+- **Compress** — re-encodes the image locally (canvas pass, no server round-trip; never writes a larger file). The button's tooltip shows the current file size, and after compressing it reports the saving — e.g. `Compressed · 1.2 MB → 410 KB`.
 - **Reveal in Finder** — opens the folder that contains the image file in the OS file browser.
 - **Remove** — deletes the image from the document.
 
