@@ -1642,6 +1642,10 @@ html.source-full-width #source-view {
 .bm-btn:hover  { background: var(--block-hover); }
 .bm-btn.active { background: var(--block-hover); color: var(--link); }
 
+/* Text size presets (S / M / L / Full) in the image menu — sized for text, not
+   a fixed icon square, so they read evenly and the row stays aligned. */
+.bm-size-btn { width: auto; min-width: 34px; padding: 0 10px; font-weight: 700; font-size: 13px; line-height: 1; }
+
 .bm-div {
   display: inline-block;
   width: 1px;

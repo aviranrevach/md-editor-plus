@@ -21,7 +21,8 @@ import { IMAGE_SIZE_PRESETS } from './imageNodeView';
 
 // Phosphor (256-viewBox, fill) icons — same set/style the bubble menu uses.
 const ICON = {
-  image:     `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,16V158.75l-26.07-26.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L40,149.37V56ZM40,172l52-52,80,80H40Zm176,28H194.63l-36-36,20-20L216,181.38V200ZM144,100a12,12,0,1,1,12,12A12,12,0,0,1,144,100Z"/></svg>`,
+  // Two-way arrows = swap/replace.
+  swap:      `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,48V152a16,16,0,0,1-16,16H112v16a8,8,0,0,1-13.66,5.66l-24-24a8,8,0,0,1,0-11.32l24-24A8,8,0,0,1,112,136v16h96V48H96v8a8,8,0,0,1-16,0V48A16,16,0,0,1,96,32H208A16,16,0,0,1,224,48ZM168,192a8,8,0,0,0-8,8v8H48V104h96v16a8,8,0,0,0,13.66,5.66l24-24a8,8,0,0,0,0-11.32l-24-24A8,8,0,0,0,144,72V88H48a16,16,0,0,0-16,16V208a16,16,0,0,0,16,16H160a16,16,0,0,0,16-16v-8A8,8,0,0,0,168,192Z"/></svg>`,
   upload:    `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M74.34,85.66a8,8,0,0,1,0-11.32l48-48a8,8,0,0,1,11.32,0l48,48a8,8,0,0,1-11.32,11.32L136,51.31V152a8,8,0,0,1-16,0V51.31L85.66,85.66A8,8,0,0,1,74.34,85.66ZM216,144a8,8,0,0,0-8,8v48H48V152a8,8,0,0,0-16,0v48a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A8,8,0,0,0,216,144Z"/></svg>`,
   folder:    `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V56H92.69l27.31,27.31A15.86,15.86,0,0,0,131.31,88H216Z"/></svg>`,
   clipboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H163.74a47.92,47.92,0,0,0-71.48,0H56A16,16,0,0,0,40,48V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm-72,0a32,32,0,0,1,32,32H96A32,32,0,0,1,128,32Zm72,184H56V48H82.75A47.93,47.93,0,0,0,80,64v8a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V64a47.93,47.93,0,0,0-2.75-16H200Z"/></svg>`,
@@ -30,13 +31,11 @@ const ICON = {
   compress:  `<svg width="20" height="20" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"><polyline points="100,44 100,100 44,100"/><polyline points="156,44 156,100 212,100"/><polyline points="100,212 100,156 44,156"/><polyline points="156,212 156,156 212,156"/></svg>`,
 } as const;
 
-const DIV = `<span class="bm-div"></span>`;
-
 function sizeButtonsHtml(): string {
   const presets = IMAGE_SIZE_PRESETS
-    .map((p) => `<button class="bm-btn" data-size="${p.px}" data-tip="${p.label} · ${p.px}px"><span class="bm-into-text" style="font-weight:700;font-size:13px">${p.label}</span></button>`)
+    .map((p) => `<button class="bm-btn bm-size-btn" data-size="${p.px}" data-tip="${p.label} · ${p.px}px">${p.label}</button>`)
     .join('');
-  return `${presets}<button class="bm-btn" data-size="full" data-tip="Full width"><span class="bm-into-text" style="font-weight:700;font-size:12px;letter-spacing:-.2px">Full</span></button>`;
+  return `${presets}<button class="bm-btn bm-size-btn" data-size="full" data-tip="Full width">Full</button>`;
 }
 
 function buildEl(): HTMLElement {
@@ -44,13 +43,13 @@ function buildEl(): HTMLElement {
   el.className = 'bubble-menu';
   el.innerHTML = `
     <div class="bubble-row">
-      <button class="bm-btn" data-action="replace" data-tip="Replace image">${ICON.image}</button>
-      ${DIV}
-      ${sizeButtonsHtml()}
-      ${DIV}
+      <button class="bm-btn" data-action="replace" data-tip="Replace image">${ICON.swap}</button>
       <button class="bm-btn" data-action="compress" data-tip="Compress (smaller file)">${ICON.compress}</button>
       <button class="bm-btn" data-action="reveal" data-tip="Reveal in Finder">${ICON.folder}</button>
       <button class="bm-btn" data-action="remove" data-tip="Remove image">${ICON.trash}</button>
+    </div>
+    <div class="bubble-row">
+      ${sizeButtonsHtml()}
     </div>
     <div class="bubble-into hidden" id="img-replace">
       <div class="bubble-into-title">Replace with</div>
@@ -206,7 +205,9 @@ export function createImageBubbleMenu(editor: Editor): void {
       pluginKey: new PluginKey('imageBubbleMenu'),
       editor,
       element: el,
-      tippyOptions: { duration: 100, placement: 'top' },
+      // Open below the image (like the text menu) so the Replace panel expands
+      // into open space instead of off the top of the screen.
+      tippyOptions: { duration: 100, placement: 'bottom' },
       shouldShow: ({ state }) =>
         state.selection instanceof NodeSelection &&
         state.selection.node.type.name === 'image',
