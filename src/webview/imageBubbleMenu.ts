@@ -205,9 +205,7 @@ export function createImageBubbleMenu(editor: Editor): void {
       pluginKey: new PluginKey('imageBubbleMenu'),
       editor,
       element: el,
-      // Open below the image (like the text menu) so the Replace panel expands
-      // into open space instead of off the top of the screen.
-      tippyOptions: { duration: 100, placement: 'bottom' },
+      tippyOptions: { duration: 100, placement: 'top' },
       shouldShow: ({ state }) =>
         state.selection instanceof NodeSelection &&
         state.selection.node.type.name === 'image',
