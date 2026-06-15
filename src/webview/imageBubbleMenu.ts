@@ -66,10 +66,44 @@ function buildEl(): HTMLElement {
   return el;
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function createImageBubbleMenu(editor: Editor): void {
   const el = buildEl();
   const replacePanel = el.querySelector<HTMLElement>('#img-replace')!;
   const replaceBtn = el.querySelector<HTMLElement>('[data-action="replace"]')!;
+  const compressBtn = el.querySelector<HTMLElement>('[data-action="compress"]')!;
+
+  // Cache measured file sizes by src so re-selecting an image doesn't refetch.
+  const sizeCache = new Map<string, number>();
+  let tipSrc = ''; // src the compress tooltip currently reflects
+
+  function setCompressTip(text: string): void { compressBtn.dataset.tip = text; }
+
+  // Show the current file size in the Compress tooltip so it's clear whether a
+  // compress actually shrank the file. Runs when the selected image changes.
+  async function refreshCompressTip(): Promise<void> {
+    const pos = selectedImagePos();
+    if (pos == null) return;
+    const src = (editor.state.doc.nodeAt(pos)?.attrs.src as string) || '';
+    if (!src || src === tipSrc) return;
+    tipSrc = src;
+    if (/^(?:https?:|data:)/i.test(src)) { setCompressTip('Compress · local images only'); return; }
+    const cached = sizeCache.get(src);
+    if (cached != null) { setCompressTip(`Compress · ${formatBytes(cached)}`); return; }
+    setCompressTip('Compress (smaller file)');
+    try {
+      const bytes = await fetchImageBytes(resolveImageSrc(src));
+      sizeCache.set(src, bytes.byteLength);
+      if (tipSrc === src) setCompressTip(`Compress · ${formatBytes(bytes.byteLength)}`);
+    } catch {
+      /* leave the default tip */
+    }
+  }
 
   function selectedImagePos(): number | null {
     const sel = editor.state.selection;
@@ -135,12 +169,21 @@ export function createImageBubbleMenu(editor: Editor): void {
         : ext === 'png' ? 'image/png'
         : `image/${ext}`;
       const bytes = await fetchImageBytes(resolveImageSrc(rawSrc));
+      const oldSize = bytes.byteLength;
+      sizeCache.set(rawSrc, oldSize);
       const result = await compressImage(bytes, inputMime, { quality: 0.8 });
-      if (!result.changed) return;
+      if (!result.changed) { setCompressTip(`Already optimized · ${formatBytes(oldSize)}`); return; }
       const stem = (rawSrc.split('/').pop() || 'image').replace(/\.[^.]+$/, '');
       const name = sanitizeImageFileName(`${stem}.${extensionForMime(result.mime)}`);
       const newSrc = await saveImageBytes(name, result.bytes);
-      if (newSrc) patchAt(pos, { src: newSrc });
+      if (newSrc) {
+        patchAt(pos, { src: newSrc });
+        const newSize = result.bytes.byteLength;
+        sizeCache.set(newSrc, newSize);
+        tipSrc = newSrc;
+        // Show the win so it's obvious the compress did something.
+        setCompressTip(`Compressed · ${formatBytes(oldSize)} → ${formatBytes(newSize)}`);
+      }
     } catch {
       /* best-effort: never corrupt the asset */
     }
@@ -209,8 +252,9 @@ export function createImageBubbleMenu(editor: Editor): void {
     }
   });
 
-  // Reset the replace panel whenever the image is deselected.
+  // Reset the replace panel on deselect; refresh the size tooltip on (re)select.
   editor.on('transaction', () => {
-    if (selectedImagePos() == null) closeReplace();
+    if (selectedImagePos() == null) { closeReplace(); tipSrc = ''; }
+    else void refreshCompressTip();
   });
 }
