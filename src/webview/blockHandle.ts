@@ -117,11 +117,10 @@ export function createBlockHandle(editor: Editor): void {
     });
     plusBtn.addEventListener('mouseleave', () => hideTooltip(tooltip));
 
-    // drag icon: click without drag → open block picker in "convert this
-    // block" mode. The current block is highlighted as active and clicking
-    // a different type converts in place. Also place the editor selection
-    // inside the block so the user sees it as "selected" and the view
-    // scrolls if needed.
+    // drag icon: click without drag → open the block action menu (Turn into /
+    // Duplicate / Delete) for the current block. Also place the editor
+    // selection inside the block so the user sees it as "selected" and the
+    // view scrolls if needed.
     let dragStarted = false;
     dragIcon.addEventListener('dragstart', () => { dragStarted = true; });
     dragIcon.addEventListener('click', e => {

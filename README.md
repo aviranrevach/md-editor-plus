@@ -25,6 +25,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 ### Block editor
 
 - **Drag-handle reordering** — hover any block for a `⠿` handle and move it anywhere
+- **Block action menu** — click the `⠿` handle for one consistent menu on any block: **Turn into**, **Duplicate**, **Delete**, with a search box to jump straight to a type
 - **Slash / block picker** — `⌘/` (`Ctrl+/`) opens an inline picker; type to filter
 - **Bubble menu** — select text for inline formatting, links, color, highlight, emoji, a "Turn into" converter, and a ✨ **AI** button ([see below](#turn-selection-into-ai))
 - **Click-to-edit** — every block is editable in place; no mode switching
@@ -327,7 +328,13 @@ Type `/board kanban` or `/board table` to drop a project board. Two views over t
 
 ### Drag handle
 
-Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. Grab it to drag the whole block to a new position.
+Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. **Drag** it to move the block anywhere; **click** it to open the **block action menu** — the same for every block type:
+
+- **Turn into** — convert to paragraph, heading, list, quote, code block, or any callout type (the current type is checkmarked)
+- **Duplicate** — drop an identical copy right below (duplicating a board mints a fresh id, so the copy stays independent and saves cleanly)
+- **Delete** — remove the block
+
+A single search box at the top filters everything at once: leave it empty for the grouped menu, or type to jump straight to an action or a turn-into target (`h1` → Heading 1, `warning` → Warning callout). The `+` button on the handle opens the block picker to insert a new block below.
 
 ### Bubble menu
 

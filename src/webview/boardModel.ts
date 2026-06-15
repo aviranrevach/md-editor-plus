@@ -595,6 +595,28 @@ export function mintCardId(existingIds: Iterable<string>): string {
   return `C${n}`;
 }
 
+// Generate a board id (`b-<4 base36 chars>`) not present in `taken`.
+// Matches the creation scheme in blockPicker.insertBoardWith, but guarantees
+// it differs from existing boards so duplicates never collide at the document
+// level (board:start id="…").
+export function mintBoardId(taken: Iterable<string>): string {
+  const used = new Set(taken);
+  let id = `b-${Math.random().toString(36).slice(2, 6)}`;
+  while (used.has(id)) id = `b-${Math.random().toString(36).slice(2, 6)}`;
+  return id;
+}
+
+// Duplicate a board's `source`: parse it, assign a fresh unique board id, and
+// re-serialize. Card ids are scoped inside this board's own region, so they are
+// preserved as-is — only the board id must be unique across the document.
+export function duplicateBoardSource(source: string, takenBoardIds: Iterable<string>): string {
+  const board = parseBoardSource(source);
+  const taken = new Set(takenBoardIds);
+  taken.add(board.id); // never reuse the source board's own id
+  const dup: Board = { ...board, id: mintBoardId(taken) };
+  return serializeBoard(dup);
+}
+
 export function serializeBoard(board: Board): string {
   // De-duplicate card ids: first occurrence wins; later occurrences get -N suffix.
   // Empty ids are minted in the canonical C<n> scheme, continuing from the highest.
