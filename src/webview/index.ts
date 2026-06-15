@@ -3,6 +3,7 @@ import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
 import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
+import { decideExternalUpdate } from './syncGuard';
 import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { setAlwaysDarkDiagram } from './mermaidRenderer';
@@ -1034,25 +1035,49 @@ function init(): void {
     }
 
     if (msg.type === 'update' && editorReady) {
-      // Skip the round-trip echo of our own edit — re-running setContent
-      // forces lowlight to re-tokenize, which briefly clears syntax colors.
-      // Compare normalized (VS Code may rewrite trailing whitespace / line endings).
-      if (lastSentMarkdown !== null && normalizeMd(msg.markdown) === lastSentMarkdown) {
+      // The decision (echo / data-loss guard / conflict / apply) is a pure
+      // function so it can be unit-tested without the DOM. Compare normalized —
+      // VS Code may rewrite trailing whitespace / line endings.
+      const decision = decideExternalUpdate({
+        incoming:      normalizeMd(msg.markdown),
+        editorCurrent: normalizeMd(getCurrentMarkdown()),
+        lastSent:      lastSentMarkdown,
+        isRefresh:     msg.source === 'refresh',
+      });
+
+      if (decision === 'dedup') {
+        // Echo of our own edit. Re-running setContent would force lowlight to
+        // re-tokenize, briefly clearing syntax colors — so don't.
         currentMarkdown = msg.markdown;
         if (sourceMode && sourceEditorReady) updateSourceContent(msg.markdown);
         return;
       }
-      // Conflict detection: the external content differs from what we last
-      // sent, AND the editor has unsent local edits queued in the 500ms
-      // debounce. Don't silently overwrite — surface a banner so the user
-      // picks. The 'refresh' source skips this check (user-initiated reload).
-      const editorCurrent = normalizeMd(getCurrentMarkdown());
-      const localDirty = lastSentMarkdown !== null && editorCurrent !== lastSentMarkdown;
-      if (localDirty && msg.source !== 'refresh') {
+
+      if (decision === 'restore-content') {
+        // DATA-LOSS GUARD. An empty 'update' would have wiped a non-empty
+        // editor (a race can deliver one right after open). Keep the editor as
+        // it is and re-assert our content so a spuriously-emptied host document
+        // / on-disk file is corrected on the next save.
+        const ours = getCurrentMarkdown();
+        console.warn(
+          '[md-editor-plus] data-loss guard: ignored an empty external update ' +
+          'that would have wiped the editor; re-asserting content',
+          { editorChars: ours.length, hadLocalEdit: lastSentMarkdown !== null },
+        );
+        currentMarkdown = ours;
+        lastSentMarkdown = normalizeMd(ours);
+        vscode.postMessage({ type: 'edit', markdown: ours });
+        return;
+      }
+
+      if (decision === 'conflict') {
+        // External content differs from unsent local edits — surface a banner
+        // so the user picks, rather than silently overwriting either side.
         pendingExternalMarkdown = msg.markdown;
         showConflictBanner();
         return;
       }
+
       pendingExternalMarkdown = null;
       hideConflictBanner();
       currentMarkdown = msg.markdown;
