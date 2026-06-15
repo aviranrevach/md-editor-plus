@@ -8,14 +8,13 @@ import { Editor } from '@tiptap/core';
 import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import { PluginKey } from '@tiptap/pm/state';
 import { NodeSelection } from '@tiptap/pm/state';
-import { resolveImageSrc } from './mediaResolve';
 import { compressImage } from './imageCompress';
 import {
   saveImageBytes,
   pickProjectImage,
   embedImageFromClipboard,
   revealImage,
-  fetchImageBytes,
+  readImageBytes,
 } from './imageUpload';
 import { sanitizeImageFileName, extensionForMime } from '../imageAssets';
 import { IMAGE_SIZE_PRESETS } from './imageNodeView';
@@ -97,7 +96,7 @@ export function createImageBubbleMenu(editor: Editor): void {
     if (cached != null) { setCompressTip(`Compress · ${formatBytes(cached)}`); return; }
     setCompressTip('Compress (smaller file)');
     try {
-      const bytes = await fetchImageBytes(resolveImageSrc(src));
+      const bytes = await readImageBytes(src);
       sizeCache.set(src, bytes.byteLength);
       if (tipSrc === src) setCompressTip(`Compress · ${formatBytes(bytes.byteLength)}`);
     } catch {
@@ -168,7 +167,7 @@ export function createImageBubbleMenu(editor: Editor): void {
         : ext === 'webp' ? 'image/webp'
         : ext === 'png' ? 'image/png'
         : `image/${ext}`;
-      const bytes = await fetchImageBytes(resolveImageSrc(rawSrc));
+      const bytes = await readImageBytes(rawSrc);
       const oldSize = bytes.byteLength;
       sizeCache.set(rawSrc, oldSize);
       const result = await compressImage(bytes, inputMime, { quality: 0.8 });

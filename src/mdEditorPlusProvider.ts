@@ -609,6 +609,36 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         }
         return;
       }
+      if (msg.type === 'readImageBytes') {
+        // The webview can't fetch() local resources (CSP default-src 'none'),
+        // so it asks the extension to read the asset bytes for compress/size.
+        const m = msg as unknown as { requestId?: unknown; relPath?: unknown };
+        const requestId = typeof m.requestId === 'string' ? m.requestId : '';
+        const reply = (extra: Record<string, unknown>) =>
+          void webviewPanel.webview.postMessage({ type: 'imageBytesRead', requestId, ...extra });
+        if (!requestId || typeof m.relPath !== 'string') {
+          reply({ error: 'bad readImageBytes request' });
+          return;
+        }
+        if (/^(?:https?:|data:)/i.test(m.relPath)) {
+          reply({ error: 'not a local image' });
+          return;
+        }
+        if (!document.uri.scheme.startsWith('file')) {
+          reply({ error: 'save the file first' });
+          return;
+        }
+        try {
+          const clean = m.relPath.replace(/^\.\//, '');
+          const docDir = vscode.Uri.joinPath(document.uri, '..');
+          const target = vscode.Uri.joinPath(docDir, clean);
+          const data = await vscode.workspace.fs.readFile(target);
+          reply({ bytesBase64: Buffer.from(data).toString('base64') });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+        return;
+      }
       if (msg.type === 'pickProjectImage') {
         const m = msg as unknown as { requestId?: unknown };
         const requestId = typeof m.requestId === 'string' ? m.requestId : '';

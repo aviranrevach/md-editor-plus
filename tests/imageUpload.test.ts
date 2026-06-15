@@ -18,7 +18,7 @@ describe('arrayBufferToBase64', () => {
   });
 });
 
-import { revealImage } from '../src/webview/imageUpload';
+import { revealImage, readImageBytes } from '../src/webview/imageUpload';
 
 describe('revealImage transport', () => {
   it('posts a revealImage message and resolves when the extension replies', async () => {
@@ -32,5 +32,22 @@ describe('revealImage transport', () => {
       data: { type: 'imageRevealed', requestId: req.requestId, ok: true },
     }));
     await expect(p).resolves.toBeUndefined();
+  });
+});
+
+describe('readImageBytes transport', () => {
+  it('posts readImageBytes and decodes the base64 reply to bytes', async () => {
+    const posted: any[] = [];
+    (window as any).__mdViewerVscode = { postMessage: (m: any) => posted.push(m) };
+    const p = readImageBytes('./Note.assets/x.png');
+    const req = posted.find((m) => m.type === 'readImageBytes');
+    expect(req).toBeTruthy();
+    expect(req.relPath).toBe('./Note.assets/x.png');
+    // "Man" -> "TWFu"
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'imageBytesRead', requestId: req.requestId, bytesBase64: 'TWFu' },
+    }));
+    const buf = await p;
+    expect(Array.from(new Uint8Array(buf))).toEqual([0x4d, 0x61, 0x6e]);
   });
 });

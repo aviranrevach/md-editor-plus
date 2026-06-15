@@ -1,4 +1,4 @@
-import { saveImageBytes, pickProjectImage, embedImageFromClipboard, revealImage, fetchImageBytes } from './imageUpload';
+import { saveImageBytes, pickProjectImage, embedImageFromClipboard, revealImage, readImageBytes } from './imageUpload';
 import { resolveImageSrc } from './mediaResolve';
 import { parseImageLinks, appendImageLink, removeImageLinkAt, replaceImageLinkAt } from './boardImageLinks';
 import { compressImage } from './imageCompress';
@@ -73,7 +73,7 @@ export function openBoardImageManager(
         : ext === 'webp' ? 'image/webp'
         : ext === 'png' ? 'image/png'
         : `image/${ext}`;
-      const bytes = await fetchImageBytes(resolveImageSrc(src));
+      const bytes = await readImageBytes(src);
       const result = await compressImage(bytes, inputMime, { quality: 0.8 });
       if (!result.changed) return;
       const stem = (src.split('/').pop() || 'image').replace(/\.[^.]+$/, '');

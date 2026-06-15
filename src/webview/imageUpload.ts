@@ -21,6 +21,7 @@ function ensureListener(): void {
     const msg = event.data as {
       type?: string; requestId?: string;
       relPath?: string; src?: string; canceled?: boolean; error?: string; ok?: boolean;
+      bytesBase64?: string;
     };
     if (!msg || typeof msg.requestId !== 'string') return;
     const p = pending.get(msg.requestId);
@@ -42,6 +43,10 @@ function ensureListener(): void {
       pending.delete(msg.requestId);
       if (msg.error) p.reject(new Error(msg.error));
       else p.resolve('');
+    } else if (msg.type === 'imageBytesRead') {
+      pending.delete(msg.requestId);
+      if (msg.error) p.reject(new Error(msg.error));
+      else p.resolve(msg.bytesBase64 ?? '');
     }
   });
 }
@@ -102,10 +107,14 @@ export function revealImage(relPath: string): Promise<void> {
   return request({ type: 'revealImage', relPath }).then(() => undefined);
 }
 
-// Read the bytes of an already-resolved (webview-accessible) image URI. Used to
-// feed the current image into compressImage. Throws on a non-OK fetch.
-export async function fetchImageBytes(resolvedSrc: string): Promise<ArrayBuffer> {
-  const res = await fetch(resolvedSrc);
-  if (!res.ok) throw new Error(`couldn't read image (${res.status})`);
-  return res.arrayBuffer();
+// Read the bytes of a local asset by its RELATIVE path (e.g. ./Note.assets/x.png).
+// Goes through the extension because the webview's CSP (default-src 'none')
+// blocks fetch() of local resources. Used to feed the image into compressImage
+// and to measure its size. Throws if the extension can't read it.
+export async function readImageBytes(relPath: string): Promise<ArrayBuffer> {
+  const b64 = (await request({ type: 'readImageBytes', relPath })) ?? '';
+  const binary = typeof atob === 'function' ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }
