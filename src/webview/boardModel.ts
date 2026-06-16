@@ -634,7 +634,8 @@ export function duplicateBoardSource(source: string, takenBoardIds: Iterable<str
 
 export function serializeBoard(board: Board): string {
   // De-duplicate card ids: first occurrence wins; later occurrences get -N suffix.
-  // Empty ids are minted in the canonical C<n> scheme, continuing from the highest.
+  // Empty ids are minted continuing from the highest, in the board's existing id
+  // case (lowercase only when all ids are lowercase; uppercase otherwise).
   let maxN = 0;
   for (const c of board.cards) {
     const n = idNumber(c.id);
