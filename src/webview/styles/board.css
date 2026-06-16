@@ -1482,6 +1482,17 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-cell-editing { background: var(--bg); outline: 2px solid var(--link); outline-offset: -2px; caret-color: var(--board-text, var(--text-primary)); }
 .bd-table-cell { cursor: text; caret-color: var(--board-text, var(--text-primary)); }
 .bd-cell-status, .bd-cell-date, .bd-cell-tags { cursor: pointer; }
+/* c16: clip pill/tag cells to their column. The table is `table-layout: fixed`,
+   so when the window narrows the column is squeezed below the pill's width — and
+   a `white-space: nowrap` pill would spill past the cell into the neighbour
+   (e.g. "Medium" bleeding over the next cell). Clip the cell and let the pill
+   truncate its label with an ellipsis instead of overflowing. The auto-fit
+   (autofitStatusColumns) still keeps pills full-width whenever there is room;
+   this is the fallback for when the window is too narrow to honor that width. */
+.bd-cell-status, .bd-cell-tags, .bd-cell-date { overflow: hidden; }
+.bd-cell-status .board-column-chip, .bd-cell-tags .bd-tag { max-width: 100%; }
+.bd-cell-status .board-column-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bd-cell-tags .bd-tag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bd-cell-empty { color: var(--text-secondary, #888); font-size: 12px; }
 .bd-cell-id { cursor: default; color: var(--text-secondary, #888); }
 .bd-date { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); font: 500 11.5px var(--font-board); }
