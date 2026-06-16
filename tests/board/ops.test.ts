@@ -196,8 +196,8 @@ describe('addCard id scheme (c17)', () => {
     expect(b.cards[b.cards.length - 1].values.id).toBe('C3');
   });
 
-  it('continues past legacy lowercase ids', () => {
+  it('continues past legacy lowercase ids in the board\'s case', () => {
     const b = board(['c8']);
-    expect(ops.addCard(b)).toBe('C9');
+    expect(ops.addCard(b)).toBe('c9');
   });
 });
