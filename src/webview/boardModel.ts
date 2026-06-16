@@ -440,13 +440,15 @@ export function parseBoardSource(source: string): Board {
       table.header.forEach((h, idx) => {
         values[h] = row[idx] ?? '';
       });
-      const id = normalizeLegacyId(values.id || '');
-      values.id = id;
-      cards.push({ id, values, body: bodyById.get(id) ?? '' });
+      // Preserve the id exactly as authored (idempotent serialize). Body links
+      // and orphan checks compare via normalizeLegacyId so c8/C8 still match.
+      const rawId = values.id || '';
+      values.id = rawId;
+      cards.push({ id: rawId, values, body: bodyById.get(normalizeLegacyId(rawId)) ?? '' });
     }
   }
 
-  const cardIds = new Set(cards.map((c) => c.id));
+  const cardIds = new Set(cards.map((c) => normalizeLegacyId(c.id)));
   const orphanBodies: { id: string; body: string }[] = [];
   for (const [bid, bodyText] of bodyById.entries()) {
     if (!cardIds.has(bid)) {
@@ -581,18 +583,31 @@ export function normalizeLegacyId(id: string): string {
   return m ? `C${parseInt(m[1], 10)}` : id;
 }
 
-/** Next free id in the canonical `C<n>` scheme, continuing from the highest existing number. */
-export function mintCardId(existingIds: Iterable<string>): string {
-  const used = new Set<string>();
-  let max = 0;
+/** Pick the id prefix to mint with: lowercase only when the board's ids are all
+ *  lowercase `c<n>` (no canonical `C<n>` present); uppercase otherwise / when empty. */
+function idCase(existingIds: Iterable<string>): 'c' | 'C' {
+  let lower = 0;
+  let upper = 0;
   for (const id of existingIds) {
-    used.add(id);
+    if (/^c\d+$/.test(id)) lower++;
+    else if (/^C\d+$/.test(id)) upper++;
+  }
+  return lower > 0 && upper === 0 ? 'c' : 'C';
+}
+
+/** Next free id, continuing from the highest existing number, in the board's case. */
+export function mintCardId(existingIds: Iterable<string>): string {
+  const ids = [...existingIds];
+  const prefix = idCase(ids);
+  const used = new Set<string>(ids);
+  let max = 0;
+  for (const id of ids) {
     const n = idNumber(id);
     if (n !== null && n > max) max = n;
   }
   let n = max + 1;
-  while (used.has(`C${n}`)) n++;
-  return `C${n}`;
+  while (used.has(`${prefix}${n}`)) n++;
+  return `${prefix}${n}`;
 }
 
 // Generate a board id (`b-<4 base36 chars>`) not present in `taken`.
@@ -619,15 +634,17 @@ export function duplicateBoardSource(source: string, takenBoardIds: Iterable<str
 
 export function serializeBoard(board: Board): string {
   // De-duplicate card ids: first occurrence wins; later occurrences get -N suffix.
-  // Empty ids are minted in the canonical C<n> scheme, continuing from the highest.
+  // Empty ids are minted continuing from the highest, in the board's existing id
+  // case (lowercase only when all ids are lowercase; uppercase otherwise).
   let maxN = 0;
   for (const c of board.cards) {
     const n = idNumber(c.id);
     if (n !== null && n > maxN) maxN = n;
   }
+  const mintPrefix = idCase(board.cards.map((c) => c.id));
   const seen = new Set<string>();
   const normalizedCards = board.cards.map((c) => {
-    let id = c.id || `C${++maxN}`;
+    let id = c.id || `${mintPrefix}${++maxN}`;
     if (!seen.has(id)) {
       seen.add(id);
       return { ...c, id, values: { ...c.values, id } };

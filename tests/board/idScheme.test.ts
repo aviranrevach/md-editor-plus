@@ -45,9 +45,12 @@ describe('mintCardId', () => {
     // max is 5 -> tries C6; if C6 already present, advances
     expect(mintCardId(['C5', 'C6'])).toBe('C7');
   });
+  it('mints lowercase when the board uses lowercase ids', () => {
+    expect(mintCardId(['c5', 'c6'])).toBe('c7');
+  });
 });
 
-describe('legacy id migration on parse (c17)', () => {
+describe('legacy id case is preserved on parse (c28)', () => {
   const src = [
     '<!-- board:start id="b1" name="B" columns="Todo" column-colors="blue" field-types="Title=text,Status=status,id=text" hidden-fields="id" -->',
     '',
@@ -67,22 +70,22 @@ describe('legacy id migration on parse (c17)', () => {
     '<!-- board:end -->',
   ].join('\n');
 
-  it('uppercases card ids and keeps them linked to their bodies', () => {
+  it('preserves authored (lowercase) card ids and keeps them linked to their bodies', () => {
     const board = parseBoardSource(src)!;
-    expect(board.cards.map(c => c.id)).toEqual(['C8', 'C17']);
-    expect(board.cards.map(c => c.values.id)).toEqual(['C8', 'C17']);
+    expect(board.cards.map(c => c.id)).toEqual(['c8', 'c17']);
+    expect(board.cards.map(c => c.values.id)).toEqual(['c8', 'c17']);
     expect(board.cards[0].body.trim()).toBe('Body for eight');
     expect(board.cards[1].body.trim()).toBe('Body for seventeen');
     expect(board.orphanBodies).toHaveLength(0);
   });
 
-  it('round-trips uppercased ids into the table and the body anchors', () => {
+  it('round-trips authored ids into the table and the body anchors unchanged', () => {
     const out = serializeBoard(parseBoardSource(src)!);
-    expect(out).toContain('| Alpha | Todo | C8 |');
-    expect(out).toContain('| Beta | Todo | C17 |');
-    expect(out).toContain('<!-- board:body id="C8" -->');
-    expect(out).toContain('<!-- board:body id="C17" -->');
-    expect(out).not.toContain('id="c8"');
-    expect(out).not.toContain('| c17 |');
+    expect(out).toContain('| Alpha | Todo | c8 |');
+    expect(out).toContain('| Beta | Todo | c17 |');
+    expect(out).toContain('<!-- board:body id="c8" -->');
+    expect(out).toContain('<!-- board:body id="c17" -->');
+    expect(out).not.toContain('| C8 |');
+    expect(out).not.toContain('id="C17"');
   });
 });
