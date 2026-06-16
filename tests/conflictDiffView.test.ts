@@ -5,22 +5,22 @@ import type { ConflictDiff } from '../src/webview/conflictDiff';
 const diff = (rows: ConflictDiff['rows'], truncated = 0): ConflictDiff => ({ rows, truncated });
 
 describe('buildConflictDiffPanel', () => {
-  it('renders one .conflict-pair per row with the right cell classes (disk left, yours right)', () => {
+  it('colors cells by column — disk (red) left, mine (green) right, empty for gaps', () => {
     const el = buildConflictDiffPanel(diff([
       { kind: 'change', yours: 'B', disk: 'X' },
-      { kind: 'del', yours: 'gone', disk: null },   // yours-only → empty on disk, del on yours
-      { kind: 'add', yours: null, disk: 'new' },     // disk-only → add on disk, empty on yours
+      { kind: 'del', yours: 'gone', disk: null },   // yours-only → empty on disk, mine on yours
+      { kind: 'add', yours: null, disk: 'new' },     // disk-only → disk on left, empty on yours
     ]));
     const pairs = el.querySelectorAll('.conflict-pair');
     expect(pairs).toHaveLength(3);
-    // change: both sides
-    expect(pairs[0].children[0].className).toContain('change');
-    expect(pairs[0].children[1].className).toContain('change');
-    // del (yours-only): disk empty, yours del
+    // change: disk left, mine right
+    expect(pairs[0].children[0].className).toContain('disk');
+    expect(pairs[0].children[1].className).toContain('mine');
+    // del (yours-only): disk empty, yours green
     expect(pairs[1].children[0].className).toContain('empty');
-    expect(pairs[1].children[1].className).toContain('del');
-    // add (disk-only): disk add, yours empty
-    expect(pairs[2].children[0].className).toContain('add');
+    expect(pairs[1].children[1].className).toContain('mine');
+    // add (disk-only): disk red, yours empty
+    expect(pairs[2].children[0].className).toContain('disk');
     expect(pairs[2].children[1].className).toContain('empty');
   });
 
