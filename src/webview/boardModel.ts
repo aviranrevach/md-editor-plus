@@ -440,13 +440,15 @@ export function parseBoardSource(source: string): Board {
       table.header.forEach((h, idx) => {
         values[h] = row[idx] ?? '';
       });
-      const id = normalizeLegacyId(values.id || '');
-      values.id = id;
-      cards.push({ id, values, body: bodyById.get(id) ?? '' });
+      // Preserve the id exactly as authored (idempotent serialize). Body links
+      // and orphan checks compare via normalizeLegacyId so c8/C8 still match.
+      const rawId = values.id || '';
+      values.id = rawId;
+      cards.push({ id: rawId, values, body: bodyById.get(normalizeLegacyId(rawId)) ?? '' });
     }
   }
 
-  const cardIds = new Set(cards.map((c) => c.id));
+  const cardIds = new Set(cards.map((c) => normalizeLegacyId(c.id)));
   const orphanBodies: { id: string; body: string }[] = [];
   for (const [bid, bodyText] of bodyById.entries()) {
     if (!cardIds.has(bid)) {
