@@ -1,6 +1,9 @@
-import type { ConflictDiff, DiffRowKind } from './conflictDiff';
+import type { ConflictDiff } from './conflictDiff';
 
-function cell(kind: DiffRowKind | 'empty', text: string): HTMLDivElement {
+// Cells are colored by COLUMN, not by change-type: the on-disk (left) side is red,
+// your-edits (right) side is green — the standard before→after diff convention.
+// `empty` is the hatched gap where a line exists on only one side.
+function cell(kind: 'disk' | 'mine' | 'empty', text: string): HTMLDivElement {
   const c = document.createElement('div');
   c.className = `conflict-cell ${kind}`;
   c.textContent = text;
@@ -43,19 +46,19 @@ export function buildConflictDiffPanel(diff: ConflictDiff): HTMLElement {
   for (const row of diff.rows) {
     const pair = document.createElement('div');
     pair.className = 'conflict-pair';
-    let left: HTMLDivElement;   // on disk
-    let right: HTMLDivElement;  // yours
+    let left: HTMLDivElement;   // on disk (red)
+    let right: HTMLDivElement;  // yours (green)
     if (row.kind === 'change') {
-      left = cell('change', row.disk ?? '');
-      right = cell('change', row.yours ?? '');
+      left = cell('disk', row.disk ?? '');
+      right = cell('mine', row.yours ?? '');
     } else if (row.kind === 'add') {
       // disk-only line
-      left = cell('add', row.disk ?? '');
+      left = cell('disk', row.disk ?? '');
       right = cell('empty', '');
     } else {
       // yours-only line (del)
       left = cell('empty', '');
-      right = cell('del', row.yours ?? '');
+      right = cell('mine', row.yours ?? '');
     }
     pair.append(left, right);
     grid.appendChild(pair);

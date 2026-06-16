@@ -280,10 +280,16 @@ function init(): void {
   const conflictBanner = document.createElement('div');
   conflictBanner.id = 'conflict-banner';
   conflictBanner.className = 'conflict-banner';
+  // Phosphor icons (regular weight, 256 viewBox) — matches the rest of the UI.
+  const iConflictCaret = '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>';
+  const iConflictWarn = '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09Zm-13.87,15.71a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></svg>';
   conflictBanner.innerHTML = `
     <div class="conflict-bar">
-      <button type="button" class="conflict-count" id="conflict-reveal" aria-expanded="false"></button>
-      <span class="conflict-banner-icon" aria-hidden="true">⚠</span>
+      <button type="button" class="conflict-reveal" id="conflict-reveal" aria-expanded="false">
+        <span class="conflict-chevron">${iConflictCaret}</span>
+        <span class="conflict-count"></span>
+      </button>
+      <span class="conflict-banner-icon" aria-hidden="true">${iConflictWarn}</span>
       <span class="conflict-banner-text">This file was changed outside the editor while you have unsaved changes.</span>
       <button type="button" class="conflict-banner-btn primary" id="conflict-reload">Reload from disk</button>
       <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
@@ -294,13 +300,16 @@ function init(): void {
 
   const conflictReveal = conflictBanner.querySelector<HTMLElement>('#conflict-reveal');
   const conflictPanel  = conflictBanner.querySelector<HTMLElement>('#conflict-panel');
+  const conflictCountLabel = conflictReveal?.querySelector<HTMLElement>('.conflict-count') ?? null;
   let conflictCount = 0; // total changed lines for the current conflict
 
-  // The red "N changes" pill doubles as the reveal toggle; the caret reflects state.
+  // The chevron + "N changes" red pill together are the reveal toggle. The chevron
+  // (a real Phosphor caret) rotates via CSS on aria-expanded; the pill shows the count.
   function renderRevealPill(open: boolean): void {
-    if (!conflictReveal) return;
-    conflictReveal.textContent = `${conflictCount} change${conflictCount === 1 ? '' : 's'} ${open ? '⌃' : '⌄'}`;
-    conflictReveal.setAttribute('aria-expanded', String(open));
+    if (conflictCountLabel) {
+      conflictCountLabel.textContent = `${conflictCount} change${conflictCount === 1 ? '' : 's'}`;
+    }
+    conflictReveal?.setAttribute('aria-expanded', String(open));
   }
 
   function setRevealOpen(open: boolean): void {
