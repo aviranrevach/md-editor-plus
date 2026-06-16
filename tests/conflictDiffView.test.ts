@@ -5,27 +5,42 @@ import type { ConflictDiff } from '../src/webview/conflictDiff';
 const diff = (rows: ConflictDiff['rows'], truncated = 0): ConflictDiff => ({ rows, truncated });
 
 describe('buildConflictDiffPanel', () => {
-  it('renders one .conflict-pair per row with the right cell classes', () => {
+  it('renders one .conflict-pair per row with the right cell classes (disk left, yours right)', () => {
     const el = buildConflictDiffPanel(diff([
       { kind: 'change', yours: 'B', disk: 'X' },
-      { kind: 'del', yours: 'gone', disk: null },
-      { kind: 'add', yours: null, disk: 'new' },
+      { kind: 'del', yours: 'gone', disk: null },   // yours-only → empty on disk, del on yours
+      { kind: 'add', yours: null, disk: 'new' },     // disk-only → add on disk, empty on yours
     ]));
     const pairs = el.querySelectorAll('.conflict-pair');
     expect(pairs).toHaveLength(3);
+    // change: both sides
     expect(pairs[0].children[0].className).toContain('change');
     expect(pairs[0].children[1].className).toContain('change');
-    expect(pairs[1].children[0].className).toContain('del');
-    expect(pairs[1].children[1].className).toContain('empty');
-    expect(pairs[2].children[0].className).toContain('empty');
-    expect(pairs[2].children[1].className).toContain('add');
+    // del (yours-only): disk empty, yours del
+    expect(pairs[1].children[0].className).toContain('empty');
+    expect(pairs[1].children[1].className).toContain('del');
+    // add (disk-only): disk add, yours empty
+    expect(pairs[2].children[0].className).toContain('add');
+    expect(pairs[2].children[1].className).toContain('empty');
   });
 
-  it('puts yours on the left cell and disk on the right cell', () => {
-    const el = buildConflictDiffPanel(diff([{ kind: 'change', yours: 'L', disk: 'R' }]));
+  it('puts ON DISK on the left cell and YOURS on the right cell', () => {
+    const el = buildConflictDiffPanel(diff([{ kind: 'change', yours: 'mine', disk: 'theirs' }]));
     const pair = el.querySelector('.conflict-pair')!;
-    expect(pair.children[0].textContent).toBe('L');
-    expect(pair.children[1].textContent).toBe('R');
+    expect(pair.children[0].textContent).toBe('theirs'); // disk
+    expect(pair.children[1].textContent).toBe('mine');   // yours
+  });
+
+  it('labels the columns so each maps to its button', () => {
+    const el = buildConflictDiffPanel(diff([{ kind: 'change', yours: 'a', disk: 'b' }]));
+    const head = el.querySelector('.conflict-panel-head')!;
+    expect(head.children[0].textContent).toContain('On disk');
+    expect(head.children[0].textContent).toContain('Reload from disk');
+    expect(head.children[1].textContent).toContain('Your unsaved edits');
+    expect(head.children[1].textContent).toContain('Keep my version');
+    // dots present, ordered disk then mine
+    expect(el.querySelector('.conflict-dot.disk')).not.toBeNull();
+    expect(el.querySelector('.conflict-dot.mine')).not.toBeNull();
   });
 
   it('shows a "no line differences" note when there are no rows', () => {
@@ -34,15 +49,15 @@ describe('buildConflictDiffPanel', () => {
     expect(el.textContent).toContain('No line differences');
   });
 
-  it('reports the truncated count in the footer', () => {
-    const el = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }], 5));
-    expect(el.querySelector('.conflict-foot')!.textContent).toContain('+5 more');
+  it('shows a "+N more" footer only when the diff is truncated', () => {
+    const truncated = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }], 5));
+    expect(truncated.querySelector('.conflict-foot')!.textContent).toContain('+5 more');
+    const notTruncated = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }]));
+    expect(notTruncated.querySelector('.conflict-foot')).toBeNull();
   });
 
-  it('fires onOpenFullDiff when the "Open full diff" link is clicked', () => {
-    const onOpenFullDiff = jest.fn();
-    const el = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }]), { onOpenFullDiff });
-    el.querySelector<HTMLElement>('.conflict-openfull')!.click();
-    expect(onOpenFullDiff).toHaveBeenCalledTimes(1);
+  it('no longer renders an "Open full diff" link', () => {
+    const el = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }]));
+    expect(el.querySelector('.conflict-openfull')).toBeNull();
   });
 });
