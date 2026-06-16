@@ -3,6 +3,8 @@ import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
 import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
+import { computeConflictDiff } from './conflictDiff';
+import { buildConflictDiffPanel } from './conflictDiffView';
 import { decideExternalUpdate } from './syncGuard';
 import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
@@ -279,12 +281,44 @@ function init(): void {
   conflictBanner.id = 'conflict-banner';
   conflictBanner.className = 'conflict-banner';
   conflictBanner.innerHTML = `
-    <span class="conflict-banner-icon" aria-hidden="true">⚠</span>
-    <span class="conflict-banner-text">This file was changed outside the editor while you have unsaved changes.</span>
-    <button type="button" class="conflict-banner-btn primary" id="conflict-reload">Reload from disk</button>
-    <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
+    <div class="conflict-bar">
+      <span class="conflict-banner-icon" aria-hidden="true">⚠</span>
+      <span class="conflict-banner-text">This file was changed outside the editor while you have unsaved changes.</span>
+      <button type="button" class="conflict-reveal" id="conflict-reveal" aria-expanded="false">What changed ▾</button>
+      <button type="button" class="conflict-banner-btn primary" id="conflict-reload">Reload from disk</button>
+      <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
+    </div>
+    <div class="conflict-panel" id="conflict-panel" hidden></div>
   `;
   document.body.appendChild(conflictBanner);
+
+  const conflictReveal = conflictBanner.querySelector<HTMLElement>('#conflict-reveal');
+  const conflictPanel  = conflictBanner.querySelector<HTMLElement>('#conflict-panel');
+
+  function setRevealOpen(open: boolean): void {
+    if (!conflictPanel || !conflictReveal) return;
+    if (open) conflictPanel.removeAttribute('hidden');
+    else conflictPanel.setAttribute('hidden', '');
+    conflictReveal.setAttribute('aria-expanded', String(open));
+    conflictReveal.textContent = open ? 'What changed ▴' : 'What changed ▾';
+  }
+
+  // Build the (collapsed) diff panel for the current conflict. Computed once per
+  // conflict — not on every keystroke. Both versions are in hand at conflict time.
+  function renderConflictPanel(yours: string, disk: string): void {
+    if (!conflictPanel) return;
+    // computeConflictDiff normalizes CRLF / trailing blanks internally — pass raw.
+    const diff = computeConflictDiff(yours, disk);
+    conflictPanel.replaceChildren(buildConflictDiffPanel(diff, { onOpenFullDiff: openFullDiff }));
+    setRevealOpen(false); // collapsed by default
+  }
+
+  // Seam for the future full diff viewer (c24). Intentionally inert for now.
+  function openFullDiff(): void { /* c24: open the full side-by-side diff viewer here */ }
+
+  conflictReveal?.addEventListener('click', () => {
+    setRevealOpen(conflictPanel?.hasAttribute('hidden') ?? false);
+  });
 
   let saveState: SaveState = 'saved';
   const saveIndicatorEl = document.getElementById('save-indicator');
@@ -318,6 +352,8 @@ function init(): void {
   function hideConflictBanner(): void {
     conflictBanner.classList.remove('visible');
     document.documentElement.classList.remove('conflict-active');
+    conflictPanel?.replaceChildren();
+    setRevealOpen(false);
     applySaveEvent('conflictResolved');
     vscode.postMessage({ type: 'conflictPause', paused: false });
   }
@@ -1074,6 +1110,7 @@ function init(): void {
         // External content differs from unsent local edits — surface a banner
         // so the user picks, rather than silently overwriting either side.
         pendingExternalMarkdown = msg.markdown;
+        renderConflictPanel(getCurrentMarkdown(), msg.markdown);
         showConflictBanner();
         return;
       }
