@@ -276,6 +276,10 @@ function init(): void {
     vscode.postMessage({ type: 'refresh' });
   });
 
+  document.getElementById('diff-btn')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openFullDiff' });
+  });
+
   // External-edit conflict banner. Rendered once and toggled via 'visible'.
   const conflictBanner = document.createElement('div');
   conflictBanner.id = 'conflict-banner';
@@ -327,7 +331,9 @@ function init(): void {
     // computeConflictDiff normalizes CRLF / trailing blanks internally — pass raw.
     const diff = computeConflictDiff(yours, disk);
     conflictCount = diff.rows.length + diff.truncated;
-    conflictPanel.replaceChildren(buildConflictDiffPanel(diff));
+    conflictPanel.replaceChildren(buildConflictDiffPanel(diff, {
+      onOpenFullDiff: () => vscode.postMessage({ type: 'openFullDiff', baseContent: disk, baseLabel: 'On disk' }),
+    }));
     setRevealOpen(false); // collapsed by default
   }
 

@@ -56,7 +56,16 @@ describe('buildConflictDiffPanel', () => {
     expect(notTruncated.querySelector('.conflict-foot')).toBeNull();
   });
 
-  it('no longer renders an "Open full diff" link', () => {
+  it('renders an "Open full diff" link that fires onOpenFullDiff', () => {
+    const onOpenFullDiff = jest.fn();
+    const el = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }]), { onOpenFullDiff });
+    const link = el.querySelector<HTMLElement>('.conflict-openfull');
+    expect(link).not.toBeNull();
+    link!.click();
+    expect(onOpenFullDiff).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the "Open full diff" link when no callback is given', () => {
     const el = buildConflictDiffPanel(diff([{ kind: 'add', yours: null, disk: 'x' }]));
     expect(el.querySelector('.conflict-openfull')).toBeNull();
   });

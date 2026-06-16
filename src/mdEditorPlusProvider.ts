@@ -843,6 +843,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
     <span class="save-indicator" id="save-indicator" aria-live="polite"></span>
     <span class="toolbar-spacer"></span>
+    <button class="toolbar-icon" id="diff-btn" data-tip="View changes (diff)">${iArrowsH}</button>
     <button class="toolbar-icon" id="refresh-btn" data-tip="Reload from disk">${iRefresh}</button>
     <button class="toolbar-icon" id="settings-btn" data-tip="Display settings">${iAa}</button>
     <button class="toolbar-icon" id="actions-btn" data-tip="More actions">${iDots}</button>

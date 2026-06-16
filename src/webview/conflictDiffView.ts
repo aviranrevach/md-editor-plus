@@ -1,5 +1,7 @@
 import type { ConflictDiff } from './conflictDiff';
 
+export interface ConflictDiffPanelOptions { onOpenFullDiff?: () => void; }
+
 // Cells are colored by COLUMN, not by change-type: the on-disk (left) side is red,
 // your-edits (right) side is green — the standard before→after diff convention.
 // `empty` is the hatched gap where a line exists on only one side.
@@ -30,7 +32,7 @@ function header(dot: 'disk' | 'mine', title: string, sub: string): HTMLDivElemen
 
 /** Builds the panel content (header + aligned grid + optional footer) from a diff.
  *  Pure DOM, no app deps. Left column = on disk, right column = your unsaved edits. */
-export function buildConflictDiffPanel(diff: ConflictDiff): HTMLElement {
+export function buildConflictDiffPanel(diff: ConflictDiff, opts: ConflictDiffPanelOptions = {}): HTMLElement {
   const wrap = document.createElement('div');
 
   const head = document.createElement('div');
@@ -65,16 +67,26 @@ export function buildConflictDiffPanel(diff: ConflictDiff): HTMLElement {
   }
   wrap.appendChild(grid);
 
-  // Footer only when there's something to say: empty diff, or a truncation note.
+  // Footer: empty-state note, an optional "+N more" truncation note, and an
+  // optional "Open full diff →" link (wired by the host to open the c24 viewer).
+  const footParts: Array<Node | string> = [];
   if (diff.rows.length === 0) {
-    const foot = document.createElement('div');
-    foot.className = 'conflict-foot';
-    foot.textContent = 'No line differences.';
-    wrap.appendChild(foot);
+    footParts.push('No line differences.');
   } else if (diff.truncated > 0) {
+    footParts.push(`+${diff.truncated} more changed line${diff.truncated === 1 ? '' : 's'}`);
+  }
+  if (opts.onOpenFullDiff && diff.rows.length > 0) {
+    if (footParts.length) footParts.push(' · ');
+    const link = document.createElement('span');
+    link.className = 'conflict-openfull';
+    link.textContent = 'Open full diff →';
+    link.addEventListener('click', () => opts.onOpenFullDiff?.());
+    footParts.push(link);
+  }
+  if (footParts.length) {
     const foot = document.createElement('div');
     foot.className = 'conflict-foot';
-    foot.textContent = `+${diff.truncated} more changed line${diff.truncated === 1 ? '' : 's'}`;
+    foot.append(...footParts);
     wrap.appendChild(foot);
   }
   return wrap;
