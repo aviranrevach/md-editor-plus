@@ -282,9 +282,9 @@ function init(): void {
   conflictBanner.className = 'conflict-banner';
   conflictBanner.innerHTML = `
     <div class="conflict-bar">
+      <button type="button" class="conflict-count" id="conflict-reveal" aria-expanded="false"></button>
       <span class="conflict-banner-icon" aria-hidden="true">⚠</span>
       <span class="conflict-banner-text">This file was changed outside the editor while you have unsaved changes.</span>
-      <button type="button" class="conflict-reveal" id="conflict-reveal" aria-expanded="false">What changed ▾</button>
       <button type="button" class="conflict-banner-btn primary" id="conflict-reload">Reload from disk</button>
       <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
     </div>
@@ -294,27 +294,33 @@ function init(): void {
 
   const conflictReveal = conflictBanner.querySelector<HTMLElement>('#conflict-reveal');
   const conflictPanel  = conflictBanner.querySelector<HTMLElement>('#conflict-panel');
+  let conflictCount = 0; // total changed lines for the current conflict
+
+  // The red "N changes" pill doubles as the reveal toggle; the caret reflects state.
+  function renderRevealPill(open: boolean): void {
+    if (!conflictReveal) return;
+    conflictReveal.textContent = `${conflictCount} change${conflictCount === 1 ? '' : 's'} ${open ? '⌃' : '⌄'}`;
+    conflictReveal.setAttribute('aria-expanded', String(open));
+  }
 
   function setRevealOpen(open: boolean): void {
-    if (!conflictPanel || !conflictReveal) return;
+    if (!conflictPanel) return;
     if (open) conflictPanel.removeAttribute('hidden');
     else conflictPanel.setAttribute('hidden', '');
-    conflictReveal.setAttribute('aria-expanded', String(open));
-    conflictReveal.textContent = open ? 'What changed ▴' : 'What changed ▾';
+    renderRevealPill(open);
   }
 
   // Build the (collapsed) diff panel for the current conflict. Computed once per
   // conflict — not on every keystroke. Both versions are in hand at conflict time.
+  // (The future full diff viewer — c24 — will hang off this same panel.)
   function renderConflictPanel(yours: string, disk: string): void {
     if (!conflictPanel) return;
     // computeConflictDiff normalizes CRLF / trailing blanks internally — pass raw.
     const diff = computeConflictDiff(yours, disk);
-    conflictPanel.replaceChildren(buildConflictDiffPanel(diff, { onOpenFullDiff: openFullDiff }));
+    conflictCount = diff.rows.length + diff.truncated;
+    conflictPanel.replaceChildren(buildConflictDiffPanel(diff));
     setRevealOpen(false); // collapsed by default
   }
-
-  // Seam for the future full diff viewer (c24). Intentionally inert for now.
-  function openFullDiff(): void { /* c24: open the full side-by-side diff viewer here */ }
 
   conflictReveal?.addEventListener('click', () => {
     setRevealOpen(conflictPanel?.hasAttribute('hidden') ?? false);
