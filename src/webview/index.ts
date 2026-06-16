@@ -1078,6 +1078,18 @@ function init(): void {
         return;
       }
 
+      // Gap B diagnostic: applying an external update that DIFFERS from what the
+      // editor shows, while the user has edited this session (lastSent set), means
+      // we are about to overwrite the editor — the suspected silent-revert path.
+      // Logged (not changed) so a live repro can confirm whether this is what
+      // eats freshly-added board rows before they reach disk.
+      if (lastSentMarkdown !== null && normalizeMd(msg.markdown) !== normalizeMd(getCurrentMarkdown())) {
+        console.warn(
+          '[md-editor-plus] sync: APPLYING a differing external update over local edits ' +
+          '(possible silent revert — Gap B). If board rows vanish here, this is why.',
+          { incomingChars: msg.markdown.length, editorChars: getCurrentMarkdown().length, source: msg.source ?? null },
+        );
+      }
       pendingExternalMarkdown = null;
       hideConflictBanner();
       currentMarkdown = msg.markdown;

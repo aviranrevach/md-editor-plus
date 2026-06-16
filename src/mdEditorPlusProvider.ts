@@ -129,7 +129,18 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     const saveToDisk = async (flash = false): Promise<void> => {
       if (conflictPaused) return;
       // No disk write needed — emit 'saved' directly (onDidSaveTextDocument won't fire).
-      if (!document.isDirty) { postSaveState('saved', flash); return; }
+      // This is also exactly where the "Saved but not on disk" lie surfaces: if the
+      // webview believes it has edits but the document is clean, those edits never
+      // reached the host (Gap A) or were reverted (Gap B). Log it so a live repro
+      // can confirm the document really was clean when we reported "saved".
+      if (!document.isDirty) {
+        console.warn('[md-editor-plus] saveToDisk: document NOT dirty → reporting "saved" with no write', {
+          uri: document.uri.toString(),
+          docChars: document.getText().length,
+          flash,
+        });
+        postSaveState('saved', flash); return;
+      }
       postSaveState('saving');
       // The single post-save 'saved' is emitted by onDidSaveTextDocument; hand it the flash.
       pendingFlash = flash;

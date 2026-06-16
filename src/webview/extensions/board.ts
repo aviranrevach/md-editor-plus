@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { NodeSelection } from '@tiptap/pm/state';
 import { createBoardView, BOARD_INTERACTIVE_SELECTOR } from '../boardBlock';
+import { commitBoardSource } from '../boardCommit';
 
 const REGION_RE =
   /<!--\s*board:start[\s\S]*?<!--\s*board:end\s*-->/gi;
@@ -80,14 +81,12 @@ const Board = Node.create({
       let lastSource = node.attrs.source as string;
       const view = createBoardView(lastSource, {
         onMutate(nextSource) {
-          const pos = typeof getPos === 'function' ? getPos() : null;
-          if (pos == null) return;
-          // Update lastSource locally so the update() callback doesn't re-render
-          // on the same content we just produced.
-          lastSource = nextSource;
-          editor.commands.command(({ tr }) => {
-            tr.setNodeAttribute(pos, 'source', nextSource);
-            return true;
+          // Never drop the edit when getPos() is transiently null (Gap A
+          // data-loss): commitBoardSource retries and logs loudly on failure.
+          // lastSource is updated via onCommitted ONLY when the write lands, so
+          // the update() echo check below stays correct.
+          commitBoardSource(editor, getPos, nextSource, {
+            onCommitted() { lastSource = nextSource; },
           });
         },
         isReadOnly() {
