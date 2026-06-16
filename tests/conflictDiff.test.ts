@@ -59,4 +59,22 @@ describe('computeConflictDiff', () => {
       { kind: 'change', yours: '| RTL | c26 |', disk: '| Diff viewer | c24 |' },
     ]);
   });
+
+  it('handles empty inputs on either or both sides', () => {
+    expect(computeConflictDiff('', '')).toEqual({ rows: [], truncated: 0 });
+    expect(computeConflictDiff('', 'a\nb')).toEqual({
+      rows: [
+        { kind: 'add', yours: null, disk: 'a' },
+        { kind: 'add', yours: null, disk: 'b' },
+      ],
+      truncated: 0,
+    });
+    expect(computeConflictDiff('a\nb', '')).toEqual({
+      rows: [
+        { kind: 'del', yours: 'a', disk: null },
+        { kind: 'del', yours: 'b', disk: null },
+      ],
+      truncated: 0,
+    });
+  });
 });

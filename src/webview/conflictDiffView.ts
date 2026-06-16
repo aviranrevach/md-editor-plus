@@ -1,8 +1,8 @@
-import type { ConflictDiff, DiffRow } from './conflictDiff';
+import type { ConflictDiff, DiffRowKind } from './conflictDiff';
 
 export interface ConflictDiffPanelOptions { onOpenFullDiff?: () => void; }
 
-function cell(kind: 'change' | 'add' | 'del' | 'empty', text: string): HTMLDivElement {
+function cell(kind: DiffRowKind | 'empty', text: string): HTMLDivElement {
   const c = document.createElement('div');
   c.className = `conflict-cell ${kind}`;
   c.textContent = text;

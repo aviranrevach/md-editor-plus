@@ -307,7 +307,8 @@ function init(): void {
   // conflict — not on every keystroke. Both versions are in hand at conflict time.
   function renderConflictPanel(yours: string, disk: string): void {
     if (!conflictPanel) return;
-    const diff = computeConflictDiff(normalizeMd(yours), normalizeMd(disk));
+    // computeConflictDiff normalizes CRLF / trailing blanks internally — pass raw.
+    const diff = computeConflictDiff(yours, disk);
     conflictPanel.replaceChildren(buildConflictDiffPanel(diff, { onOpenFullDiff: openFullDiff }));
     setRevealOpen(false); // collapsed by default
   }

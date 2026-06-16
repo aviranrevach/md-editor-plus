@@ -46,6 +46,8 @@ export function computeConflictDiff(yours: string, disk: string, maxRows = 200):
       else adds.push(ops[k].b as string);
       k++;
     }
+    // Pair dels with adds positionally within the hunk: the first N lines read as
+    // "changed" (both sides), and any remainder is a pure add or pure del.
     const paired = Math.min(dels.length, adds.length);
     for (let p = 0; p < paired; p++) rows.push({ kind: 'change', yours: dels[p], disk: adds[p] });
     for (let p = paired; p < dels.length; p++) rows.push({ kind: 'del', yours: dels[p], disk: null });
