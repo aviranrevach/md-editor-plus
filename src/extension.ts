@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { MdEditorPlusProvider } from './mdEditorPlusProvider';
+import { registerDiffContentProvider } from './diffViewer';
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(MdEditorPlusProvider.register(context));
+  registerDiffContentProvider(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('mdEditorPlus.openSourceView', async () => {

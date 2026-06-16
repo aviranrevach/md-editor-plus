@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
 import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 import { ApplyingTracker } from './applyingTracker';
+import { openFullDiff } from './diffViewer';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -91,6 +92,9 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    // Snapshot of the file's content when this editor opened — the fallback base
+    // for the full diff viewer (c24) when the file isn't git-tracked.
+    const openSnapshot = document.getText();
     const docDir = vscode.Uri.joinPath(document.uri, '..');
     const wsFolder = vscode.workspace.getWorkspaceFolder(document.uri);
     const localResourceRoots: vscode.Uri[] = [
@@ -251,6 +255,11 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       // leaves the page blank. Fires once per webview load (and on reload).
       if (msg.type === 'ready') {
         sendInit();
+        return;
+      }
+      if (msg.type === 'openFullDiff') {
+        const m = msg as unknown as { baseContent?: string; baseLabel?: string };
+        await openFullDiff(document, { baseContent: m.baseContent, baseLabel: m.baseLabel }, openSnapshot);
         return;
       }
       if (msg.type === 'edit' && msg.markdown !== undefined) {
@@ -834,6 +843,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
     <span class="save-indicator" id="save-indicator" aria-live="polite"></span>
     <span class="toolbar-spacer"></span>
+    <button class="toolbar-icon" id="diff-btn" data-tip="View changes (diff)">${iArrowsH}</button>
     <button class="toolbar-icon" id="refresh-btn" data-tip="Reload from disk">${iRefresh}</button>
     <button class="toolbar-icon" id="settings-btn" data-tip="Display settings">${iAa}</button>
     <button class="toolbar-icon" id="actions-btn" data-tip="More actions">${iDots}</button>

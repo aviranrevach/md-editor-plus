@@ -2865,6 +2865,8 @@ html.outline-visible .conflict-banner { left: 240px; }
 }
 .conflict-foot { padding: 6px 16px; font-size: 11px; color: #a1a1aa; border-top: 1px solid #ececf0; }
 .theme-dark .conflict-foot { border-top-color: rgba(255, 255, 255, 0.12); }
+.conflict-openfull { color: var(--link, #2563eb); cursor: pointer; }
+.conflict-openfull:hover { text-decoration: underline; }
 /* Push the editor / outline panel below the banner while it's visible */
 html.conflict-active #toolbar { top: 0; }
 html.conflict-active .outline-panel { top: 84px; }
