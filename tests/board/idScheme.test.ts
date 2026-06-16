@@ -45,6 +45,12 @@ describe('mintCardId', () => {
     // max is 5 -> tries C6; if C6 already present, advances
     expect(mintCardId(['C5', 'C6'])).toBe('C7');
   });
+  it('mints lowercase when the board uses lowercase ids', () => {
+    expect(mintCardId(['c5', 'c6'])).toBe('c7');
+  });
+  it('mints uppercase for a mixed board', () => {
+    expect(mintCardId(['c8', 'C2'])).toBe('C9');
+  });
 });
 
 describe('legacy id case is preserved on parse (c28)', () => {
