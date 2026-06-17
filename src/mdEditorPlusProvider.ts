@@ -391,10 +391,11 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         await vscode.window.showInformationMessage('File path copied to clipboard');
       }
       if (msg.type === 'copyText') {
-        const text = (msg as unknown as { text?: unknown }).text;
+        const { text, toast } = msg as unknown as { text?: unknown; toast?: unknown };
         if (typeof text !== 'string') return;
         await vscode.env.clipboard.writeText(text);
-        await vscode.window.showInformationMessage('AI prompt copied to clipboard');
+        const note = typeof toast === 'string' && toast.length > 0 ? toast : 'Copied to clipboard';
+        await vscode.window.showInformationMessage(note);
         return;
       }
       if (msg.type === 'installSkill') {

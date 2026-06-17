@@ -26,5 +26,5 @@ export function copyToClipboard(text: string): void {
   const vs = (window as unknown as {
     __mdViewerVscode?: { postMessage: (m: unknown) => void };
   }).__mdViewerVscode;
-  vs?.postMessage({ type: 'copyText', text });
+  vs?.postMessage({ type: 'copyText', text, toast: 'AI prompt copied to clipboard' });
 }
