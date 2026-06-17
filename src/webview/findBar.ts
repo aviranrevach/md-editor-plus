@@ -28,6 +28,15 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
   let open = false;
   const coordinator = new SearchCoordinator();
 
+  // Board card highlights are CSS Custom Highlight ranges anchored to the
+  // board's live text nodes. When a board re-renders (external sync echo, a
+  // cell edit, column autofit, …) it replaces those nodes, which collapses the
+  // ranges to empty — the highlight registry still lists them but nothing
+  // paints. While the bar is open we watch the active editor for board DOM
+  // changes and re-scan, rebuilding the ranges against the fresh nodes.
+  let boardObserver: MutationObserver | null = null;
+  let refreshScheduled = false;
+
   const bar = document.createElement('div');
   bar.className = 'find-bar';
   bar.setAttribute('dir', 'ltr');
@@ -74,6 +83,44 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
     updateCount();
   }
 
+  // rAF-coalesced re-scan, keeping the user's current match position.
+  function scheduleRefresh(): void {
+    if (refreshScheduled) return;
+    refreshScheduled = true;
+    requestAnimationFrame(() => {
+      refreshScheduled = false;
+      if (!open || !input.value) return;
+      const editor = getActiveEditor();
+      if (editor) {
+        coordinator.refresh(editor);
+        updateCount();
+      }
+    });
+  }
+
+  // Watch only `.board-block` subtrees: a board rebuild is what orphans the
+  // highlight ranges. Ignoring everything else keeps us from reacting to the
+  // ProseMirror search-decoration spans this search adds elsewhere in the doc
+  // (which would otherwise loop endlessly).
+  function startBoardObserver(editor: Editor | null): void {
+    stopBoardObserver();
+    if (!editor) return;
+    boardObserver = new MutationObserver((mutations) => {
+      const touchedBoard = mutations.some((m) => {
+        const t = m.target;
+        const el = t.nodeType === Node.ELEMENT_NODE ? (t as HTMLElement) : t.parentElement;
+        return !!el?.closest('.board-block');
+      });
+      if (touchedBoard) scheduleRefresh();
+    });
+    boardObserver.observe(editor.view.dom, { childList: true, subtree: true, characterData: true });
+  }
+
+  function stopBoardObserver(): void {
+    boardObserver?.disconnect();
+    boardObserver = null;
+  }
+
   input.addEventListener('input', runSearch);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -111,12 +158,14 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
     input.select();
     if (input.value) runSearch();
     else updateCount();
+    startBoardObserver(editor);
   }
 
   function close(): void {
     if (!open) return;
     open = false;
     bar.classList.remove('open');
+    stopBoardObserver();
     coordinator.clear(getActiveEditor());
     // Return focus to the editor so the user keeps typing where they were.
     getActiveEditor()?.commands.focus();
@@ -127,6 +176,7 @@ export function createFindBar({ getActiveEditor }: FindBarOptions): FindBar {
     coordinator.clear(previousEditor);
     if (input.value) runSearch();
     else updateCount();
+    startBoardObserver(getActiveEditor());
   }
 
   return {
