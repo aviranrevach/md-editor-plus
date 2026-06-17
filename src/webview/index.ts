@@ -6,6 +6,7 @@ import { createEditor, updateContent, createSourceEditor, updateSourceContent, g
 import { computeConflictDiff } from './conflictDiff';
 import { buildConflictDiffPanel } from './conflictDiffView';
 import { decideExternalUpdate } from './syncGuard';
+import { merge3 } from './merge3';
 import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
 import { setAlwaysDarkDiagram } from './mermaidRenderer';
@@ -1128,8 +1129,22 @@ function init(): void {
       }
 
       if (decision === 'conflict') {
-        // External content differs from unsent local edits — surface a banner
-        // so the user picks, rather than silently overwriting either side.
+        // c28-part-2: if our unsent edits and the external change touch DISJOINT
+        // lines, merge them silently (base = last-sent = the common ancestor)
+        // instead of interrupting. Any overlap / no base → merge3 returns null
+        // and we fall back to the banner.
+        const merged = lastSentMarkdown !== null
+          ? merge3(lastSentMarkdown, normalizeMd(getCurrentMarkdown()), normalizeMd(msg.markdown))
+          : null;
+        if (merged !== null) {
+          currentMarkdown = merged;
+          lastSentMarkdown = normalizeMd(merged);
+          updateContent(merged);
+          if (sourceMode && sourceEditorReady) updateSourceContent(merged);
+          vscode.postMessage({ type: 'edit', markdown: merged });
+          return;
+        }
+        // True overlap — surface the banner so the user picks.
         pendingExternalMarkdown = msg.markdown;
         renderConflictPanel(getCurrentMarkdown(), msg.markdown);
         showConflictBanner();
