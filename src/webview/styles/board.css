@@ -1771,7 +1771,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-filter-panel {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  /* Anchor to the funnel's right edge and open leftward, like the ⋯ menu — the
+     button sits near the right of the board chrome, so left:0 ran off-screen. */
+  right: 0;
   z-index: 40;
   min-width: 250px;
   max-width: 340px;
