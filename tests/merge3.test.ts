@@ -44,4 +44,9 @@ describe('merge3', () => {
   it('handles an empty base without crashing', () => {
     expect(merge3('', 'a', 'a')).toBe('a');
   });
+
+  it('returns null when one side deletes a line the other edits (same base line)', () => {
+    // ours deletes line "b"; theirs replaces "b" — both touch base line 1 → conflict.
+    expect(merge3('a\nb\nc', 'a\nc', 'a\nB\nc')).toBeNull();
+  });
 });
