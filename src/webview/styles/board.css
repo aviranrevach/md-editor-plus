@@ -1755,3 +1755,64 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-image-empty { color: var(--text-secondary); opacity: .55; display: inline-flex; align-items: center; border: none; background: none; }
 .bd-image-empty svg { width: 18px; height: 18px; display: block; }
 .bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary); opacity: .55; border: none; background: none; }
+
+/* ---- Board filter pill + popover (c20) ---- */
+.bd-filter { position: relative; display: inline-flex; }
+
+.bd-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text-secondary, #6b6b6b);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.bd-filter-pill:hover { background: var(--toolbar-btn-hover, var(--block-hover)); color: var(--text-primary); }
+.bd-filter-pill.is-active {
+  background: var(--accent-soft, rgba(35,131,226,0.12));
+  border-color: var(--accent, #2383e2);
+  color: var(--accent, #2383e2);
+}
+.bd-filter-pill.is-open { background: var(--toolbar-btn-hover, var(--block-hover)); }
+
+.bd-filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 8px;
+  background: var(--menu-bg, #fff);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+}
+
+.bd-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 8px;
+}
+.bd-filter-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.bd-filter-clear {
+  border: none; background: none; cursor: pointer;
+  font-size: 12px; color: var(--accent, #2383e2); padding: 0;
+}
+.bd-filter-clear:hover { text-decoration: underline; }
+
+.bd-filter-field { padding: 6px 4px; }
+.bd-filter-field-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-secondary, #8a8a8a); margin-bottom: 6px;
+}
+.bd-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bd-filter-chips .bd-opt-pchip { cursor: pointer; opacity: 0.55; }
+.bd-filter-chips .bd-opt-pchip.is-selected { opacity: 1; }
