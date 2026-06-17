@@ -21,15 +21,26 @@ function filterableFields(board: Board): FilterableField[] {
 
 export interface FilterPill { el: HTMLElement; refresh: () => void; }
 
+// Funnel icon — matches the stroke weight of the sibling "+" / "⋯" chrome buttons.
+const FUNNEL_SVG =
+  `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h17l-6.6 7.8v5.2l-3.8 2v-7.2z"/></svg>`;
+
 export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
   const wrap = document.createElement('div');
   wrap.className = 'bd-filter';
 
+  // Icon button, styled like the sibling + / ⋯ buttons (.bd-more-btn).
   const pill = document.createElement('button');
   pill.type = 'button';
-  pill.className = 'bd-filter-pill';
+  pill.className = 'bd-more-btn bd-filter-btn';
   pill.setAttribute('aria-haspopup', 'true');
+  pill.setAttribute('aria-label', 'Filter');
   pill.title = 'Filter cards by status or tag';
+  pill.innerHTML = FUNNEL_SVG;
+  // Inline active count (shown only when a filter is active — no badge bubble).
+  const countEl = document.createElement('span');
+  countEl.className = 'bd-filter-count';
+  pill.appendChild(countEl);
   wrap.appendChild(pill);
 
   const panel = document.createElement('div');
@@ -86,7 +97,13 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
     head.className = 'bd-filter-head';
     const title = document.createElement('span');
     title.className = 'bd-filter-title';
-    title.textContent = 'Filter';
+    const activeN = Object.values(filter).filter((v) => Array.isArray(v) && v.length > 0).length;
+    if (activeN === 0) {
+      title.textContent = 'Filter';
+    } else {
+      const hidden = board.cards.length - applyFilter(board.cards, filter, board).length;
+      title.textContent = `Filter · ${activeN} active` + (hidden > 0 ? ` · ${hidden} hidden` : '');
+    }
     head.appendChild(title);
     const clear = document.createElement('button');
     clear.type = 'button';
@@ -112,17 +129,27 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
       const chips = document.createElement('div');
       chips.className = 'bd-filter-chips';
 
-      const mkChip = (value: string, display: string, token: string): void => {
+      // Reuse the real status pill (.board-column-chip): selected = solid,
+      // unselected = hollow outline (no dimming). The `(Empty)` chip is neutral.
+      const mkChip = (value: string, display: string, token: string, isEmpty: boolean): void => {
+        const selected = sel.has(value);
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.className = `bd-opt-pchip color-${token}` + (sel.has(value) ? ' is-selected' : '');
-        chip.textContent = display;
-        chip.addEventListener('click', () => setFieldValue(f.name, value, !sel.has(value)));
+        chip.className = `board-column-chip color-${token} bd-filter-chip`
+          + (selected ? ' is-selected' : ' bd-filter-hollow')
+          + (isEmpty ? ' bd-filter-empty' : '');
+        const dot = document.createElement('span');
+        dot.className = 'board-column-chip-dot';
+        chip.appendChild(dot);
+        const name = document.createElement('span');
+        name.textContent = display;
+        chip.appendChild(name);
+        chip.addEventListener('click', () => setFieldValue(f.name, value, !selected));
         chips.appendChild(chip);
       };
 
-      for (const opt of f.values) mkChip(opt.name, opt.name, opt.color);
-      mkChip(EMPTY_VALUE, '(Empty)', 'gray');
+      for (const opt of f.values) mkChip(opt.name, opt.name, opt.color, false);
+      mkChip(EMPTY_VALUE, '(Empty)', 'gray', true);
 
       row.appendChild(chips);
       panel.appendChild(row);
@@ -140,12 +167,14 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
     const filter = ctx.getFilter();
     const activeN = Object.values(filter).filter((v) => Array.isArray(v) && v.length > 0).length;
     if (activeN === 0) {
-      pill.classList.remove('is-active');
-      pill.textContent = 'Filter';
+      pill.classList.remove('is-active', 'has-count');
+      countEl.textContent = '';
+      pill.title = 'Filter cards by status or tag';
     } else {
-      pill.classList.add('is-active');
+      pill.classList.add('is-active', 'has-count');
+      countEl.textContent = String(activeN);
       const hidden = board.cards.length - applyFilter(board.cards, filter, board).length;
-      pill.textContent = hidden > 0 ? `Filter · ${activeN} · ${hidden} hidden` : `Filter · ${activeN}`;
+      pill.title = `Filter · ${activeN} active` + (hidden > 0 ? ` · ${hidden} hidden` : '');
     }
   }
 
