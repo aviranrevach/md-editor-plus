@@ -43,6 +43,10 @@ function ensureListener(): void {
       pending.delete(msg.requestId);
       if (msg.error) p.reject(new Error(msg.error));
       else p.resolve('');
+    } else if (msg.type === 'imagePathCopied') {
+      pending.delete(msg.requestId);
+      if (msg.error) p.reject(new Error(msg.error));
+      else p.resolve('');
     } else if (msg.type === 'imageBytesRead') {
       pending.delete(msg.requestId);
       if (msg.error) p.reject(new Error(msg.error));
@@ -105,6 +109,11 @@ export function embedImageFromClipboard(): Promise<string> {
 // Ask the extension to reveal the asset (relative path) in the OS file manager.
 export function revealImage(relPath: string): Promise<void> {
   return request({ type: 'revealImage', relPath }).then(() => undefined);
+}
+
+// Ask the extension to copy the asset's ABSOLUTE filesystem path to the clipboard.
+export function copyImagePath(relPath: string): Promise<void> {
+  return request({ type: 'copyImagePath', relPath }).then(() => undefined);
 }
 
 // Read the bytes of a local asset by its RELATIVE path (e.g. ./Note.assets/x.png).
