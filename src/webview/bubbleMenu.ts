@@ -5,6 +5,8 @@ import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { summarizeSelection, locateAnchors, truncateAnchor } from './aiSelection';
 import { getDocumentPath } from './docContext';
+import { copySelectionAsPlainText } from './copyPlainText';
+import { COPY_ICON_SVG } from './extensions/codeBlock';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -189,6 +191,7 @@ function buildEl(): HTMLElement {
       <button class="bm-btn" data-action="strike" data-tip-html="Strikethrough<kbd>⌘⇧X</kbd>">${svg(P.textStrike)}</button>
       ${DIV}
       <button class="bm-btn" data-action="code" data-tip-html="Inline code<kbd>⌘E</kbd>">${svg(P.code)}</button>
+      <button class="bm-btn bm-copy-plain" data-action="copy-plain" data-tip="Copy as plain text">${COPY_ICON_SVG}</button>
     </div>
     <div class="bubble-row">
       <button class="bm-btn" data-action="link" data-tip-html="Add link<kbd>⌘K</kbd>">${svg(P.link)}</button>
@@ -694,6 +697,13 @@ export function createBubbleMenu(editor: Editor): void {
       case 'underline': editor.chain().focus().toggleUnderline().run(); break;
       case 'strike':    editor.chain().focus().toggleStrike().run();    break;
       case 'code':      editor.chain().focus().toggleCode().run();      break;
+      case 'copy-plain': {
+        const vs = (window as unknown as {
+          __mdViewerVscode?: { postMessage: (m: unknown) => void };
+        }).__mdViewerVscode;
+        if (vs) copySelectionAsPlainText(editor, (m) => vs.postMessage(m));
+        break;
+      }
       case 'link': {
         if (editor.isActive('link')) {
           editor.chain().focus().unsetLink().run();
