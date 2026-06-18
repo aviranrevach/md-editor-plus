@@ -99,14 +99,25 @@ function notifyFrontmatterChange(): void {
 
 export type OnChangeCallback = (markdown: string) => void;
 
-export function createEditor(
+interface BuiltEditor {
+  editor: Editor;
+  debounce: FlushableDebounce;
+  frontmatter: string;
+}
+
+// Builds a fully self-contained rich editor whose onChange/flush operate ONLY
+// on its own instance. The `debounce` it returns is closed over by this
+// editor's own onUpdate/onBlur, so nothing here touches the module-level
+// primary singletons. Both the primary editor and detached editors (card
+// description panel) are built through here.
+function buildRichEditor(
   element: HTMLElement,
   initialMarkdown: string,
   onChange: OnChangeCallback,
   onDirty?: () => void,
-): Editor {
+): BuiltEditor {
   const split = splitFrontmatter(initialMarkdown);
-  _frontmatter = split.frontmatter;
+  const frontmatter = split.frontmatter;
   let body: string;
   try {
     body = preprocessMarkdownBoards(preprocessMarkdownCallouts(split.body));
@@ -115,7 +126,8 @@ export function createEditor(
     body = split.body;
   }
 
-  _editor = new Editor({
+  let debounce: FlushableDebounce | null = null;
+  const editor = new Editor({
     element,
     extensions: [
       StarterKit.configure({
@@ -152,26 +164,69 @@ export function createEditor(
     content: body,
     onUpdate() {
       onDirty?.();
-      _editDebounce?.schedule();
+      debounce?.schedule();
     },
     onBlur() {
       // Losing focus is a natural save point — flush so the last keystrokes
       // reach the host immediately instead of waiting on the debounce.
-      _editDebounce?.flush();
+      debounce?.flush();
     },
   });
 
-  _editDebounce = createFlushableDebounce(() => {
-    if (!_editor) return;
-    const markdown = _editor.storage.markdown.getMarkdown() as string;
-    onChange(_frontmatter + markdown);
+  debounce = createFlushableDebounce(() => {
+    const markdown = editor.storage.markdown.getMarkdown() as string;
+    onChange(frontmatter + markdown);
   }, 500);
 
-  createBubbleMenu(_editor);
-  createImageBubbleMenu(_editor);
-  createBlockHandle(_editor);
+  createBubbleMenu(editor);
+  createImageBubbleMenu(editor);
+  createBlockHandle(editor);
+
+  return { editor, debounce, frontmatter };
+}
+
+// Creates the PRIMARY document editor and registers it as the module-level
+// singleton the host save path reads (getCurrentMarkdown / flushPendingEdit).
+export function createEditor(
+  element: HTMLElement,
+  initialMarkdown: string,
+  onChange: OnChangeCallback,
+  onDirty?: () => void,
+): Editor {
+  const built = buildRichEditor(element, initialMarkdown, onChange, onDirty);
+  _editor = built.editor;
+  _editDebounce = built.debounce;
+  _frontmatter = built.frontmatter;
   notifyFrontmatterChange();
-  return _editor;
+  return built.editor;
+}
+
+export interface DetachedEditorHandle {
+  editor: Editor;
+  flush(): void;
+  destroy(): void;
+}
+
+// Creates an INDEPENDENT rich editor (used for the board card description
+// panel). Unlike createEditor it does NOT register itself as `_editor` /
+// `_editDebounce` / `_frontmatter`, so the host's save path keeps reading the
+// MAIN document. Hijacking those singletons with a nested editor is the c37
+// data-loss bug: saving wrote one card's description as the entire file.
+export function createDetachedEditor(
+  element: HTMLElement,
+  initialMarkdown: string,
+  onChange: OnChangeCallback,
+  onDirty?: () => void,
+): DetachedEditorHandle {
+  const built = buildRichEditor(element, initialMarkdown, onChange, onDirty);
+  return {
+    editor: built.editor,
+    flush: () => built.debounce.flush(),
+    destroy: () => {
+      built.debounce.flush();
+      built.editor.destroy();
+    },
+  };
 }
 
 export function updateContent(markdown: string): void {

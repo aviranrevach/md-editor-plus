@@ -1,7 +1,7 @@
 // src/webview/boardSidePanel.ts
 import type { Board, Card, FieldDef, FieldType } from './boardModel';
 import { getStatusOptions, autoColorPublic } from './boardModel';
-import { createEditor } from './editor';
+import { createDetachedEditor, type DetachedEditorHandle } from './editor';
 import { promptNewField, openFieldActionMenu } from './boardProperties';
 import { openTagsPicker } from './boardTagsPicker';
 import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
@@ -12,6 +12,11 @@ let currentCard: Card | null = null;
 let currentOnChange: ((next: Card) => void) | null = null;
 let currentOnBoardChange: ((next: Board) => void) | null = null;
 let currentReadOnly = false;
+// The card description's own editor instance. It is INDEPENDENT of the primary
+// document editor (see createDetachedEditor). Tracked so we can flush + destroy
+// it before rebuilding the panel or closing — leaving it alive would orphan a
+// debounce that fires commitCard with stale content.
+let currentBodyEditor: DetachedEditorHandle | null = null;
 // Name of a field whose label should render as an inline-editable input on
 // the next renderPanel call. Used immediately after "+ Add a property" so
 // the user can rename the just-added field in place (Option D flow).
@@ -82,6 +87,10 @@ export function closeBoardSidePanel(): void {
   // fire — e.g., when reduced-motion is on).
   panel.classList.remove('is-open');
   const finish = () => {
+    // Flush the last description keystrokes to the card, then tear the editor
+    // down so its debounce can't fire later against a closed panel.
+    currentBodyEditor?.destroy();
+    currentBodyEditor = null;
     currentBoard = null;
     currentCard = null;
     currentOnChange = null;
@@ -129,6 +138,10 @@ function commitBoard(next: Board): void {
 function renderPanel(): void {
   if (!panel || !currentBoard || !currentCard) return;
 
+  // Tear down the previous description editor before wiping the DOM so its
+  // debounce can't fire against a detached node / stale card.
+  currentBodyEditor?.destroy();
+  currentBodyEditor = null;
   panel.innerHTML = '';
 
   // === Toolbar (just close) ===
@@ -509,13 +522,14 @@ function renderBody(): HTMLElement {
   bodyHost.className = 'board-panel-body editable';
   bodyWrap.appendChild(bodyHost);
 
-  const sub = createEditor(bodyHost, card.body || '', (markdown: string) => {
+  const sub = createDetachedEditor(bodyHost, card.body || '', (markdown: string) => {
     // Use currentCard (latest) instead of the stale closure capture so a
     // body update doesn't clobber other edits the user already made.
     commitCard((c) => ({ ...c, body: markdown }));
     updateBodyPlaceholderVisibility(bodyWrap, markdown);
   });
-  sub.setEditable(!currentReadOnly);
+  sub.editor.setEditable(!currentReadOnly);
+  currentBodyEditor = sub;
 
   const placeholder = document.createElement('div');
   placeholder.className = 'board-panel-body-placeholder';
