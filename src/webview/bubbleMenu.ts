@@ -3,8 +3,7 @@ import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import { PluginKey, NodeSelection } from '@tiptap/pm/state';
 import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
-import { summarizeSelection, locateAnchors, truncateAnchor } from './aiSelection';
-import { getDocumentPath } from './docContext';
+import { buildAiPanelInput } from './aiSelection';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -289,33 +288,10 @@ export function createBubbleMenu(editor: Editor): void {
 
   function openAiPanel(target: AiTarget, label: string): void {
     const { from, to } = editor.state.selection;
-    const slice = editor.state.doc.textBetween(from, to, '\n', '\n');
-    const nonEmpty = slice.split('\n').filter(l => l.trim().length > 0);
-    const startRaw = nonEmpty[0] ?? '';
-    const endRaw   = nonEmpty[nonEmpty.length - 1] ?? startRaw;
-    // Best-effort line numbers from the editor's own markdown (frontmatter
-    // excluded; line numbers are a hint — the text anchor is the real locator).
-    // Locate from the RAW lines before truncation, so a long line (whose
-    // display anchor would end in "…") still matches the source.
-    const md = editor.storage.markdown.getMarkdown() as string;
-    const { startLine, endLine } = locateAnchors(md, startRaw, endRaw);
-    const startText = truncateAnchor(startRaw);
-    const endText   = truncateAnchor(endRaw);
-    aiTransformPanel.open({
-      target,
-      targetLabel: label,
-      filePath: getDocumentPath() || 'this file',
-      startText,
-      endText,
-      startLine,
-      endLine,
-      summary: summarizeSelection(slice),
-    });
+    aiTransformPanel.open(buildAiPanelInput(editor, target, label, from, to));
     closeAi();
     closeInto();
-    // Dismiss the bubble menu so it doesn't float over the panel — collapsing
-    // the selection makes shouldShow() false. Anchors/summary are already
-    // captured above, so nothing is lost.
+    // Collapse the selection so the bubble menu hides behind the panel.
     editor.commands.setTextSelection(to);
   }
 

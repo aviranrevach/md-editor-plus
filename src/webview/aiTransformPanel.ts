@@ -4,19 +4,10 @@ import {
   type AiInsertMode,
   type AiPromptContext,
 } from './aiTransforms';
-import { formatSummary, type SelectionSummary } from './aiSelection';
+import { formatSummary, type SelectionSummary, type AiPanelInput } from './aiSelection';
 import { copyToClipboard } from './docContext';
 
-export interface AiPanelInput {
-  target: AiTarget;
-  targetLabel: string;
-  filePath: string;
-  startText: string;
-  endText: string;
-  startLine: number | null;
-  endLine: number | null;
-  summary: SelectionSummary;
-}
+export type { AiPanelInput } from './aiSelection';
 
 export interface AiTransformPanel {
   open(input: AiPanelInput): void;

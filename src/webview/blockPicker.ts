@@ -5,7 +5,12 @@ import {
   searchBlockActions,
   type ActionId,
 } from './blockActions';
-import { parseBoardSource, duplicateBoardSource } from './boardModel';
+import { parseBoardSource, duplicateBoardSource, mintBoardId } from './boardModel';
+import { tableToBoardSource } from './tableToBoard';
+import { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
+import { createAiTransformPanel } from './aiTransformPanel';
+import { buildAiPanelInput } from './aiSelection';
 
 export interface BlockDef {
   id: string;
@@ -103,6 +108,53 @@ function replaceBlockWith(
   }).run();
 }
 
+// Every board id currently in the doc — so a converted board gets a fresh id.
+function existingBoardIds(editor: Editor): string[] {
+  const ids: string[] = [];
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'board') {
+      try { ids.push(parseBoardSource(node.attrs.source as string).id); }
+      catch { /* malformed source — skip */ }
+    }
+    return true;
+  });
+  return ids;
+}
+
+// Read a ProseMirror table node into a row-major grid of trimmed cell text.
+function tableNodeToMatrix(node: ProseMirrorNode): string[][] {
+  const rows: string[][] = [];
+  node.forEach((row) => {
+    const cells: string[] = [];
+    row.forEach((cell) => { cells.push((cell.textContent ?? '').trim()); });
+    rows.push(cells);
+  });
+  return rows;
+}
+
+// Turn the block at blockPos into a Board: Table. A table maps cell-by-cell;
+// any other block seeds a one-card board from its text so nothing is dropped.
+function convertTableToBoard(editor: Editor, blockPos: number): void {
+  const boardId = mintBoardId(existingBoardIds(editor));
+  editor.chain().focus().command(({ tr, state, dispatch }) => {
+    const node = tr.doc.nodeAt(blockPos);
+    if (!node) return false;
+    const boardType = state.schema.nodes.board;
+    if (!boardType) return false;
+    let matrix: string[][];
+    if (node.type.name === 'table') {
+      matrix = tableNodeToMatrix(node);
+    } else {
+      const text = (node.textContent ?? '').trim();
+      matrix = text ? [['Title'], [text]] : [];
+    }
+    const source = tableToBoardSource(matrix, boardId);
+    const boardNode = boardType.create({ source });
+    if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, boardNode);
+    return true;
+  }).run();
+}
+
 // Wrap the block's inline content in a list (bulletList / orderedList /
 // taskList). Lists nest inline content inside listItem > paragraph, so a
 // plain replaceBlockWith doesn't work for them.
@@ -128,6 +180,40 @@ function convertToList(
   }).run();
 }
 
+function tableCellNode(text: string, header: boolean) {
+  return {
+    type: header ? 'tableHeader' : 'tableCell',
+    content: [{ type: 'paragraph', content: text ? [{ type: 'text', text }] : [] }],
+  };
+}
+function tableRowJson(cells: string[], header: boolean) {
+  return { type: 'tableRow', content: cells.map((c) => tableCellNode(c, header)) };
+}
+function starterTableJson(firstCell = '') {
+  return {
+    type: 'table',
+    content: [
+      tableRowJson(['Column 1', 'Column 2', 'Column 3'], true),
+      tableRowJson([firstCell, '', ''], false),
+      tableRowJson(['', '', ''], false),
+    ],
+  };
+}
+function insertStarterTable(editor: Editor, pos: number): void {
+  editor.chain().focus().insertContentAt(pos, starterTableJson()).run();
+}
+function convertToTable(editor: Editor, blockPos: number): void {
+  editor.chain().focus().command(({ tr, state, dispatch }) => {
+    const node = tr.doc.nodeAt(blockPos);
+    if (!node) return false;
+    if (!state.schema.nodes.table) return false;
+    const text = (node.textContent ?? '').trim();
+    const newNode = state.schema.nodeFromJSON(starterTableJson(text));
+    if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, newNode);
+    return true;
+  }).run();
+}
+
 const ICO = {
   paragraph: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M208,36H96a68,68,0,0,0,0,136h36v36a12,12,0,0,0,24,0V60h16V208a12,12,0,0,0,24,0V60h12a12,12,0,0,0,0-24ZM132,148H96a44,44,0,0,1,0-88h36Z"/></svg>`,
   h1: `<span class="bm-into-text" style="font-weight:800;font-size:14px;letter-spacing:-.5px">H1</span>`,
@@ -149,6 +235,7 @@ const ICO = {
   folder: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V56H92.69l27.31,27.31A15.86,15.86,0,0,0,131.31,88H216Z"/></svg>`,
   link: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M137.54,186.36a8,8,0,0,1,0,11.31l-9.94,10A56,56,0,0,1,48.38,128.4L72.5,104.28A56,56,0,0,1,149.31,102a8,8,0,1,1-10.64,12,40,40,0,0,0-54.85,1.63L59.7,139.72a40,40,0,0,0,56.58,56.58l9.94-9.94A8,8,0,0,1,137.54,186.36Zm70.08-138a56.08,56.08,0,0,0-79.22,0l-9.94,9.95a8,8,0,0,0,11.32,11.31l9.94-9.94a40,40,0,0,1,56.58,56.58L172.18,150.4A40,40,0,0,1,117.33,152,8,8,0,1,0,106.69,164a56,56,0,0,0,76.81-2.26l24.12-24.12A56.08,56.08,0,0,0,207.62,48.38Z"/></svg>`,
   clipboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H163.74a47.92,47.92,0,0,0-71.48,0H56A16,16,0,0,0,40,48V216a16,16,0,0,0,16,16H200a16,16,0,0,0,16-16V48A16,16,0,0,0,200,32Zm-72,0a32,32,0,0,1,32,32H96A32,32,0,0,1,128,32Zm72,184H56V48H82.75A47.93,47.93,0,0,0,80,64v8a8,8,0,0,0,8,8h80a8,8,0,0,0,8-8V64a47.93,47.93,0,0,0-2.75-16H200Z"/></svg>`,
+  table: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,48H32a8,8,0,0,0-8,8V192a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A8,8,0,0,0,224,48ZM40,112H80v32H40Zm56,0H216v32H96ZM216,64V96H40V64ZM40,160H80v32H40Zm176,32H96V160H216v32Z"/></svg>`,
   turnInto: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H59.31l34.35,34.34a8,8,0,0,1-11.32,11.32l-48-48a8,8,0,0,1,0-11.32l48-48a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>`,
   copy: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>`,
 };
@@ -388,6 +475,17 @@ export const BLOCK_DEFS: BlockDef[] = [
       editor.chain().focus().insertContentAt(pos, { type: 'horizontalRule' }).run(),
   },
   {
+    id: 'table',
+    label: 'Table',
+    description: 'Simple grid — a plain markdown table',
+    iconHtml: ICO.table,
+    section: 'other',
+    aliases: ['table', 'grid', 'markdown table', 'rows', 'columns'],
+    isActive: (t) => t === 'table',
+    insert: (editor, pos) => insertStarterTable(editor, pos),
+    convert: (editor, blockPos) => convertToTable(editor, blockPos),
+  },
+  {
     id: 'board-kanban',
     label: 'Board: Kanban',
     description: 'Kanban board with columns and cards',
@@ -402,8 +500,9 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Table board: rows, columns, inline editing',
     iconHtml: ICO.board,
     section: 'lists',
-    aliases: ['board', 'table', 'database', 'grid', 'board table'],
+    aliases: ['board', 'database', 'board table'],
     insert: (editor, pos) => insertBoardWith('table', editor, pos),
+    convert: (editor, blockPos) => convertTableToBoard(editor, blockPos),
   },
   {
     id: 'whiteboard',
@@ -458,6 +557,19 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   let filtered: BlockDef[] = BLOCK_DEFS;
   let drillParent: BlockDef | null = null;
   let context: PickerContext = {};
+
+  const aiTransformPanel = createAiTransformPanel();
+
+  function convertActiveWithAi(target: AiTarget, label: string): void {
+    const ab = context.activeBlock;
+    if (!ab) { close(); return; }
+    const node = editor.state.doc.nodeAt(ab.blockPos);
+    const from = ab.blockPos;
+    const to = node ? ab.blockPos + node.nodeSize : ab.blockPos;
+    aiTransformPanel.open(buildAiPanelInput(editor, target, label, from, to));
+    close();
+  }
+
   let actionMode = false;   // opened over a block (dragger) -> show action menu
   let turnIntoOpen = false; // inside the flat "Turn into" target list
   // Each rendered row registers its activation callback here, indexed to match
@@ -641,6 +753,20 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     items.forEach((t) => {
       makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
     });
+
+    const aiItems = AI_TRANSFORMS.filter(
+      (t) => !q || t.label.toLowerCase().includes(q),
+    );
+    if (aiItems.length) {
+      const sub = document.createElement('div');
+      sub.className = 'block-picker-section-label';
+      sub.textContent = '✨ Using AI';
+      list.appendChild(sub);
+      aiItems.forEach((t) => {
+        makeRow(t.iconHtml, t.label, () => convertActiveWithAi(t.id, t.label));
+      });
+    }
+
     activeIdx = 0;
     updateActive();
   }

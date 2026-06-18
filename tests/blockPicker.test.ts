@@ -52,8 +52,12 @@ describe('board block picker entries', () => {
   it('board-table has the expected label and aliases', () => {
     expect(table!.label).toBe('Board: Table');
     expect(table!.aliases).toEqual(
-      expect.arrayContaining(['board', 'table', 'database', 'grid']),
+      expect.arrayContaining(['board', 'database']),
     );
+    // 'table' and 'grid' are intentionally removed to avoid ambiguity with
+    // the plain-table block type (alias disambiguation, c31/Task 3).
+    expect(table!.aliases).not.toContain('table');
+    expect(table!.aliases).not.toContain('grid');
   });
 
   it('both entries live in the "lists" section', () => {
