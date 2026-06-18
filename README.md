@@ -218,7 +218,7 @@ Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**.
 | Section | Blocks |
 | --- | --- |
 | **Text** | Paragraph, Heading 1, Heading 2, Heading 3 |
-| **Lists** | Bullet list, Numbered list, Task list, Board: Kanban, Board: Table |
+| **Lists** | Bullet list, Numbered list, Task list, **Table**, Board: Kanban, Board: Table |
 | **Media & blocks** | Image, Callout, Toggle, **Whiteboard** |
 | **Other** | Blockquote, Code block, Divider |
 
@@ -255,7 +255,9 @@ Type `->` and `<-` and they become `→` and `←` as you go — Notion-style. A
 
 ### Tables
 
-Insert from the block picker, then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table.
+Insert a plain Markdown table from the block picker (under **Lists**) — a 3×3 starter with a header row — then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table. It's a distinct block from **Board: Table**, so typing `table` in the picker surfaces both.
+
+Outgrown a simple grid? Use the `⠿` handle → **Turn into → Board: Table** to convert it into a full board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the view toggle.
 
 ### Code blocks
 
@@ -330,7 +332,7 @@ Type `/board kanban` or `/board table` to drop a project board. Two views over t
 
 Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. **Drag** it to move the block anywhere; **click** it to open the **block action menu** — the same for every block type:
 
-- **Turn into** — convert to paragraph, heading, list, quote, code block, or any callout type (the current type is checkmarked)
+- **Turn into** — convert to paragraph, heading, list, quote, code block, **table**, **Board: Table**, or any callout type (the current type is checkmarked). At the bottom, a **✨ Using AI** section offers AI-powered conversions for targets without a direct converter (Ask AI…, Board: Kanban, Mermaid, Summary, Action items, Outline, Timeline) — it reuses the same clipboard-prompt flow as the bubble menu, scoped to the active block
 - **Duplicate** — drop an identical copy right below (duplicating a board mints a fresh id, so the copy stays independent and saves cleanly)
 - **Delete** — remove the block
 
