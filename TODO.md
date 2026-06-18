@@ -1,14 +1,14 @@
 # TODO
 
 <!-- board:start id="b1" name="My Board" columns="Todo|Doing|Review|Done" column-colors="blue|amber|purple|emerald" field-types="Title=text,Status=status,id=text,Impact=status,Area=text,Tags=tags" field-options="Impact=Low:gray|Medium:indigo|High:red|Urgent!!:red;Tags=Gilad:blue" active-view="table" -->
-<!-- board:view name="table" columns="Title,Area,Status,Description,Impact" sort="Impact,desc" group="Impact" widths="Area=94,Impact=60,Status=85" -->
+<!-- board:view name="table" columns="Title,Area,Status,Description,Impact" sort="id,desc" group="Impact" widths="Area=94,Impact=60,Status=85" -->
 
 | Title | Status | id | Impact | Area | Tags |
 |---|---|---|---|---|---|
 | Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Done | c8 | Urgent!! | General |  |
 | Fix Add image feature. now it doesnt work at all when you click on it. | Done | c1 | High | Add / Modify Block |  |
 | In some block types, clicking the dragger doesn't let you reach "Turn into", "Delete", "Duplicate", etc. | Done | c2 | High | Add / Modify Block |  |
-| Pasting Image in - add image to workspace options (consider also in table / board table) | Review | c10 | High | General |  |
+| Pasting Image in - add image to workspace options (consider also in table / board table) | Done | c10 | High | General |  |
 | Bug! Changing column size | Todo | c11 | High | Board table |  |
 | Bug in description when pasting | Todo | c9 | Medium | General |  |
 | Add "Delete property" option to the table column three-dot menu | Todo | c3 | Medium | Board Table -> Three dot menu |  |
@@ -16,7 +16,7 @@
 | Board table view bug when moving title  column (Bug) | Todo | c6 | Medium | Board Table |  |
 | board table sometimes clicking on a cell doesnt add in the curser and allow you to change its location in cell (Bug) | Todo | c7 | Medium | Board table -> cell |  |
 | When typing -> <- Should actually put arrow character (like in notion), and check which combinations should also allow this | Done | c5 | Low | General |  |
-| Board table grouping visual bugs- the color doesnt fill the whole cell | Review | c12 | High | Board table grouping |  |
+| Board table grouping visual bugs- the color doesnt fill the whole cell | Done | c12 | High | Board table grouping |  |
 | Board table grouping - allow dragging whole group and reorder groups, or organize by sorting order | Todo | c13 | Medium | Board table grouping |  |
 | Main three dots menu duplicate should have two options- save in workspace, or download (saved in your download) | Todo | c14 | Medium | Main three dots menu |  |
 | Export pdf doesnt work, probably html too. | Todo | c15 | High | Main three dots menu |  |
@@ -34,15 +34,16 @@
 | text styles doesnt work in board views | Todo | c27 | Urgent!! | Boards |  |
 | Editor reports "unsaved changes" when nothing was edited, so an external / other-tab change pops a conflict banner you didn't cause. And when the two changes don't actually collide, it should merge silently instead of asking. | Done | c28 | High | Boards / Save |  |
 | When the "changed outside the editor" conflict banner appears, show WHAT changed (a diff of the rows/lines that differ) so you can choose Reload vs Keep my version with context, instead of blind. Ties into c24 (diff viewer). | Done | c29 | High | Conflict banner |  |
-| Gap B — a differing external change can silently revert just-made edits before they persist. Currently only instrumented (a console warning); the real fix needs the host to signal "edit in flight" so the webview can surface a conflict instead of applying. | Review | c30 | High | Boards / Save |  |
-| Convert table into board teable doesnt work | Todo | c31 | High |  |  |
-| Regular table dissappeard from the + and tunr into menu | Todo | c32 | Urgent!! |  |  |
-| Turn into with AI is not in the Turn into menu | Todo | c33 | Urgent!! |  |  |
+| Gap B — a differing external change can silently revert just-made edits before they persist. Currently only instrumented (a console warning); the real fix needs the host to signal "edit in flight" so the webview can surface a conflict instead of applying. | Done | c30 | High | Boards / Save |  |
+| Convert table into board teable doesnt work | Done | c31 | High |  |  |
+| Regular table dissappeard from the + and tunr into menu | Done | c32 | Urgent!! |  |  |
+| Turn into with AI is not in the Turn into menu | Done | c33 | Urgent!! |  |  |
 | fix all the menus drill downs that get cropped because they are out of the screen, and make sure this doesnt happen again in this project. if needed show me all instances of this to check them | Todo | c34 | Urgent!! |  |  |
 | Search doesnt work. i tried searching "type" in this page- showed me nothing | Done | c35 | Urgent!! |  |  |
-| The | Todo | c36 | Urgent!! |  |  |
+| on table board allow clicking on the dragger for row actions | Todo | c36 | Medium |  |  |
 | Bug! Saving says "Saved" but the file is wiped to empty (0 bytes) on disk — the whole board can vanish | Todo | c37 | Urgent!! | Boards / Save |  |
-| On the image bubble menu, add another items with 2 options- 1. find file on finder. 2. copy path. it pops these options to choose- make it make sense | Todo | c38 | High |  | Gilad |
+| On the image bubble menu, add another items with 2 options- 1. find file on finder. 2. copy path. it pops these options to choose- make it make sense | Done | c38 | High |  | Gilad |
+| Redesign column menu for the same look and feel, icons, and grouping as the other menus. allow filtering shortcut (that opens the regular filter) | Todo | c39 | Medium | Board table |  |
 
 <!-- board:body id="c8" -->
 
@@ -127,6 +128,10 @@ Almost certainly the same save/sync family as c8, c26, c28, c30: the editor sign
 - Never write an empty / blank buffer over a non-empty file without an explicit confirm — treat "serialized output is empty but the doc is non-empty" as a bug, abort the save.
 - After a save, verify the byte count actually changed on disk before reporting "Saved" (ties into the c8 save-indicator work).
 - Reproduce: open TODO.md in the editor, add a row, watch disk byte count during/after save.
+
+<!-- board:body id="c39" -->
+
+![](./TODO.assets/image-8.webp)
 
 <!-- board:end -->
 

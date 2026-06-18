@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-18
+
+### Added
+
+- **Plain table block** — a simple Markdown table is back as its own block in the **+ / slash menu** and the dragger **Turn into** menu, listed under **Lists** alongside the board blocks. Inserting it drops a 3×3 grid with a header row; it round-trips as standard `| col | col |` Markdown. Distinct from **Board: Table** (the database-style board), so typing `table` in the picker now surfaces both. (c32)
+- **Turn a table into a board** — **Turn into → Board: Table** converts a plain Markdown table into a board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the existing view toggle. (c31)
+- **AI transforms in the dragger Turn-into** — the ⠿ block-handle **Turn into** menu now has a **✨ Using AI** section (Ask AI…, Board: Kanban, Mermaid diagram, Summary, Action items, Outline, Timeline), mirroring the text-selection bubble menu. Targets that already have a deterministic converter (Table, Board: Table) aren't duplicated under AI. (c33)
+- **Image file actions** — the image menu's folder control is now a drill-down offering **Reveal in Finder** and **Copy path** (the path is copied through the host clipboard via a webview bridge). (c38)
+
+### Fixed
+
+- **Save could wipe the file to a fragment** — the card-description editor is now isolated so a save can no longer truncate the whole file down to a single card's content. (c37)
+
 ## [0.5.5] - 2026-06-17
 
 ### Added
