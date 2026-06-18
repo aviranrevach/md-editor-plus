@@ -1663,6 +1663,19 @@ html.source-full-width #source-view {
   z-index: 1000;
 }
 
+/* Image menu view toggle — the folder button swaps the menu in place
+   (back row + list) like "Turn into", instead of a second floating panel. */
+.bm-default.hidden,
+.bm-file-view.hidden { display: none; }
+
+.bm-file-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 200px;
+}
+.bm-file-view .bm-into-item { width: 100%; }
+
 .bm-div {
   display: inline-block;
   width: 1px;
