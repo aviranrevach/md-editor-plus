@@ -4,6 +4,7 @@ import { mountKanban } from './boardKanbanRender';
 import { mountTable } from './boardTableRender';
 import { openBoardSidePanel } from './boardSidePanel';
 import { renderChrome, type ChromeHandle } from './boardChrome';
+import type { FilterState } from './boardFilter';
 
 export interface BoardView {
   dom: HTMLElement;
@@ -36,6 +37,10 @@ export interface BoardRendererCtx {
   /** Delete the entire board block from the document. */
   requestDelete:  () => void;
   readonly:       boolean;
+  /** Session-only display filter (never serialized). */
+  getFilter: () => FilterState;
+  /** Replace the filter and re-render the body + chrome (no save/mutate). */
+  setFilter: (next: FilterState) => void;
 }
 
 /** Lifecycle handles returned by a board renderer. */
@@ -93,6 +98,10 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
 
   let board = parseBoardSource(initialSource);
 
+  // Session-only filter — visibility only, never serialized. Lives here so a
+  // change can re-render the body without going through mutate()/save.
+  let filter: FilterState = {};
+
   // Stable body container — renderers paint into this. Chrome lives above it
   // in a separate element so it survives body re-renders (e.g. when a popover
   // inside the chrome triggers mutate()).
@@ -109,6 +118,13 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     } else {
       renderer!.update(board);
     }
+  }
+
+  // Re-render the body + chrome WITHOUT serializing or saving. Used by the
+  // filter, which is view state, not document state.
+  function rerender(): void {
+    renderer?.update(board);
+    chromeHandle.update(board);
   }
 
   const ctx: BoardRendererCtx = {
@@ -137,6 +153,11 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     },
     requestDelete: () => opts.onDelete?.(),
     readonly: opts.isReadOnly(),
+    getFilter: () => filter,
+    setFilter: (next: FilterState) => {
+      filter = next;
+      rerender();
+    },
   };
 
   // Chrome (name + ⋯ menu) is built once and prepended to dom before bodyEl.

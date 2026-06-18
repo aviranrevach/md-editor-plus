@@ -6,6 +6,7 @@ import type { Board } from './boardModel';
 import type { BoardRendererCtx } from './boardBlock';
 import { renderPropertiesContent, promptNewField } from './boardProperties';
 import { requestHeaderRename } from './boardTableRender';
+import { createFilterPill, type FilterPill } from './boardFilterPanel';
 
 export interface ChromeHandle {
   el: HTMLElement;
@@ -53,6 +54,11 @@ export function renderChrome(
   }
   chrome.appendChild(name);
 
+  // Filter pill — view-only control, shown for readonly boards too. Hidden by
+  // its own refresh() when the board has no status/tag fields.
+  const filterPill: FilterPill = createFilterPill(ctx);
+  chrome.appendChild(filterPill.el);
+
   let refreshViewSeg: (() => void) | null = null;
   let refreshPropsIfOpen: (() => void) | null = null;
 
@@ -94,6 +100,7 @@ export function renderChrome(
     refreshViewSeg?.();
     // If the more menu is open, refresh the props so newly-added fields appear.
     refreshPropsIfOpen?.();
+    filterPill.refresh();
   }
 
   return { el: chrome, update };

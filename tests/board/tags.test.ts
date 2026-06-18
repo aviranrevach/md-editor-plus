@@ -22,6 +22,8 @@ function ctxFor(b: Board) {
     openSidePanel: (_id: string) => {},
     requestDelete: () => {},
     readonly: false,
+    getFilter: () => ({}),
+    setFilter: (_next) => {},
   };
   return { ctx, ref };
 }

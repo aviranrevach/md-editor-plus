@@ -1755,3 +1755,66 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-image-empty { color: var(--text-secondary); opacity: .55; display: inline-flex; align-items: center; border: none; background: none; }
 .bd-image-empty svg { width: 18px; height: 18px; display: block; }
 .bd-image-broken { display: inline-flex; align-items: center; color: var(--text-secondary); opacity: .55; border: none; background: none; }
+
+/* ---- Board filter: funnel icon button + popover (c20) ---- */
+.bd-filter { position: relative; display: inline-flex; }
+
+/* Trigger reuses .bd-more-btn (the + / ⋯ buttons). When a filter is active it
+   tints accent and grows to fit a small inline count — no badge bubble. */
+.bd-filter-btn.is-open { background: var(--toolbar-btn-hover, var(--block-hover)); }
+.bd-filter-btn.is-active { color: var(--accent, #2383e2); background: var(--accent-soft, rgba(35,131,226,0.14)); }
+.bd-filter-btn.is-active:hover { color: var(--accent, #2383e2); }
+.bd-filter-btn.has-count { width: auto; padding: 0 7px; gap: 3px; }
+.bd-filter-count { font-size: 11px; font-weight: 600; line-height: 1; }
+.bd-filter-btn:not(.has-count) .bd-filter-count { display: none; }
+
+.bd-filter-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  /* Anchor to the funnel's right edge and open leftward, like the ⋯ menu — the
+     button sits near the right of the board chrome, so left:0 ran off-screen. */
+  right: 0;
+  z-index: 40;
+  min-width: 250px;
+  max-width: 340px;
+  padding: 10px 12px 12px;
+  background: var(--menu-bg, #fff);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+}
+
+.bd-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 6px;
+}
+.bd-filter-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.bd-filter-clear {
+  border: none; background: none; cursor: pointer;
+  font-size: 12px; color: var(--accent, #2383e2); padding: 0; white-space: nowrap;
+}
+.bd-filter-clear:hover { text-decoration: underline; }
+
+.bd-filter-field { padding: 9px 2px 4px; }
+.bd-filter-field + .bd-filter-field { border-top: 1px solid var(--border-color, rgba(0,0,0,0.08)); }
+.bd-filter-field-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-secondary, #8a8a8a); margin-bottom: 8px; font-weight: 600;
+}
+.bd-filter-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* Chips reuse the real status pill (.board-column-chip). Selected = solid
+   (the .color-X.board-column-chip rules paint it); unselected = hollow outline,
+   no dimming. A transparent border on every chip keeps both states the same
+   size. */
+.bd-filter-chip { cursor: pointer; border: 1.5px solid transparent; font-family: inherit; }
+.board-column-chip.bd-filter-hollow {
+  background: transparent;
+  border-color: var(--border-color, rgba(0,0,0,0.16));
+  color: var(--board-text-muted, var(--text-secondary, #73726e));
+}
+.bd-filter-chip.bd-filter-empty .board-column-chip-dot { display: none; }
+.bd-filter-chip.bd-filter-empty.bd-filter-hollow { border-style: dashed; }

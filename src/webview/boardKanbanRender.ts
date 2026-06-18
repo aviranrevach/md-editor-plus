@@ -7,6 +7,7 @@
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
 import { COLOR_TOKENS_PUBLIC, mintCardId } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { applyFilter } from './boardFilter';
 import { resolveImageSrc } from './mediaResolve';
 import { firstImageSrc } from './boardImageLinks';
 import { attachSmartTypography } from './extensions/smartTypography';
@@ -51,7 +52,8 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
   for (const col of board.columns) {
     row.appendChild(renderColumn(board, col, mutate, readOnly, ctx));
   }
-  const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
+  const visible = applyFilter(board.cards, ctx.getFilter(), board);
+  const orphans = visible.filter((c) => !validNames.has(c.values.Status || ''));
   if (orphans.length) {
     row.appendChild(renderUncategorized(board, orphans, mutate, readOnly, ctx));
   }
@@ -127,7 +129,8 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   el.className = `board-column color-${col.color}`;
   el.dataset.column = col.name;
 
-  const cards = board.cards.filter((c) => (c.values.Status || '') === col.name);
+  const visible = applyFilter(board.cards, ctx.getFilter(), board);
+  const cards = visible.filter((c) => (c.values.Status || '') === col.name);
 
   if (!readOnly) {
     el.draggable = true;

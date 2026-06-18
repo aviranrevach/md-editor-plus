@@ -13,6 +13,7 @@
 
 import type { Board, Card, ViewDef, FieldDef, ColorToken } from './boardModel';
 import { getStatusOptions, autoColorPublic, mintCardId } from './boardModel';
+import { applyFilter } from './boardFilter';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
@@ -461,7 +462,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
     // tbody — grouped rendering
     const tbody = document.createElement('tbody');
-    const sortedCards = applySort(b.cards, v, b);
+    const sortedCards = applySort(applyFilter(b.cards, ctx.getFilter(), b), v, b);
     const groups = applyGroup(sortedCards, v, b);
     lastGroups = groups;
     for (const g of groups) {
