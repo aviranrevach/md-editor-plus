@@ -1,4 +1,5 @@
-// Pure helpers for deriving prompt context from a selection. No DOM/editor imports.
+// Pure helpers for deriving prompt context from a selection, including building AI panel input.
+// Imports Editor type and AiTarget for buildAiPanelInput but no DOM operations.
 
 import type { Editor } from '@tiptap/core';
 import type { AiTarget } from './aiTransforms';
