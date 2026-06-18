@@ -479,7 +479,7 @@ export const BLOCK_DEFS: BlockDef[] = [
     label: 'Table',
     description: 'Simple grid — a plain markdown table',
     iconHtml: ICO.table,
-    section: 'other',
+    section: 'lists',
     aliases: ['table', 'grid', 'markdown table', 'rows', 'columns'],
     isActive: (t) => t === 'table',
     insert: (editor, pos) => insertStarterTable(editor, pos),
@@ -754,8 +754,12 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
     });
 
+    // Skip AI targets that already have a deterministic Turn-into converter
+    // (Table, Board: Table) — offering an AI duplicate next to the real
+    // converter is confusing and routes through the example-seeded AI prompt.
+    const deterministicIds = new Set(convertibleTargets(BLOCK_DEFS).map((t) => t.id));
     const aiItems = AI_TRANSFORMS.filter(
-      (t) => !q || t.label.toLowerCase().includes(q),
+      (t) => !deterministicIds.has(t.id) && (!q || t.label.toLowerCase().includes(q)),
     );
     if (aiItems.length) {
       const sub = document.createElement('div');
