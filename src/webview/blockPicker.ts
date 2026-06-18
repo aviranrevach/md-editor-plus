@@ -8,6 +8,9 @@ import {
 import { parseBoardSource, duplicateBoardSource, mintBoardId } from './boardModel';
 import { tableToBoardSource } from './tableToBoard';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
+import { createAiTransformPanel } from './aiTransformPanel';
+import { buildAiPanelInput } from './aiSelection';
 
 export interface BlockDef {
   id: string;
@@ -554,6 +557,19 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   let filtered: BlockDef[] = BLOCK_DEFS;
   let drillParent: BlockDef | null = null;
   let context: PickerContext = {};
+
+  const aiTransformPanel = createAiTransformPanel();
+
+  function convertActiveWithAi(target: AiTarget, label: string): void {
+    const ab = context.activeBlock;
+    if (!ab) { close(); return; }
+    const node = editor.state.doc.nodeAt(ab.blockPos);
+    const from = ab.blockPos;
+    const to = node ? ab.blockPos + node.nodeSize : ab.blockPos;
+    aiTransformPanel.open(buildAiPanelInput(editor, target, label, from, to));
+    close();
+  }
+
   let actionMode = false;   // opened over a block (dragger) -> show action menu
   let turnIntoOpen = false; // inside the flat "Turn into" target list
   // Each rendered row registers its activation callback here, indexed to match
@@ -737,6 +753,20 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     items.forEach((t) => {
       makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
     });
+
+    const aiItems = AI_TRANSFORMS.filter(
+      (t) => !q || t.label.toLowerCase().includes(q),
+    );
+    if (aiItems.length) {
+      const sub = document.createElement('div');
+      sub.className = 'block-picker-section-label';
+      sub.textContent = '✨ Using AI';
+      list.appendChild(sub);
+      aiItems.forEach((t) => {
+        makeRow(t.iconHtml, t.label, () => convertActiveWithAi(t.id, t.label));
+      });
+    }
+
     activeIdx = 0;
     updateActive();
   }
