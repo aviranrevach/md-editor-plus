@@ -5,7 +5,9 @@ import {
   searchBlockActions,
   type ActionId,
 } from './blockActions';
-import { parseBoardSource, duplicateBoardSource } from './boardModel';
+import { parseBoardSource, duplicateBoardSource, mintBoardId } from './boardModel';
+import { tableToBoardSource } from './tableToBoard';
+import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 export interface BlockDef {
   id: string;
@@ -99,6 +101,53 @@ function replaceBlockWith(
       try { newNode = targetType.create(attrs); } catch { return false; }
     }
     if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, newNode);
+    return true;
+  }).run();
+}
+
+// Every board id currently in the doc — so a converted board gets a fresh id.
+function existingBoardIds(editor: Editor): string[] {
+  const ids: string[] = [];
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === 'board') {
+      try { ids.push(parseBoardSource(node.attrs.source as string).id); }
+      catch { /* malformed source — skip */ }
+    }
+    return true;
+  });
+  return ids;
+}
+
+// Read a ProseMirror table node into a row-major grid of trimmed cell text.
+function tableNodeToMatrix(node: ProseMirrorNode): string[][] {
+  const rows: string[][] = [];
+  node.forEach((row) => {
+    const cells: string[] = [];
+    row.forEach((cell) => { cells.push((cell.textContent ?? '').trim()); });
+    rows.push(cells);
+  });
+  return rows;
+}
+
+// Turn the block at blockPos into a Board: Table. A table maps cell-by-cell;
+// any other block seeds a one-card board from its text so nothing is dropped.
+function convertTableToBoard(editor: Editor, blockPos: number): void {
+  const boardId = mintBoardId(existingBoardIds(editor));
+  editor.chain().focus().command(({ tr, state, dispatch }) => {
+    const node = tr.doc.nodeAt(blockPos);
+    if (!node) return false;
+    const boardType = state.schema.nodes.board;
+    if (!boardType) return false;
+    let matrix: string[][];
+    if (node.type.name === 'table') {
+      matrix = tableNodeToMatrix(node);
+    } else {
+      const text = (node.textContent ?? '').trim();
+      matrix = text ? [['Title'], [text]] : [];
+    }
+    const source = tableToBoardSource(matrix, boardId);
+    const boardNode = boardType.create({ source });
+    if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, boardNode);
     return true;
   }).run();
 }
@@ -402,8 +451,9 @@ export const BLOCK_DEFS: BlockDef[] = [
     description: 'Table board: rows, columns, inline editing',
     iconHtml: ICO.board,
     section: 'lists',
-    aliases: ['board', 'table', 'database', 'grid', 'board table'],
+    aliases: ['board', 'database', 'board table'],
     insert: (editor, pos) => insertBoardWith('table', editor, pos),
+    convert: (editor, blockPos) => convertTableToBoard(editor, blockPos),
   },
   {
     id: 'whiteboard',
