@@ -35,16 +35,36 @@ export class SearchCoordinator {
   /** Run a fresh search on `editor` and activate the first match. */
   setQuery(editor: Editor, query: string): void {
     this.query = query;
+    this.recompute(editor, true);
+  }
 
+  /**
+   * Re-run the current query against the (possibly rebuilt) DOM, KEEPING the
+   * user's current match position. Board card highlights are CSS Custom
+   * Highlight ranges anchored to live text nodes; when a board re-renders (an
+   * external sync echo, a cell edit, autofit, …) it replaces those text nodes,
+   * which silently collapses the ranges to empty — the highlight registry still
+   * reports them but nothing paints. Re-scanning rebuilds the ranges against the
+   * fresh nodes so the highlight survives the re-render. No-op without a query.
+   */
+  refresh(editor: Editor): void {
+    if (!this.query) return;
+    this.recompute(editor, false);
+  }
+
+  // Recompute matches from scratch and re-render. `resetActive` starts at the
+  // first match (a brand-new search); otherwise the current position is kept,
+  // clamped to the new match count (a re-scan after a DOM rebuild).
+  private recompute(editor: Editor, resetActive: boolean): void {
     // ProseMirror text matches (preview body, tables, toggles; or code view).
-    editor.commands.setSearchTerm(query);
+    editor.commands.setSearchTerm(this.query);
     const pmMatches = getMatches(editor.state);
 
     // Board card matches (preview only — code view has no boards).
     clearBoardHighlights();
     this.boardMatches =
-      query && boardSearchSupported()
-        ? scanBoards(editor.view.dom as HTMLElement, query)
+      this.query && boardSearchSupported()
+        ? scanBoards(editor.view.dom as HTMLElement, this.query)
         : [];
 
     // Merge into one list ordered by viewport position. PM and board rects are
@@ -68,7 +88,9 @@ export class SearchCoordinator {
     handles.sort((a, b) => a.top - b.top || a.left - b.left);
 
     this.handles = handles;
-    this.active = handles.length ? 0 : -1;
+    if (resetActive || this.active < 0 || this.active >= handles.length) {
+      this.active = handles.length ? 0 : -1;
+    }
     this.render(editor);
   }
 
