@@ -236,6 +236,8 @@
 .mp-menu-item:disabled { opacity: 0.45; cursor: default; }
 .mp-menu-item.is-danger { color: #d23f3f; }
 .mp-menu-icon { width: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary, #888); flex-shrink: 0; }
+/* Danger items tint their icon too (the SVG strokes use currentColor). */
+.mp-menu-item.is-danger .mp-menu-icon { color: inherit; }
 .mp-menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-menu-check, .mp-menu-caret { color: var(--text-secondary, #888); flex-shrink: 0; }
 .mp-menu-trailing { flex-shrink: 0; }
