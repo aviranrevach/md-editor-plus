@@ -6,6 +6,10 @@ export interface PlacementInput {
   margin?: number;
   gap?: number;
   preferX?: 'left' | 'right';
+  // Absolute height ceiling (px). When set, the menu never grows past it even
+  // if the side has more room — it caps and scrolls instead (Notion-style).
+  // Still further capped by the available side space. Omit for no ceiling.
+  maxHeight?: number;
 }
 export interface Placement {
   left: number;
@@ -32,16 +36,23 @@ export function computePlacement(input: PlacementInput): Placement {
   const spaceBelow = vp.height - (a.top + a.height) - gap - margin;
   const spaceAbove = a.top - gap - margin;
 
+  // The height we try to place: the content, capped by an optional ceiling.
+  // Side selection uses this so a tall menu with a ceiling still sits at its
+  // anchor instead of flipping/clamping to fit its full natural height.
+  const cappedH = Math.min(size.height, input.maxHeight ?? Infinity);
+
   let side: 'above' | 'below';
   let avail: number;
-  if (size.height <= spaceBelow + FUZZ)      { side = 'below'; avail = spaceBelow; }
-  else if (size.height <= spaceAbove + FUZZ) { side = 'above'; avail = spaceAbove; }
-  else if (spaceBelow >= spaceAbove)         { side = 'below'; avail = spaceBelow; }
-  else                                       { side = 'above'; avail = spaceAbove; }
+  if (cappedH <= spaceBelow + FUZZ)      { side = 'below'; avail = spaceBelow; }
+  else if (cappedH <= spaceAbove + FUZZ) { side = 'above'; avail = spaceAbove; }
+  else if (spaceBelow >= spaceAbove)     { side = 'below'; avail = spaceBelow; }
+  else                                   { side = 'above'; avail = spaceAbove; }
 
-  const scroll = size.height > avail + FUZZ;
-  const maxHeight = scroll ? Math.max(0, avail) : null;
-  const effH = scroll ? Math.max(0, avail) : size.height;
+  // Final display height: the capped height, but never more than the side has.
+  const effH = Math.max(0, Math.min(cappedH, avail));
+  // Scroll whenever the full content can't show at that height.
+  const scroll = size.height > effH + FUZZ;
+  const maxHeight = scroll ? effH : null;
 
   let top = side === 'below' ? a.top + a.height + gap : a.top - gap - effH;
 
@@ -61,7 +72,7 @@ export function computePlacement(input: PlacementInput): Placement {
   return { left, top, side, maxHeight, scroll };
 }
 
-export interface PlaceOpts { margin?: number; gap?: number; preferX?: 'left' | 'right'; }
+export interface PlaceOpts { margin?: number; gap?: number; preferX?: 'left' | 'right'; maxHeight?: number; }
 export interface PlacementHandle { reposition(): void; destroy(): void; }
 
 export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceOpts = {}): PlacementHandle {
@@ -89,7 +100,7 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
       anchor: { top: a.top, left: a.left, width: a.width, height: a.height },
       size: { width: el.offsetWidth, height: natH },
       viewport: { width: window.innerWidth, height: window.innerHeight },
-      margin: opts.margin, gap: opts.gap, preferX: opts.preferX,
+      margin: opts.margin, gap: opts.gap, preferX: opts.preferX, maxHeight: opts.maxHeight,
     });
     el.style.left = `${p.left}px`;
     el.style.top = `${p.top}px`;

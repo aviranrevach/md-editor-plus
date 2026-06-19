@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Notion-style block handle (c42)** — the gutter `⠿` handle is now a larger SVG ＋ and a 6-dot drag grip, each with a soft rounded background that appears on hover only, aligned to each block's first line.
-
+- **Block picker looks like Notion now (c43)** — the `+` / slash menu got a visual pass: **flat borderless icons** (no more boxed icon tiles), **tighter rows** with less padding, and calm **sentence-case section labels**. Each row shows its **markdown shortcut** on the right (`#`, `##`, `-`, `1.`, …), and a small **caption-sized footer** spells out the keys — `↑↓ Navigate · ↵ Select · esc Close` (and `esc Back` inside a drill-down). Same behavior, friendlier look. (c43)
 - **Menus now share one component** — every click-anchored menu (tags picker, the + / slash menu and its drill-downs, board table & kanban column menus, status dropdowns, the Properties / field-action / add-property menus, the status-options editor, the callout menu, the board view switcher, the filter panel, the image manager) is built on a single shared `Popover` primitive and `Menu` builder. Behavior is now consistent everywhere: open/close, outside-click **and Escape** dismissal, only one menu open at a time, drill-downs, and the edge-aware positioning + scrollbar from before. Internal refactor — no change to what menus do, only how they're built. (Popover component)
 - **Read-only is now a real toggle** — the "Read only" control in the ⋯ menu is a proper on/off switch (like the other settings), not a button with a hard-to-read blue highlight. (c45)
 

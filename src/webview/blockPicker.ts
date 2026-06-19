@@ -516,6 +516,29 @@ export const BLOCK_DEFS: BlockDef[] = [
   },
 ];
 
+// Markdown shortcut shown on the right of a picker row. Only blocks with a
+// real markdown trigger get one; everything else returns undefined (no span).
+const BLOCK_SHORTCUTS: Record<string, string> = {
+  heading1: '#',
+  heading2: '##',
+  heading3: '###',
+  bulletList: '-',
+  orderedList: '1.',
+  taskList: '[]',
+  blockquote: '"',
+  codeBlock: '```',
+};
+
+export function shortcutForBlock(id: string): string | undefined {
+  return BLOCK_SHORTCUTS[id];
+}
+
+// Footer hint: Esc closes the root menu, but inside a drilled-down sub-list
+// Esc goes back one level. The footer verb reflects that.
+export function footerCloseVerb(isDrilled: boolean): 'Close' | 'Back' {
+  return isDrilled ? 'Back' : 'Close';
+}
+
 export function filterBlocks(query: string, source: BlockDef[] = BLOCK_DEFS): BlockDef[] {
   if (!query.trim()) return source;
   const q = query.toLowerCase();
@@ -585,18 +608,27 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     return block.isActive(ab.typeName, ab.attrs);
   }
 
-  popover = createPopover({ className: 'block-picker', onClose: resetState });
+  // Cap the picker height so a long block list scrolls inside the menu
+  // (Notion-style) instead of growing to fill the screen and getting shoved
+  // away from the cursor. placeFloating further caps this to the side space.
+  popover = createPopover({ className: 'block-picker', onClose: resetState, maxHeight: 440 });
   const el = popover.el;
   el.innerHTML = `
     <div class="block-picker-search">
       <input class="block-picker-input" placeholder="Filter blocks…" autocomplete="off" spellcheck="false" />
     </div>
     <div class="block-picker-list"></div>
+    <div class="block-picker-footer">
+      <span class="block-picker-foot-hints"><span class="bp-key">↑↓</span> Navigate&nbsp;&nbsp;<span class="bp-key">↵</span> Select</span>
+      <span class="block-picker-foot-close"><span class="bp-key">esc</span> <span class="bp-foot-verb">Close</span></span>
+    </div>
   `;
 
   const input = el.querySelector<HTMLInputElement>('.block-picker-input')!;
   const list  = el.querySelector<HTMLElement>('.block-picker-list')!;
   const searchEl = el.querySelector<HTMLElement>('.block-picker-search')!;
+  const footVerb = el.querySelector<HTMLElement>('.bp-foot-verb')!;
+  const footHints = el.querySelector<HTMLElement>('.block-picker-foot-hints')!;
 
   function currentSource(): BlockDef[] {
     return drillParent?.subItems ?? BLOCK_DEFS;
@@ -650,6 +682,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
     activeIdx = 0;
     updateActive();
+    footHints.style.display = '';
+    footVerb.textContent = footerCloseVerb(!!drillParent);
   }
 
   function deleteActiveBlock(): void {
@@ -844,7 +878,9 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     row.dataset.idx = String(idx);
     const drillCaret = block.subItems?.length ? '<span class="block-picker-caret">›</span>' : '';
     const checkMark = isActiveItem(block) ? '<span class="block-picker-current-mark">✓</span>' : '';
-    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${checkMark}${drillCaret}`;
+    const sc = block.subItems?.length ? undefined : shortcutForBlock(block.id);
+    const shortcut = sc ? `<span class="block-picker-shortcut">${sc}</span>` : '';
+    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${shortcut}${checkMark}${drillCaret}`;
     row.addEventListener('mousedown', (e) => { e.preventDefault(); select(block); });
     return row;
   }
@@ -878,6 +914,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     // otherwise keystrokes hit the still-focused filter input and its `input`
     // handler re-renders the list, wiping this field away.
     searchEl.style.display = 'none';
+    footHints.style.display = 'none';
+    footVerb.textContent = 'Back';
     list.innerHTML = '';
 
     const back = document.createElement('div');

@@ -1,4 +1,4 @@
-import { filterBlocks, BLOCK_DEFS } from '../src/webview/blockPicker';
+import { filterBlocks, BLOCK_DEFS, footerCloseVerb, shortcutForBlock } from '../src/webview/blockPicker';
 
 describe('filterBlocks', () => {
   it('returns all blocks when query is empty', () => {
@@ -27,6 +27,38 @@ describe('filterBlocks', () => {
   it('finds image block when querying "image"', () => {
     const ids = filterBlocks('image').map(b => b.id);
     expect(ids).toContain('image');
+  });
+});
+
+describe('footerCloseVerb', () => {
+  it('says "Close" at the root list', () => {
+    expect(footerCloseVerb(false)).toBe('Close');
+  });
+
+  it('says "Back" inside a drill-down', () => {
+    expect(footerCloseVerb(true)).toBe('Back');
+  });
+});
+
+describe('shortcutForBlock', () => {
+  it('maps headings to hash shortcuts', () => {
+    expect(shortcutForBlock('heading1')).toBe('#');
+    expect(shortcutForBlock('heading2')).toBe('##');
+    expect(shortcutForBlock('heading3')).toBe('###');
+  });
+
+  it('maps lists, quote, and code', () => {
+    expect(shortcutForBlock('bulletList')).toBe('-');
+    expect(shortcutForBlock('orderedList')).toBe('1.');
+    expect(shortcutForBlock('taskList')).toBe('[]');
+    expect(shortcutForBlock('blockquote')).toBe('"');
+    expect(shortcutForBlock('codeBlock')).toBe('```');
+  });
+
+  it('returns undefined for blocks without a shortcut', () => {
+    expect(shortcutForBlock('paragraph')).toBeUndefined();
+    expect(shortcutForBlock('image')).toBeUndefined();
+    expect(shortcutForBlock('zzznope')).toBeUndefined();
   });
 });
 

@@ -6,6 +6,9 @@ export interface PopoverOpts {
   parent?: Popover;
   closeOnScroll?: boolean;
   onClose?: () => void;
+  // Absolute height ceiling (px) forwarded to placeFloating: the popover caps
+  // and scrolls past this instead of growing to fit all its content.
+  maxHeight?: number;
 }
 export interface Popover {
   readonly el: HTMLElement;
@@ -63,7 +66,7 @@ export function createPopover(opts: PopoverOpts = {}): Popover {
       // A top-level popover replaces the current stack; a child pushes onto it.
       if (!opts.parent) { while (openStack.length) openStack[openStack.length - 1].close(); }
       document.body.appendChild(el);
-      placement = placeFloating(el, anchor, { preferX: opts.preferX });
+      placement = placeFloating(el, anchor, { preferX: opts.preferX, maxHeight: opts.maxHeight });
       open = true;
       openStack.push(pop);
       // Track whether this popover should close on scroll.

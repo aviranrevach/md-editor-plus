@@ -1997,7 +1997,9 @@ html.source-full-width #source-view {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 6px;
+  /* No bottom padding: the sticky footer bleeds to the bottom edge itself, so
+     a scrolling row can't peek through a gap beneath it. */
+  padding: 6px 6px 0;
   box-shadow: 0 12px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
   z-index: 1050;
   /* Height + scroll owned by placeFloating()/.is-scroll — no self-scroll here
@@ -2065,12 +2067,12 @@ html.source-full-width #source-view {
 .block-picker-inline-field::placeholder { color: var(--text-secondary); }
 
 .block-picker-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: .01em;
   color: var(--text-secondary);
-  padding: 8px 10px 4px;
+  padding: 8px 12px 4px;
 }
 
 .block-picker-empty {
@@ -2089,9 +2091,9 @@ html.source-full-width #source-view {
 .block-picker-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 8px;
-  border-radius: 7px;
+  gap: 10px;
+  padding: 4px 12px;
+  border-radius: 6px;
   cursor: pointer;
   background: transparent;
   color: var(--text-primary);
@@ -2114,20 +2116,20 @@ html.source-full-width #source-view {
 }
 
 .block-picker-icon {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: transparent;
   flex-shrink: 0;
-  color: var(--text-primary);
+  color: var(--text-secondary);
+  font-size: 15px;
 }
 
 .block-picker-item.active .block-picker-icon {
-  border-color: var(--link);
   color: var(--link);
 }
 
@@ -2141,7 +2143,7 @@ html.source-full-width #source-view {
 }
 
 .block-picker-label {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.3;
   flex: 1;
 }
@@ -2161,11 +2163,19 @@ html.source-full-width #source-view {
   padding-left: 6px;
 }
 
+.block-picker-shortcut {
+  color: var(--text-secondary);
+  opacity: 0.6;
+  font-size: 12px;
+  line-height: 1;
+  padding-left: 6px;
+  font-feature-settings: "tnum";
+}
+
 .block-picker-item.current {
   background: color-mix(in srgb, var(--link) 12%, transparent);
 }
 .block-picker-item.current .block-picker-icon {
-  border-color: var(--link);
   color: var(--link);
 }
 .block-picker-item.current .block-picker-label {
@@ -2197,6 +2207,32 @@ html.source-full-width #source-view {
 }
 .block-picker-back-label {
   font-weight: 500;
+}
+
+.block-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Bleed over the picker's 6px side padding to the inner edges, and round the
+     bottom corners to match the picker — so the footer fully seals the bottom
+     and nothing peeks past it. Text stays aligned with the rows (18px). */
+  margin: 0 -6px;
+  padding: 6px 18px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 11px 11px;
+  font-size: 11px;            /* caption — smaller than Notion */
+  color: var(--text-secondary);
+  /* Pin to the bottom of the (scrolling) picker so it stays visible while the
+     block list scrolls underneath. The picker itself is the scroll container
+     (placeFloating caps its height + adds .is-scroll). */
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+}
+.block-picker-footer .bp-key {
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.85;
 }
 
 .block-picker-emoji-icon {
