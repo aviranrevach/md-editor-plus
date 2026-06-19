@@ -2218,7 +2218,7 @@ html.source-full-width #source-view {
      bottom corners to match the picker — so the footer fully seals the bottom
      and nothing peeks past it. Text stays aligned with the rows (18px). */
   margin: 0 -6px;
-  padding: 8px 18px;
+  padding: 6px 18px;
   border-top: 1px solid var(--border);
   border-radius: 0 0 11px 11px;
   font-size: 11px;            /* caption — smaller than Notion */
