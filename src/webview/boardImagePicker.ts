@@ -3,6 +3,8 @@ import { resolveImageSrc } from './mediaResolve';
 import { parseImageLinks, appendImageLink, removeImageLinkAt, replaceImageLinkAt } from './boardImageLinks';
 import { compressImage } from './imageCompress';
 import { sanitizeImageFileName, extensionForMime } from '../imageAssets';
+import { placeFloating } from './menuPosition';
+import type { PlacementHandle } from './menuPosition';
 
 let stylesInjected = false;
 function injectStyles(): void {
@@ -49,14 +51,13 @@ export function openBoardImageManager(
   const el = document.createElement('div');
   el.className = 'bd-image-mgr';
   document.body.appendChild(el);
-  const rect = anchor.getBoundingClientRect();
-  el.style.left = `${Math.min(rect.left, window.innerWidth - 320)}px`;
-  el.style.top = `${Math.min(rect.bottom + 4, window.innerHeight - 320)}px`;
+  const placement: PlacementHandle = placeFloating(el, anchor);
 
   let done = false;
   function finish(): void {
     if (done) return;
     done = true;
+    placement.destroy();
     el.remove();
     document.removeEventListener('mousedown', onDocDown, true);
   }

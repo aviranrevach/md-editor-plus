@@ -5,6 +5,8 @@ import {
   addTagOption, renameTagOption, deleteTagOption,
 } from './boardModel';
 import type { Board, ColumnDef, ColorToken } from './boardModel';
+import { placeFloating } from './menuPosition';
+import type { PlacementHandle } from './menuPosition';
 
 export interface OptionsEditorConfig {
   getOptions: () => ColumnDef[];
@@ -130,9 +132,7 @@ export function openStatusOptionsEditor(
   pop.className = 'bd-opt-popover';
   document.body.appendChild(pop);
 
-  const rect = anchor.getBoundingClientRect();
-  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  pop.style.left = `${rect.left + window.scrollX}px`;
+  const placement: PlacementHandle = placeFloating(pop, anchor);
 
   const isTags = () => getBoard().fields.find(f => f.name === fieldName)?.type === 'tags';
 
@@ -156,6 +156,7 @@ export function openStatusOptionsEditor(
     if (!pop.contains(e.target as Node) && e.target !== anchor) close();
   }
   function close() {
+    placement.destroy();
     pop.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }
