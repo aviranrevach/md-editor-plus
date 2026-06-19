@@ -920,7 +920,7 @@ function openRowMenu(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): vo
     ? { [groupBy]: card.values[groupBy] ?? '' }
     : {};
 
-  const cloneBoard = (): Board => ({ ...ctx.getBoard(), cards: [...ctx.getBoard().cards] });
+  const cloneBoard = (): Board => { const cur = ctx.getBoard(); return { ...cur, cards: [...cur.cards] }; };
 
   const sections: MenuSection[] = [
     { items: [
@@ -936,6 +936,8 @@ function openRowMenu(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): vo
         } },
         { icon: RM_ICON.insert, label: 'Insert row below', onSelect: () => {
           const b2 = cloneBoard();
+          // Anchor = the card after the source; null when source is last, which
+          // makes insertCardAt append to the end (correctly "below" the last row).
           const after = b2.cards[b2.cards.findIndex(c => c.id === card.id) + 1]?.id ?? null;
           insertCardAt(b2, after, insertPresets); ctx.mutate(b2);
         } },
