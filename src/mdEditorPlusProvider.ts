@@ -184,7 +184,6 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           shortenCodeSnippets: cfg.get<boolean>('shortenCodeSnippets', false),
           smartTypography:     cfg.get<boolean>('smartTypography', true),
           outlineVisible:      cfg.get<boolean>('outlineVisible', false),
-          readOnly:            cfg.get<boolean>('readOnly', false),
           sourceWordWrap:      cfg.get<boolean>('sourceWordWrap', false),
         },
       });
@@ -468,13 +467,6 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         if (typeof value !== 'boolean') return;
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
         await cfg.update('outlineVisible', value, vscode.ConfigurationTarget.Global);
-        return;
-      }
-      if (msg.type === 'saveReadOnly') {
-        const value = (msg as unknown as { value?: unknown }).value;
-        if (typeof value !== 'boolean') return;
-        const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
-        await cfg.update('readOnly', value, vscode.ConfigurationTarget.Global);
         return;
       }
       if (msg.type === 'saveSourceWordWrap') {
@@ -867,6 +859,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <button class="toolbar-icon" id="outline-btn" data-tip="Outline (⌘⇧O)">${iOutline}</button>
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
     <span class="save-indicator" id="save-indicator" aria-live="polite"></span>
+    <button class="readonly-pill" id="readonly-pill" hidden data-tip="Read-only — click to enable editing">${iLock}<span>Read only</span></button>
     <span class="toolbar-spacer"></span>
     <button class="toolbar-icon" id="diff-btn" data-tip="View changes (diff)">${iArrowsH}</button>
     <button class="toolbar-icon" id="refresh-btn" data-tip="Reload from disk">${iRefresh}</button>
@@ -971,6 +964,11 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <div class="settings-divider"></div>
     <div class="settings-section">
       <div class="settings-label">Editing</div>
+      <div class="settings-row" data-tip="Lock this file — blocks typing and structural edits (never persists; reopen to edit)">
+        <span class="settings-row-icon">${iLock}</span>
+        <span class="settings-row-label">Read only</span>
+        <button class="toggle-switch" id="readonly-toggle" role="switch" aria-checked="false"></button>
+      </div>
       <div class="settings-row" data-tip="Replace typed sequences like -&gt; with → and -- with — as you type (never inside code)">
         <span class="settings-row-icon">${iArrowsH}</span>
         <span class="settings-row-label">Smart typography</span>
@@ -993,7 +991,6 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   </div>
   <div class="actions-panel hidden" id="actions-panel-dots" data-anchor="dots">
     <button class="settings-action act-find" data-tip="Find text in this document (⌘F / Ctrl+F)">${iSearch}<span class="settings-action-label">Find in page</span></button>
-    <button class="settings-action act-toggle-readonly" id="act-toggle-readonly" data-tip="Toggle read-only mode — when on, typing and structural edits are blocked">${iLock}<span class="settings-action-label">Read only</span></button>
     <div class="actions-sep"></div>
     <button class="settings-action act-copy" data-tip="Copy the entire markdown to clipboard">${iCopy}<span class="settings-action-label">Copy page content</span></button>
     <button class="settings-action act-copy-path" data-tip="Copy the absolute file path to clipboard">${iLink}<span class="settings-action-label">Copy file path</span></button>

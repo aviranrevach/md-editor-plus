@@ -19,6 +19,8 @@ import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
 import { placeFloating, type PlacementHandle } from './menuPosition';
 import { nextSaveState, describeSaveState, SaveState, SaveEvent } from './saveState';
+import { createReadOnlyController } from './readonlyState';
+import { createReadOnlyNotice } from './readonlyNotice';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -188,7 +190,8 @@ function init(): void {
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
   const smartTypographyToggle = document.getElementById('smart-typography-toggle') as HTMLElement;
-  const readOnlyActionBtn     = document.getElementById('act-toggle-readonly')     as HTMLElement | null;
+  const readOnlyToggle = document.getElementById('readonly-toggle') as HTMLElement | null;
+  const readOnlyPill   = document.getElementById('readonly-pill')   as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
 
@@ -257,10 +260,11 @@ function init(): void {
     setSmartTypography(!smartTypographyToggle.classList.contains('on'));
   });
 
-  readOnlyActionBtn?.addEventListener('click', () => {
-    const next = !readOnlyActionBtn.classList.contains('active');
-    applyReadOnly(next);
-    vscode.postMessage({ type: 'saveReadOnly', value: next });
+  readOnlyToggle?.addEventListener('click', () => {
+    applyReadOnly(!roController.get());
+  });
+  readOnlyPill?.addEventListener('click', () => {
+    applyReadOnly(false);
   });
 
   function applySourceWordWrap(on: boolean): void {
@@ -943,18 +947,33 @@ function init(): void {
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
     setSmartTypography(d.smartTypography ?? true); // default ON (unlike the Boolean()-defaulted toggles above)
-    applyReadOnly(Boolean(d.readOnly));
+    applyReadOnly(false);
     applySourceWordWrap(Boolean(d.sourceWordWrap));
   }
 
+  const roController = createReadOnlyController({
+    root: document.documentElement,
+    toggleSwitch: readOnlyToggle,
+    pill: readOnlyPill,
+    setEditable: (editable) => setReadOnly(!editable),
+  });
+  const roNotice = createReadOnlyNotice({
+    container: document.body,
+    onEnableEditing: () => applyReadOnly(false),
+  });
   function applyReadOnly(on: boolean): void {
-    document.documentElement.classList.toggle('read-only', on);
-    if (readOnlyActionBtn) {
-      readOnlyActionBtn.classList.toggle('active', on);
-      readOnlyActionBtn.setAttribute('aria-pressed', String(on));
-    }
-    setReadOnly(on);
+    roController.set(on);
   }
+
+  document.addEventListener('keydown', (e) => {
+    if (!roController.get()) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // shortcuts aren't edits
+    const isEdit = e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete';
+    if (!isEdit) return;
+    const t = e.target as HTMLElement | null;
+    if (!t?.closest('.ProseMirror, .bd-table-cell, .board-panel-body')) return;
+    roNotice.show();
+  }, true);
 
   let savedDefaults: SavedDefaults = { ...FACTORY_DEFAULTS };
 
