@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Board table row actions (c36)** — hover a row and **click the ⠿ grip** to open a row menu: **Open in side panel**, **Duplicate**, **Insert row above / below**, and **Delete row**. Dragging the grip still reorders, and in a grouped table **dragging a row into another group now re-assigns its group field** (like moving a kanban card between columns). The grip stays clickable even when the table is sorted — only the Insert options hide, since position is computed there. (c36)
+
 ### Changed
 
 - **Menus now share one component** — every click-anchored menu (tags picker, the + / slash menu and its drill-downs, board table & kanban column menus, status dropdowns, the Properties / field-action / add-property menus, the status-options editor, the callout menu, the board view switcher, the filter panel, the image manager) is built on a single shared `Popover` primitive and `Menu` builder. Behavior is now consistent everywhere: open/close, outside-click **and Escape** dismissal, only one menu open at a time, drill-downs, and the edge-aware positioning + scrollbar from before. Internal refactor — no change to what menus do, only how they're built. (Popover component)
