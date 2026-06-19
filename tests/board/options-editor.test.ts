@@ -45,7 +45,8 @@ describe('buildOptionsEditor', () => {
     const calls: any[] = [];
     const host = render(opts, { onRecolor: (n: string, c: string) => calls.push([n, c]) });
     (host.querySelectorAll('.bd-opt-swatch')[0] as HTMLElement).click();
-    const tealSwatch = host.querySelector('.bd-opt-palette .color-teal') as HTMLElement;
+    // palette is appended to document.body (via createPopover), not inside host
+    const tealSwatch = document.querySelector('.bd-opt-palette .color-teal') as HTMLElement;
     tealSwatch.click();
     expect(calls).toEqual([['Low', 'teal']]);
   });
