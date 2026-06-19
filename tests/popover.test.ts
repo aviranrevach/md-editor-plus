@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { createPopover } from '../src/webview/popover';
+import { createPopover, __closeAllForTest } from '../src/webview/popover';
 
 beforeEach(() => {
   document.body.innerHTML = '';
@@ -7,6 +7,10 @@ beforeEach(() => {
   (window as any).innerHeight = 800;
   (window as any).requestAnimationFrame = (cb: FrameRequestCallback) => { cb(0); return 0; };
   (window as any).ResizeObserver = class { observe() {} disconnect() {} };
+});
+
+afterEach(() => {
+  __closeAllForTest();
 });
 
 function anchorAt(): HTMLElement {
@@ -74,4 +78,14 @@ test('Escape closes the topmost popover; close() is idempotent + fires onClose o
   expect(p.isOpen()).toBe(false);
   p.close(); // idempotent
   expect(closes).toBe(1);
+});
+
+test('mousedown inside the parent (outside the child) closes the child but keeps the parent open', () => {
+  const a = anchorAt();
+  const parent = createPopover(); parent.open(a);
+  const inside = parent.el.appendChild(document.createElement('span'));
+  const child = createPopover({ parent }); child.open(a);
+  inside.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+  expect(child.isOpen()).toBe(false);
+  expect(parent.isOpen()).toBe(true);
 });

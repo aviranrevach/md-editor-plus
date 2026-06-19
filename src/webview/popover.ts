@@ -17,6 +17,8 @@ export interface Popover {
 
 // Module-level registry: the chain of currently-open popovers (root first).
 const openStack: Popover[] = [];
+// Module-level set to track popovers that should NOT close on scroll.
+const noCloseOnScroll = new WeakSet<Popover>();
 
 function closeFrom(target: EventTarget | null): void {
   // Close every open popover (top-down) whose el does not contain `target`,
@@ -41,7 +43,7 @@ function ensureGlobalListeners(): void {
     const top = openStack[openStack.length - 1];
     const t = e.target as Node | null;
     if (t && top.el.contains(t)) return;          // scrolling inside the popover
-    if ((top as any).__closeOnScroll) top.close();
+    if (!noCloseOnScroll.has(top)) top.close();
   }, { capture: true, passive: true });
 }
 
@@ -51,7 +53,7 @@ export function createPopover(opts: PopoverOpts = {}): Popover {
   let placement: PlacementHandle | null = null;
   let open = false;
 
-  const pop: Popover & { __closeOnScroll?: boolean } = {
+  const pop: Popover = {
     el,
     isOpen: () => open,
     reposition: () => placement?.reposition(),
@@ -61,10 +63,11 @@ export function createPopover(opts: PopoverOpts = {}): Popover {
       // A top-level popover replaces the current stack; a child pushes onto it.
       if (!opts.parent) { while (openStack.length) openStack[openStack.length - 1].close(); }
       document.body.appendChild(el);
-      el.style.position = 'fixed';
       placement = placeFloating(el, anchor, { preferX: opts.preferX });
       open = true;
       openStack.push(pop);
+      // Track whether this popover should close on scroll.
+      if (opts.closeOnScroll === false) noCloseOnScroll.add(pop);
     },
     close() {
       if (!open) return;
@@ -74,9 +77,13 @@ export function createPopover(opts: PopoverOpts = {}): Popover {
       const i = openStack.indexOf(pop);
       if (i >= 0) openStack.splice(i, 1);
       if (el.parentNode) el.parentNode.removeChild(el);
+      noCloseOnScroll.delete(pop);
       opts.onClose?.();
     },
   };
-  pop.__closeOnScroll = opts.closeOnScroll !== false;
   return pop;
+}
+
+export function __closeAllForTest(): void {
+  while (openStack.length) openStack[openStack.length - 1].close();
 }
