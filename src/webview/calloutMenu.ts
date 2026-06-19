@@ -1,5 +1,5 @@
 import { Editor } from '@tiptap/core';
-import { placeFloating, type PlacementHandle } from './menuPosition';
+import { createPopover, type Popover } from './popover';
 
 interface CalloutTypeDef {
   id: 'note' | 'tip' | 'important' | 'warning' | 'caution';
@@ -34,11 +34,9 @@ export interface CalloutMenu {
 
 export function createCalloutMenu(editor: Editor): CalloutMenu {
   let pos = 0;
-  let placement: PlacementHandle | null = null;
 
-  const el = document.createElement('div');
-  el.className = 'callout-menu';
-  document.body.appendChild(el);
+  const popover: Popover = createPopover({ className: 'callout-menu' });
+  const el = popover.el;
 
   function setAttrs(nextType: CalloutTypeDef['id'] | null, nextEmoji: string | null): void {
     editor
@@ -219,31 +217,15 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
       const currentType = (node.attrs.type as CalloutTypeDef['id']) ?? 'note';
       const currentEmoji = (node.attrs.emoji as string) ?? DEFAULT_EMOJI_BY_TYPE[currentType];
       render(currentType, currentEmoji);
-      el.classList.add('open');
-      placement = placeFloating(el, anchorEl);
+      popover.open(anchorEl);
     } catch (err) {
       console.error('[md-editor-plus] calloutMenu.open failed', err);
     }
   }
 
   function close(): void {
-    el.classList.remove('open');
-    placement?.destroy();
-    placement = null;
+    popover.close();
   }
-
-  document.addEventListener('mousedown', (e) => {
-    if (!el.contains(e.target as Node)) close();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && el.classList.contains('open')) close();
-  });
-  // Close on any scroll — the popover is anchored to a viewport position,
-  // so scrolling makes it visually disconnect from the callout it opened
-  // from. capture:true catches scrolls on every ancestor.
-  window.addEventListener('scroll', () => {
-    if (el.classList.contains('open')) close();
-  }, { capture: true, passive: true });
 
   // Open the menu when the user clicks the emoji icon inside a rendered callout.
   editor.view.dom.addEventListener('click', (e) => {
