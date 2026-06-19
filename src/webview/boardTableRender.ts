@@ -27,7 +27,7 @@ import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
 import { imageFilesFrom } from './extensions/imagePasteDrop';
 import { createMenu } from './menu';
-import type { MenuSection } from './menu';
+import type { Menu, MenuSection } from './menu';
 import { createPopover } from './popover';
 
 interface Group { key: string; cards: Card[]; }
@@ -900,7 +900,13 @@ function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
 
 // One reused menu instance for all row grips (matches the column-menu pattern;
 // opening it dismisses any other floating panel via the popover registry).
-const rowMenu = createMenu({ className: 'bd-row-menu' });
+// Created lazily on first open so importing this module never touches the DOM
+// (module-level createMenu would crash in non-jsdom test environments).
+let rowMenu: Menu | null = null;
+function getRowMenu(): Menu {
+  if (!rowMenu) rowMenu = createMenu({ className: 'bd-row-menu' });
+  return rowMenu;
+}
 
 // Inline icons (stroke-based, 16px) for the row-actions menu.
 const RM_ICON = {
@@ -950,7 +956,7 @@ function openRowMenu(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): vo
     ] },
   ];
 
-  rowMenu.open(anchor, sections);
+  getRowMenu().open(anchor, sections);
 }
 
 // Phosphor Bold 16px icons for the column header menu.
