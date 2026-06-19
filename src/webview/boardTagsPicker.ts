@@ -1,6 +1,7 @@
 import { getStatusOptions, addTagOption, toggleTagOnCard, sanitizeTagName } from './boardModel';
 import type { Board } from './boardModel';
 import { buildChip } from './boardSidePanel';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 /**
  * Multi-select tag picker: a checklist of the field's tag options (toggle each
@@ -17,10 +18,7 @@ export function openTagsPicker(
   const pop = document.createElement('div');
   pop.className = 'bd-tags-pop';
   document.body.appendChild(pop);
-  const rect = anchor.getBoundingClientRect();
-  pop.style.position = 'absolute';
-  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  pop.style.left = `${rect.left + window.scrollX}px`;
+  const placement: PlacementHandle = placeFloating(pop, anchor);
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -93,6 +91,6 @@ export function openTagsPicker(
   function onOutside(e: MouseEvent) {
     if (!pop.contains(e.target as Node) && e.target !== anchor) close();
   }
-  function close() { pop.remove(); document.removeEventListener('mousedown', onOutside, true); }
+  function close() { placement.destroy(); pop.remove(); document.removeEventListener('mousedown', onOutside, true); }
   setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
 }
