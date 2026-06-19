@@ -2,6 +2,7 @@ import { Editor } from '@tiptap/core';
 import { createBlockPicker } from './blockPicker';
 import { createCalloutMenu } from './calloutMenu';
 import { slashShouldOpenPicker } from './slashTrigger';
+import { createPlusIcon, createGripIcon } from './handleIcons';
 
 function getInsertPosFromHandle(editor: Editor, handleEl: HTMLElement): number {
   const rect = handleEl.getBoundingClientRect();
@@ -99,13 +100,13 @@ export function createBlockHandle(editor: Editor): void {
     // Inject + button at the start of the handle
     const plusBtn = document.createElement('button');
     plusBtn.className = 'block-handle-plus';
-    plusBtn.textContent = '+';
+    plusBtn.appendChild(createPlusIcon());
     handleEl.insertAdjacentElement('afterbegin', plusBtn);
 
     // Wrap the existing drag icon content in a styled span
     const dragIcon = document.createElement('div');
     dragIcon.className = 'block-handle-drag';
-    dragIcon.textContent = '⠿';
+    dragIcon.appendChild(createGripIcon());
     // Replace whatever GlobalDragHandle put inside (keep only our icon)
     Array.from(handleEl.children).forEach(child => {
       if (child !== plusBtn) child.remove();
