@@ -516,6 +516,23 @@ export const BLOCK_DEFS: BlockDef[] = [
   },
 ];
 
+// Markdown shortcut shown on the right of a picker row. Only blocks with a
+// real markdown trigger get one; everything else returns undefined (no span).
+const BLOCK_SHORTCUTS: Record<string, string> = {
+  heading1: '#',
+  heading2: '##',
+  heading3: '###',
+  bulletList: '-',
+  orderedList: '1.',
+  taskList: '[]',
+  blockquote: '"',
+  codeBlock: '```',
+};
+
+export function shortcutForBlock(id: string): string | undefined {
+  return BLOCK_SHORTCUTS[id];
+}
+
 // Footer hint: Esc closes the root menu, but inside a drilled-down sub-list
 // Esc goes back one level. The footer verb reflects that.
 export function footerCloseVerb(isDrilled: boolean): 'Close' | 'Back' {
@@ -856,7 +873,9 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     row.dataset.idx = String(idx);
     const drillCaret = block.subItems?.length ? '<span class="block-picker-caret">›</span>' : '';
     const checkMark = isActiveItem(block) ? '<span class="block-picker-current-mark">✓</span>' : '';
-    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${checkMark}${drillCaret}`;
+    const sc = block.subItems?.length ? undefined : shortcutForBlock(block.id);
+    const shortcut = sc ? `<span class="block-picker-shortcut">${sc}</span>` : '';
+    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${shortcut}${checkMark}${drillCaret}`;
     row.addEventListener('mousedown', (e) => { e.preventDefault(); select(block); });
     return row;
   }

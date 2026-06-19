@@ -2162,6 +2162,15 @@ html.source-full-width #source-view {
   padding-left: 6px;
 }
 
+.block-picker-shortcut {
+  color: var(--text-secondary);
+  opacity: 0.6;
+  font-size: 12px;
+  line-height: 1;
+  padding-left: 6px;
+  font-feature-settings: "tnum";
+}
+
 .block-picker-item.current {
   background: color-mix(in srgb, var(--link) 12%, transparent);
 }
