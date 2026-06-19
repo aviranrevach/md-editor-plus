@@ -26,7 +26,8 @@ import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
 import { imageFilesFrom } from './extensions/imagePasteDrop';
-import { placeFloating, type PlacementHandle } from './menuPosition';
+import { createMenu } from './menu';
+import { createPopover } from './popover';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -886,115 +887,118 @@ function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
   return Array.from(bucket.keys()).sort(alpha).map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
 }
 
-let currentColumnMenuOutside: ((e: MouseEvent) => void) | null = null;
+// Phosphor Bold 16px icons for the column header menu.
+const COL_MENU_ICONS = {
+  rename: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
+  sortAsc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M152,72a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H160A8,8,0,0,1,152,72Zm8,48h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm-50.34-26.34L96,187.31V40a8,8,0,0,0-16,0V187.31L66.34,173.66a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l24-24A8,8,0,0,0,109.66,173.66Z"/></svg>`,
+  sortDesc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M160,80h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm48,24H160a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm-98.34-90.34L96,107.31V216a8,8,0,0,1-16,0V107.31L66.34,120.97A8,8,0,0,1,55,109.65l24-24a8,8,0,0,1,11.32,0l24,24A8,8,0,0,1,109.66,93.66Z"/></svg>`,
+  sortClear: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a96.12,96.12,0,0,1-93.5,95.94,8,8,0,0,1-.5-16A80.11,80.11,0,0,0,224,128a80,80,0,0,0-140.45-52.45L96.4,88.4a8,8,0,0,1-5.66,13.66H40A8,8,0,0,1,32,94V43.3a8,8,0,0,1,13.66-5.66l13.7,13.7A96,96,0,0,1,240,128Z"/></svg>`,
+  group: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></svg>`,
+  resetWidth: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,56V200a8,8,0,0,1-16,0V56a8,8,0,0,1,16,0ZM32,200V56a8,8,0,0,0-16,0V200a8,8,0,0,0,16,0Zm164.69-71.85L168.85,156a4,4,0,0,1-6.85-2.83V136H94v17.17a4,4,0,0,1-6.85,2.83l-27.84-27.85a4,4,0,0,1,0-5.66l27.84-27.85a4,4,0,0,1,6.85,2.83V114h68V102.83a4,4,0,0,1,6.85-2.83l27.84,27.85A4,4,0,0,1,196.69,128.15Z"/></svg>`,
+  hide: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l21.92,24.11a8,8,0,1,0,11.84-10.76Zm46.34,79.42a36,36,0,0,1,49.4,49.4Zm-3.18,90A102.45,102.45,0,0,1,46.71,143C39.62,134.21,32.31,123.5,29,116.74c8.45-17.59,30.93-46.74,72.17-60.18l21.93,24.12a52,52,0,0,0,75.79,71.18l24,26.4A111.55,111.55,0,0,1,128,192a112.46,112.46,0,0,1-30.92-12.27Zm130-31.46a8,8,0,0,1-1.31-11.21c2.66-3.51,17.51-23.81,17.51-32.74,0-8.62-13.79-26.39-21.33-36.06l-.55-.71a112.46,112.46,0,0,0-37.45-32.78,8,8,0,1,1,7.55-14.12,128.39,128.39,0,0,1,42.86,37.43c5.31,6.83,29.92,39.5,29.92,46.24,0,7.5-22.16,40.59-20.94,42.13A8,8,0,0,1,227.08,172.55Z"/></svg>`,
+  editOptions: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
+};
 
 function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx, collapsedGroups: Set<string>): void {
-  // Close any existing menu AND remove its stale outside-click listener.
-  if (currentColumnMenuOutside) {
-    document.removeEventListener('mousedown', currentColumnMenuOutside, true);
-    currentColumnMenuOutside = null;
-  }
-  const existing = document.querySelector('.bd-col-menu');
-  existing?.remove();
-  const menu = document.createElement('div');
-  menu.className = 'bd-col-menu';
-  const mkItem = (icon: string, label: string, fn: () => void, opts: { disabled?: boolean } = {}) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'bd-col-menu-item';
-    btn.disabled = !!opts.disabled;
-    btn.innerHTML = `<span class="bd-col-menu-icon">${icon}</span><span class="bd-col-menu-label">${label}</span>`;
-    btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
-    if (!opts.disabled) {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); currentColumnMenuOutside = null; });
-    }
-    menu.appendChild(btn);
-  };
   // Rename is the FIRST item — most-common reason to open this menu.
   // Shown but disabled for system fields (Title / Status / Description) so
   // users can SEE the action exists, even if they can't use it on these fields.
   const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
-  // Phosphor Bold 16px — viewBox 0 0 256 256, fill currentColor (matches the
-  // project's existing icon style in blockPicker.ts).
-  const ICON = {
-    rename: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
-    sortAsc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M152,72a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H160A8,8,0,0,1,152,72Zm8,48h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm-50.34-26.34L96,187.31V40a8,8,0,0,0-16,0V187.31L66.34,173.66a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l24-24A8,8,0,0,0,109.66,173.66Z"/></svg>`,
-    sortDesc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M160,80h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm48,24H160a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm-98.34-90.34L96,107.31V216a8,8,0,0,1-16,0V107.31L66.34,120.97A8,8,0,0,1,55,109.65l24-24a8,8,0,0,1,11.32,0l24,24A8,8,0,0,1,109.66,93.66Z"/></svg>`,
-    sortClear: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a96.12,96.12,0,0,1-93.5,95.94,8,8,0,0,1-.5-16A80.11,80.11,0,0,0,224,128a80,80,0,0,0-140.45-52.45L96.4,88.4a8,8,0,0,1-5.66,13.66H40A8,8,0,0,1,32,94V43.3a8,8,0,0,1,13.66-5.66l13.7,13.7A96,96,0,0,1,240,128Z"/></svg>`,
-    group: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></svg>`,
-    resetWidth: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,56V200a8,8,0,0,1-16,0V56a8,8,0,0,1,16,0ZM32,200V56a8,8,0,0,0-16,0V200a8,8,0,0,0,16,0Zm164.69-71.85L168.85,156a4,4,0,0,1-6.85-2.83V136H94v17.17a4,4,0,0,1-6.85,2.83l-27.84-27.85a4,4,0,0,1,0-5.66l27.84-27.85a4,4,0,0,1,6.85,2.83V114h68V102.83a4,4,0,0,1,6.85-2.83l27.84,27.85A4,4,0,0,1,196.69,128.15Z"/></svg>`,
-    hide: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l21.92,24.11a8,8,0,1,0,11.84-10.76Zm46.34,79.42a36,36,0,0,1,49.4,49.4Zm-3.18,90A102.45,102.45,0,0,1,46.71,143C39.62,134.21,32.31,123.5,29,116.74c8.45-17.59,30.93-46.74,72.17-60.18l21.93,24.12a52,52,0,0,0,75.79,71.18l24,26.4A111.55,111.55,0,0,1,128,192a112.46,112.46,0,0,1-30.92-12.27Zm130-31.46a8,8,0,0,1-1.31-11.21c2.66-3.51,17.51-23.81,17.51-32.74,0-8.62-13.79-26.39-21.33-36.06l-.55-.71a112.46,112.46,0,0,0-37.45-32.78,8,8,0,1,1,7.55-14.12,128.39,128.39,0,0,1,42.86,37.43c5.31,6.83,29.92,39.5,29.92,46.24,0,7.5-22.16,40.59-20.94,42.13A8,8,0,0,1,227.08,172.55Z"/></svg>`,
-    editOptions: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
-  };
-  mkItem(ICON.rename, 'Rename', () => {
-    requestHeaderRename(f.name);
-    ctx.mutate({ ...ctx.getBoard() });
-  }, { disabled: isLockedName });
-  if (f.type === 'status' || f.type === 'tags') {
-    mkItem(ICON.editOptions, 'Edit options', () => {
-      openStatusOptionsEditor(anchor, ctx.getBoard, f.name, ctx.mutate);
-    });
-  }
-  mkItem(ICON.sortAsc, 'Sort ascending', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
-    ctx.mutate(b2);
-  });
-  mkItem(ICON.sortDesc, 'Sort descending', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
-    ctx.mutate(b2);
-  });
-  mkItem(ICON.sortClear, 'Clear sort', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewSort(b2, 'table', null);
-    ctx.mutate(b2);
-  });
   const tableGroupBy = ctx.getBoard().views.find(x => x.name === 'table')?.groupBy;
-  if (tableGroupBy === f.name) {
-    mkItem(ICON.group, 'Remove grouping', () => {
-      collapsedGroups.clear();
-      const cur = ctx.getBoard();
-      const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-      setViewGroup(b2, 'table', null);
-      ctx.mutate(b2);
-    });
-  } else {
-    mkItem(ICON.group, 'Group by this', () => {
-      collapsedGroups.clear();
-      const cur = ctx.getBoard();
-      const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-      setViewGroup(b2, 'table', f.name);
-      ctx.mutate(b2);
-    });
-  }
-  mkItem(ICON.resetWidth, 'Reset column width', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewWidth(b2, 'table', f.name, null);
-    ctx.mutate(b2);
-  });
-  mkItem(ICON.hide, 'Hide column', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    hideFieldInView(b2, 'table', f.name);
-    ctx.mutate(b2);
-  });
-  document.body.appendChild(menu);
-  const placement: PlacementHandle = placeFloating(menu, anchor);
-  const close = (e: MouseEvent) => {
-    if (!menu.contains(e.target as Node)) {
-      placement.destroy();
-      menu.remove();
-      document.removeEventListener('mousedown', close, true);
-      currentColumnMenuOutside = null;
-    }
-  };
-  currentColumnMenuOutside = close;
-  document.addEventListener('mousedown', close, true);
+
+  const items = [
+    {
+      icon: COL_MENU_ICONS.rename,
+      label: 'Rename',
+      disabled: isLockedName,
+      onSelect: () => {
+        requestHeaderRename(f.name);
+        ctx.mutate({ ...ctx.getBoard() });
+      },
+    },
+    ...(f.type === 'status' || f.type === 'tags' ? [{
+      icon: COL_MENU_ICONS.editOptions,
+      label: 'Edit options',
+      onSelect: () => {
+        openStatusOptionsEditor(anchor, ctx.getBoard, f.name, ctx.mutate);
+      },
+    }] : []),
+    {
+      icon: COL_MENU_ICONS.sortAsc,
+      label: 'Sort ascending',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
+        ctx.mutate(b2);
+      },
+    },
+    {
+      icon: COL_MENU_ICONS.sortDesc,
+      label: 'Sort descending',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
+        ctx.mutate(b2);
+      },
+    },
+    {
+      icon: COL_MENU_ICONS.sortClear,
+      label: 'Clear sort',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        setViewSort(b2, 'table', null);
+        ctx.mutate(b2);
+      },
+    },
+    tableGroupBy === f.name
+      ? {
+          icon: COL_MENU_ICONS.group,
+          label: 'Remove grouping',
+          onSelect: () => {
+            collapsedGroups.clear();
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewGroup(b2, 'table', null);
+            ctx.mutate(b2);
+          },
+        }
+      : {
+          icon: COL_MENU_ICONS.group,
+          label: 'Group by this',
+          onSelect: () => {
+            collapsedGroups.clear();
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewGroup(b2, 'table', f.name);
+            ctx.mutate(b2);
+          },
+        },
+    {
+      icon: COL_MENU_ICONS.resetWidth,
+      label: 'Reset column width',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        setViewWidth(b2, 'table', f.name, null);
+        ctx.mutate(b2);
+      },
+    },
+    {
+      icon: COL_MENU_ICONS.hide,
+      label: 'Hide column',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        hideFieldInView(b2, 'table', f.name);
+        ctx.mutate(b2);
+      },
+    },
+  ];
+
+  createMenu({ className: 'bd-col-menu' }).open(anchor, [{ items }]);
 }
 
 function applySort(cards: Card[], v: ViewDef, b: Board): Card[] {
@@ -1227,18 +1231,15 @@ function startOfToday(): number {
 }
 
 function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
+  const popover = createPopover({ className: 'bd-date-popover' });
   const input = document.createElement('input');
   input.type = 'date';
   input.value = card.values[field.name] ?? '';
   input.className = 'bd-date-input';
-  document.body.appendChild(input);
-  const placement = placeFloating(input, anchor);
-  input.focus();
+  popover.el.appendChild(input);
   const commit = () => {
     const v = input.value;
-    placement.destroy();
-    input.remove();
-    document.removeEventListener('mousedown', onOutside, true);
+    popover.close();
     if (v !== (card.values[field.name] ?? '')) {
       const cur = ctx.getBoard();
       ctx.mutate({
@@ -1251,39 +1252,24 @@ function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: B
       });
     }
   };
-  const onOutside = (e: MouseEvent) => { if (e.target !== input) commit(); };
   input.addEventListener('change', commit);
-  document.addEventListener('mousedown', onOutside, true);
+  input.addEventListener('blur', commit);
+  popover.open(anchor);
+  input.focus();
 }
 
-let currentStatusOutside: ((e: MouseEvent) => void) | null = null;
-
 function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
-  document.querySelectorAll('.board-status-dropdown').forEach((n) => n.remove());
-  if (currentStatusOutside) {
-    document.removeEventListener('mousedown', currentStatusOutside, true);
-    currentStatusOutside = null;
-  }
-  const pop = document.createElement('div');
-  pop.className = 'board-status-dropdown';
-
-  let placement: PlacementHandle;
-
-  function closeOnOutside(e: MouseEvent): void {
-    if (!pop.contains(e.target as Node)) {
-      placement.destroy();
-      pop.remove();
-      document.removeEventListener('mousedown', closeOnOutside, true);
-      currentStatusOutside = null;
-    }
-  }
+  // Create a fresh popover each call — the registry (createPopover) closes any
+  // previously-open popover when open() is called, so we don't need a singleton.
+  const popover = createPopover({ className: 'board-status-dropdown' });
 
   for (const col of getStatusOptions(ctx.getBoard(), field.name)) {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'board-status-option';
     item.appendChild(buildChip(col.name, col.color));
-    item.addEventListener('click', (e) => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const cur = ctx.getBoard();
       ctx.mutate({
@@ -1294,16 +1280,12 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
             : c,
         ),
       });
-      placement.destroy();
-      pop.remove();
-      document.removeEventListener('mousedown', closeOnOutside, true);
+      popover.close();
     });
-    pop.appendChild(item);
+    popover.el.appendChild(item);
   }
-  document.body.appendChild(pop);
-  placement = placeFloating(pop, anchor);
-  currentStatusOutside = closeOnOutside;
-  document.addEventListener('mousedown', closeOnOutside, true);
+
+  popover.open(anchor);
 }
 
 function beginInlineText(
