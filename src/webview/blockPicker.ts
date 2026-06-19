@@ -3,6 +3,7 @@ import { saveImageBytes, pickProjectImage, embedImageFromClipboard } from './ima
 import {
   convertibleTargets,
   searchBlockActions,
+  turnIntoFlyoutItems,
   type ActionId,
 } from './blockActions';
 import { parseBoardSource, duplicateBoardSource, mintBoardId } from './boardModel';
@@ -779,8 +780,9 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     back.addEventListener('mousedown', (e) => { e.preventDefault(); closeTurnInto(); });
     list.appendChild(back);
 
+    const { targets, aiItems: allAi } = turnIntoFlyoutItems(BLOCK_DEFS);
     const q = input.value.toLowerCase().trim();
-    const items = convertibleTargets(BLOCK_DEFS).filter(
+    const items = targets.filter(
       t => !q || t.label.toLowerCase().includes(q) ||
            t.description.toLowerCase().includes(q) ||
            (t.aliases ?? []).some(a => a.toLowerCase().includes(q)),
@@ -789,13 +791,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
     });
 
-    // Skip AI targets that already have a deterministic Turn-into converter
-    // (Table, Board: Table) — offering an AI duplicate next to the real
-    // converter is confusing and routes through the example-seeded AI prompt.
-    const deterministicIds = new Set(convertibleTargets(BLOCK_DEFS).map((t) => t.id));
-    const aiItems = AI_TRANSFORMS.filter(
-      (t) => !deterministicIds.has(t.id) && (!q || t.label.toLowerCase().includes(q)),
-    );
+    const aiItems = allAi.filter((t) => !q || t.label.toLowerCase().includes(q));
     if (aiItems.length) {
       const sub = document.createElement('div');
       sub.className = 'block-picker-section-label';

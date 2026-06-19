@@ -1,4 +1,5 @@
 import type { BlockDef } from './blockPicker';
+import { AI_TRANSFORMS, type AiTransform } from './aiTransforms';
 
 export type ActionId = 'turn-into' | 'duplicate' | 'delete';
 
@@ -59,4 +60,14 @@ export function searchBlockActions(query: string, defs: BlockDef[]): ActionSearc
     t => matches(q, t.label, t.description, ...(t.aliases ?? [])),
   );
   return { actions, targets };
+}
+
+// The Turn-into flyout's contents: every deterministic convert target, plus
+// the AI transforms that DON'T duplicate one of those targets (offering an AI
+// "Table" next to the real Table converter is confusing).
+export function turnIntoFlyoutItems(defs: BlockDef[]): { targets: BlockDef[]; aiItems: AiTransform[] } {
+  const targets = convertibleTargets(defs);
+  const deterministic = new Set(targets.map(t => t.id));
+  const aiItems = AI_TRANSFORMS.filter(a => !deterministic.has(a.id));
+  return { targets, aiItems };
 }
