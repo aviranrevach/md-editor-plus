@@ -1890,8 +1890,9 @@ html.source-full-width #source-view {
   position: fixed;
   z-index: 998;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
+  padding-top: 1px;
   padding-right: 4px;
   cursor: grab;
   opacity: 1;
