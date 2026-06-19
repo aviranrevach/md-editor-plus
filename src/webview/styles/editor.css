@@ -112,6 +112,9 @@ body {
   user-select: none;
   transition: color 120ms ease, opacity 120ms ease;
 }
+/* `.hidden`/[hidden] otherwise loses to the explicit display above — needed so
+   the read-only pill can replace the save indicator (c44). */
+.save-indicator[hidden] { display: none; }
 .save-ind-saved    { color: var(--save-ok, #2e9e5b); }
 .save-ind-unsaved  { color: var(--save-warn, #c9821f); }
 .save-ind-saving   { color: var(--toolbar-fg-muted, #8a8a8a); }
