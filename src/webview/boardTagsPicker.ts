@@ -85,6 +85,4 @@ export function openTagsPicker(
   render();
   popover.open(anchor);
   input.focus();
-
-  function close() { popover.close(); }
 }
