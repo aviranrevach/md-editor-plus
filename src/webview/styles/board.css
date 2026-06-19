@@ -221,6 +221,28 @@
 .is-scroll:hover::-webkit-scrollbar-thumb { background: var(--board-border); }
 .is-scroll::-webkit-scrollbar-thumb:hover { background: #9aa2ad; }
 
+/* ===== Shared Menu component (menu.ts) ===== */
+.mp-menu {
+  min-width: 200px; background: var(--bg); color: var(--text, inherit);
+  border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08); z-index: 1100;
+}
+.mp-menu-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 10px; border: 0; border-radius: 6px; background: transparent;
+  font: inherit; font-size: 13px; color: inherit; text-align: left; cursor: pointer;
+}
+.mp-menu-item:hover:not(:disabled) { background: var(--block-hover, rgba(127,127,127,0.10)); }
+.mp-menu-item:disabled { opacity: 0.45; cursor: default; }
+.mp-menu-item.is-danger { color: #d23f3f; }
+.mp-menu-icon { width: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary, #888); flex-shrink: 0; }
+.mp-menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-menu-check, .mp-menu-caret { color: var(--text-secondary, #888); flex-shrink: 0; }
+.mp-menu-trailing { flex-shrink: 0; }
+.mp-menu-section { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary, #888); padding: 6px 10px 4px; }
+.mp-menu-divider { height: 1px; background: var(--border); margin: 5px 4px; }
+.mp-menu-back .mp-menu-label { color: var(--text-secondary, #888); }
+
 /* ===== Single column ===== */
 .board-column {
   flex: 0 0 244px;
