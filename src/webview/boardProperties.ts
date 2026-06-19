@@ -4,6 +4,7 @@ import { COLOR_TOKENS_PUBLIC } from './boardModel';
 import { FIELD_TYPE_ICONS, FIELD_TYPE_LABELS } from './boardIcons';
 import { setViewColumns, hideFieldInView, showFieldInView } from './boardOps';
 import { buildOptionsEditor, openStatusOptionsEditor } from './boardStatusOptions';
+import { placeFloating } from './menuPosition';
 
 const DEFAULT_STATUS_OPTIONS: ColumnDef[] = [
   { name: 'Todo',        color: 'blue' },
@@ -263,10 +264,7 @@ export function openFieldActionMenu(
   menu.className = 'board-field-action-menu';
   document.body.appendChild(menu);
 
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const placement = placeFloating(menu, anchor);
 
   const addItem = (icon: string, label: string, variant: '' | 'danger', disabled: boolean, handler: () => void) => {
     const it = document.createElement('button');
@@ -325,19 +323,11 @@ export function openFieldActionMenu(
     if (!menu.contains(e.target as Node) && e.target !== anchor) close();
   }
   function close() {
+    placement.destroy();
     menu.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }
   setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
-  // After positioning, nudge the menu horizontally if it would overflow the viewport.
-  requestAnimationFrame(() => {
-    const r = menu.getBoundingClientRect();
-    const overflow = r.right - window.innerWidth;
-    if (overflow > 0) {
-      menu.style.left = `${Math.max(8, parseFloat(menu.style.left) - overflow - 8)}px`;
-    }
-  });
 }
 
 // ===== Properties popover (the chrome ⚙ icon target) =====
@@ -418,7 +408,7 @@ export function openPropertiesMenu(
   const menu = document.createElement('div');
   menu.className = 'board-properties-menu';
   document.body.appendChild(menu);
-  positionAnchored(menu, anchor);
+  const placement = placeFloating(menu, anchor, { preferX: 'right' });
 
   // Legacy free-floating popover (no live caller in chrome path; kept for
   // back-compat). Snapshot the board once since this path has no live getter.
@@ -436,27 +426,11 @@ export function openPropertiesMenu(
     closeMenu();
   }
   function closeMenu() {
+    placement.destroy();
     menu.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }
   setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
-  // Edge-aware repositioning so the popover never overflows the viewport on
-  // either side. The menu is right-anchored via transform: translateX(-100%);
-  // if the resulting left edge goes off-screen, switch off the transform and
-  // pin the left edge to the viewport margin.
-  requestAnimationFrame(() => {
-    const r = menu.getBoundingClientRect();
-    const margin = 8;
-    if (r.left < margin) {
-      menu.style.transform = '';
-      menu.style.left = `${window.scrollX + margin}px`;
-    } else if (r.right > window.innerWidth - margin) {
-      // Unlikely (we anchor right) but guard anyway.
-      menu.style.transform = '';
-      menu.style.left = `${window.scrollX + window.innerWidth - r.width - margin}px`;
-    }
-  });
 }
 
 function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onChange: (next: Board) => void, viewName: string): HTMLElement {
@@ -760,15 +734,4 @@ export function promptNewField(
     document.addEventListener('mousedown', onOutside, true);
     document.addEventListener('keydown', onKey, true);
   }, 0);
-}
-
-function positionAnchored(menu: HTMLElement, anchor: HTMLElement): void {
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  // Right-anchored: align popover's right edge to the anchor's right edge so
-  // it grows to the LEFT (the Properties button sits at the far right of the
-  // chrome row, so opening leftward keeps it on-screen).
-  menu.style.left = `${rect.right + window.scrollX}px`;
-  menu.style.transform = 'translateX(-100%)';
 }
