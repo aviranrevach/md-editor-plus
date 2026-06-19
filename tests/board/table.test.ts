@@ -767,6 +767,85 @@ describe('column-header ⋯ menu Edit options item', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// 13. Row grip actions menu
+// ---------------------------------------------------------------------------
+
+// Helper: simulate a real click on the grip — mousedown + mouseup + the native
+// `click` event the browser fires afterwards. The menu opens on the `click`
+// event (the robust, drift-tolerant path), so the click event is the part that
+// matters; mousedown/mouseup are included so the drag wiring sees a realistic
+// gesture.
+function clickNoDrag(el: Element): void {
+  el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 5, clientY: 5 }));
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }));
+}
+
+describe('row grip actions menu', () => {
+  it('opens a menu with the full action set on grip click (unsorted)', () => {
+    const { ctx } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    clickNoDrag(grip);
+    const labels = Array.from(document.querySelectorAll('.mp-menu .mp-menu-label'))
+      .map(el => el.textContent);
+    expect(labels).toEqual([
+      'Open in side panel', 'Duplicate', 'Insert row above', 'Insert row below', 'Delete row',
+    ]);
+  });
+
+  it('opens on the native click event even after pointer drift (regression: c36 grip)', () => {
+    // Real grip clicks drift a few px; the menu must open on the browser `click`
+    // event, NOT a sub-threshold mouseup, or the menu rarely appears.
+    const { ctx } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 11, clientY: 5 })); // 6px drift
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 11, clientY: 5 }));
+    expect(document.querySelectorAll('.mp-menu .mp-menu-label').length).toBe(0); // mouseup alone must NOT open it
+    grip.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 11, clientY: 5 }));
+    expect(document.querySelectorAll('.mp-menu .mp-menu-label').length).toBeGreaterThan(0); // the click does
+  });
+
+  it('Delete row removes the card', () => {
+    const { ctx, boardRef } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const firstGrip = ctx.root.querySelector('tr.bd-table-row .bd-row-grip')!;
+    clickNoDrag(firstGrip);
+    const del = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
+      .find(el => el.textContent?.includes('Delete row'))!;
+    del.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(boardRef.current.cards.map(c => c.id)).toEqual(['c2']);
+  });
+
+  it('Duplicate adds a clone directly after the source', () => {
+    const { ctx, boardRef } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const firstGrip = ctx.root.querySelector('tr.bd-table-row .bd-row-grip')!;
+    clickNoDrag(firstGrip);
+    const dup = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
+      .find(el => el.textContent?.includes('Duplicate'))!;
+    dup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(boardRef.current.cards).toHaveLength(3);
+    expect(boardRef.current.cards[0].id).toBe('c1');
+    expect(boardRef.current.cards[1].id).not.toBe('c1'); // clone sits after source
+  });
+
+  it('omits Insert items and drops drag affordance when the view is sorted', () => {
+    const board = makeBoard({ views: [{ name: 'table', sort: { field: 'Title', dir: 'asc' } }] });
+    const { ctx } = makeCtx(board);
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    expect(grip.hasAttribute('data-board-drag')).toBe(false);
+    clickNoDrag(grip);
+    const labels = Array.from(document.querySelectorAll('.mp-menu .mp-menu-label'))
+      .map(el => el.textContent);
+    expect(labels).toEqual(['Open in side panel', 'Duplicate', 'Delete row']);
+  });
+});
+
 describe('id cell is read-only (c17)', () => {
   function boardWithId(): Board {
     return {
