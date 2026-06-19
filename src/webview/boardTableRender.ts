@@ -26,6 +26,7 @@ import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
 import { imageFilesFrom } from './extensions/imagePasteDrop';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 interface Group { key: string; cards: Card[]; }
 
@@ -982,29 +983,11 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     hideFieldInView(b2, 'table', f.name);
     ctx.mutate(b2);
   });
-  const r = anchor.getBoundingClientRect();
-  menu.style.position = 'fixed';
-  menu.style.left = `${r.left}px`;
-  menu.style.top  = `${r.bottom + 4}px`;
   document.body.appendChild(menu);
-  // Edge-aware repositioning: after the menu is sized by the browser, check
-  // for viewport overflow on right and bottom; flip / clamp so it stays
-  // fully visible. The rightmost columns frequently hit this.
-  requestAnimationFrame(() => {
-    const menuRect = menu.getBoundingClientRect();
-    const margin = 8;
-    if (menuRect.right > window.innerWidth - margin) {
-      // Align the menu's RIGHT edge with the anchor's right edge.
-      const left = Math.max(margin, r.right - menuRect.width);
-      menu.style.left = `${left}px`;
-    }
-    if (menuRect.bottom > window.innerHeight - margin) {
-      const top = Math.max(margin, r.top - menuRect.height - 4);
-      menu.style.top = `${top}px`;
-    }
-  });
+  const placement: PlacementHandle = placeFloating(menu, anchor);
   const close = (e: MouseEvent) => {
     if (!menu.contains(e.target as Node)) {
+      placement.destroy();
       menu.remove();
       document.removeEventListener('mousedown', close, true);
       currentColumnMenuOutside = null;
@@ -1288,6 +1271,7 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
 
   function closeOnOutside(e: MouseEvent): void {
     if (!pop.contains(e.target as Node)) {
+      placement.destroy();
       pop.remove();
       document.removeEventListener('mousedown', closeOnOutside, true);
       currentStatusOutside = null;
@@ -1310,16 +1294,14 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
             : c,
         ),
       });
+      placement.destroy();
       pop.remove();
       document.removeEventListener('mousedown', closeOnOutside, true);
     });
     pop.appendChild(item);
   }
-  const r = anchor.getBoundingClientRect();
-  pop.style.position = 'fixed';
-  pop.style.left = `${r.left}px`;
-  pop.style.top = `${r.bottom + 4}px`;
   document.body.appendChild(pop);
+  const placement: PlacementHandle = placeFloating(pop, anchor);
   currentStatusOutside = closeOnOutside;
   document.addEventListener('mousedown', closeOnOutside, true);
 }
