@@ -80,19 +80,23 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
 
   function reposition(): void {
     ro?.disconnect();
-    el.classList.remove('is-scroll');
-    el.style.maxHeight = 'none';
     const a = anchor.getBoundingClientRect();
+    // Natural (uncapped) border-box height WITHOUT removing the cap: scrollHeight
+    // is the full content height even while max-height + overflow are applied, so
+    // we never strip .is-scroll to remeasure. Stripping it every reposition made
+    // the native scrollbar flash (dark) on each call — visible during a window
+    // drag, where reposition fires continuously.
+    const naturalHeight = el.scrollHeight + (el.offsetHeight - el.clientHeight);
     const p = computePlacement({
       anchor: { top: a.top, left: a.left, width: a.width, height: a.height },
-      size: { width: el.offsetWidth, height: el.offsetHeight },
+      size: { width: el.offsetWidth, height: naturalHeight },
       viewport: { width: window.innerWidth, height: window.innerHeight },
       margin: opts.margin, gap: opts.gap, preferX: opts.preferX,
     });
     el.style.left = `${p.left}px`;
     el.style.top = `${p.top}px`;
     if (p.scroll) { el.classList.add('is-scroll'); el.style.maxHeight = `${p.maxHeight ?? 0}px`; }
-    else { el.style.maxHeight = ''; }
+    else { el.classList.remove('is-scroll'); el.style.maxHeight = ''; }
     if (ro) {
       requestAnimationFrame(() => {
         if (!el.isConnected || !ro) return;
