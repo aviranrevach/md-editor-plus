@@ -225,3 +225,28 @@ describe('placeFloating popovers must not carry their own scroll (c34)', () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Migrated menus route through Popover/Menu component (popover ticket)
+//
+// After migration, these files must import from './popover' or './menu',
+// never call placeFloating() directly (the component owns it), and never
+// hand-roll capture-phase dismissal via addEventListener.
+// ---------------------------------------------------------------------------
+
+describe('migrated menus route through the Popover/Menu component (popover ticket)', () => {
+  const VIA_COMPONENT = [
+    'boardTagsPicker.ts','blockPicker.ts','boardTableRender.ts','boardKanbanRender.ts',
+    'boardProperties.ts','boardStatusOptions.ts','boardImagePicker.ts','calloutMenu.ts',
+    'boardChrome.ts','boardFilterPanel.ts',
+  ];
+  const dir = path.join(__dirname, '..', 'src', 'webview');
+  for (const f of VIA_COMPONENT) {
+    test(`${f} uses createPopover/createMenu, not raw placeFloating or hand-rolled dismissal`, () => {
+      const src = fs.readFileSync(path.join(dir, f), 'utf8');
+      expect(src).toMatch(/from '\.\/(popover|menu)'/);
+      expect(src).not.toMatch(/\bplaceFloating\s*\(/);
+      expect(src).not.toMatch(/addEventListener\(\s*['"]mousedown['"][^)]*,\s*true\s*\)/);
+    });
+  }
+});
