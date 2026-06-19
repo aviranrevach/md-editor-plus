@@ -15,6 +15,8 @@ export interface Menu { readonly popover: Popover; open(anchor: HTMLElement, sec
 export function createMenu(opts: PopoverOpts = {}): Menu {
   const popover = createPopover({ ...opts, className: ['mp-menu', opts.className].filter(Boolean).join(' ') });
 
+  let stack: MenuSection[][] = [];
+
   function renderItem(item: MenuItem): HTMLElement {
     const row = document.createElement('button');
     row.type = 'button';
@@ -34,14 +36,26 @@ export function createMenu(opts: PopoverOpts = {}): Menu {
       item.trailing.addEventListener('mousedown', (e) => e.stopPropagation());
       row.appendChild(item.trailing);
     }
-    if (!item.disabled && !item.submenu) {
+    if (item.submenu) {
+      row.addEventListener('mousedown', (e) => { e.preventDefault(); stack.push(item.submenu!()); renderCurrent(); });
+    } else if (!item.disabled) {
       row.addEventListener('mousedown', (e) => { e.preventDefault(); item.onSelect?.(); popover.close(); });
     }
     return row;
   }
 
-  function render(sections: MenuSection[]): void {
+  function renderCurrent(): void {
     popover.el.innerHTML = '';
+    if (stack.length > 1) {
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.className = 'mp-menu-item mp-menu-back';
+      back.innerHTML = '<span class="mp-menu-caret mp-menu-caret-back">‹</span><span class="mp-menu-label">Back</span>';
+      back.addEventListener('mousedown', (e) => { e.preventDefault(); stack.pop(); renderCurrent(); });
+      popover.el.appendChild(back);
+      const div = document.createElement('div'); div.className = 'mp-menu-divider'; popover.el.appendChild(div);
+    }
+    const sections = stack[stack.length - 1];
     sections.forEach((section, i) => {
       if (i > 0) { const d = document.createElement('div'); d.className = 'mp-menu-divider'; popover.el.appendChild(d); }
       if (section.label) { const s = document.createElement('div'); s.className = 'mp-menu-section'; s.textContent = section.label; popover.el.appendChild(s); }
@@ -51,7 +65,7 @@ export function createMenu(opts: PopoverOpts = {}): Menu {
 
   return {
     popover,
-    open(anchor, sections) { render(sections); popover.open(anchor); },
+    open(anchor, sections) { stack = [sections]; renderCurrent(); popover.open(anchor); },
     close() { popover.close(); },
   };
 }
