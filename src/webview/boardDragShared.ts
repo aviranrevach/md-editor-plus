@@ -44,17 +44,22 @@ export function startDrag(
     onDrop:    (e: MouseEvent) => void;
     onCancel?: () => void;
     onClick?:  () => void;
+    /** Pixels of movement before this promotes to a drag (default 4). Raise it
+     *  for handles that are primarily click targets, so small click-drift isn't
+     *  misread as a drag. */
+    thresholdPx?: number;
   },
 ): () => void {
   const startX = startEvent.clientX;
   const startY = startEvent.clientY;
+  const threshold = opts.thresholdPx ?? DRAG_THRESHOLD_PX;
   let moved = false;
 
   const onMove = (e: MouseEvent) => {
     if (!moved) {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      if (Math.hypot(dx, dy) < threshold) return;
       moved = true;
     }
     opts.onMove(e);

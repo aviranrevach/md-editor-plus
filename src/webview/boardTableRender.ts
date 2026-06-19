@@ -211,7 +211,6 @@ function startRowDrag(
   ctx: BoardRendererCtx,
   groups: Group[],
   groupBy: string | undefined,
-  onClick: () => void,
 ): () => void {
   const ind = dropIndicator();
   ind.style.position = 'fixed';
@@ -252,7 +251,9 @@ function startRowDrag(
       ctx.mutate(b2);
     },
     onCancel: () => ind.remove(),
-    onClick,
+    // Primarily a click target — only treat clear movement as a drag so a
+    // normal click (with a little pointer drift) opens the menu instead.
+    thresholdPx: 8,
   });
 }
 
@@ -568,6 +569,17 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
             grip.title = 'Drag to reorder · click for actions';
           }
           grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
+          // Open the row menu on the browser-native click (matches the block
+          // handle and column-menu pattern — robust against the small pointer
+          // drift that a hand-rolled mouseup threshold would misread as a drag).
+          // After a real drag, onDrop calls suppressNextClick() so this click is
+          // swallowed and the menu does not open.
+          const gripCard = card;
+          grip.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            openRowMenu(grip, gripCard, ctx);
+          });
           gutter.appendChild(grip);
         }
         tr.appendChild(gutter);
@@ -773,18 +785,17 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       if (!card) return;
       e.preventDefault();
       e.stopPropagation();
-      const openMenu = (): void => openRowMenu(gripEl, card, ctx);
+      // The menu is opened by the grip's native `click` listener (see render).
+      // Here we only handle dragging. When the table is sorted the grip has no
+      // `data-board-drag`, so we start no drag and let the click open the menu.
       if (gripEl.hasAttribute('data-board-drag')) {
         const v = b.views.find(x => x.name === 'table');
         // First matching bucket (a multi-tag card can appear in several); moveCard
         // works by id on the global array so there's no duplication/loss.
         const group = lastGroups.find(g => g.cards.some(c => c.id === cardId)) ?? { key: '', cards: [card] };
         tr?.classList.add('bd-tr-dragging');
-        cancelRowDrag = startRowDrag(e, card, group, ctx, lastGroups, v?.groupBy, openMenu);
+        cancelRowDrag = startRowDrag(e, card, group, ctx, lastGroups, v?.groupBy);
         document.addEventListener('mouseup', () => tr?.classList.remove('bd-tr-dragging'), { once: true });
-      } else {
-        // Sorted view: no drag, but a click still opens the menu.
-        startDrag(e, { onMove: () => {}, onDrop: () => {}, onClick: openMenu });
       }
       return;
     }

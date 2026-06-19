@@ -771,10 +771,15 @@ describe('column-header ⋯ menu Edit options item', () => {
 // 13. Row grip actions menu
 // ---------------------------------------------------------------------------
 
-// Helper: simulate a plain click (mousedown + mouseup, no movement) on an element.
+// Helper: simulate a real click on the grip — mousedown + mouseup + the native
+// `click` event the browser fires afterwards. The menu opens on the `click`
+// event (the robust, drift-tolerant path), so the click event is the part that
+// matters; mousedown/mouseup are included so the drag wiring sees a realistic
+// gesture.
 function clickNoDrag(el: Element): void {
   el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
   document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 5, clientY: 5 }));
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }));
 }
 
 describe('row grip actions menu', () => {
@@ -788,6 +793,20 @@ describe('row grip actions menu', () => {
     expect(labels).toEqual([
       'Open in side panel', 'Duplicate', 'Insert row above', 'Insert row below', 'Delete row',
     ]);
+  });
+
+  it('opens on the native click event even after pointer drift (regression: c36 grip)', () => {
+    // Real grip clicks drift a few px; the menu must open on the browser `click`
+    // event, NOT a sub-threshold mouseup, or the menu rarely appears.
+    const { ctx } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 11, clientY: 5 })); // 6px drift
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 11, clientY: 5 }));
+    expect(document.querySelectorAll('.mp-menu .mp-menu-label').length).toBe(0); // mouseup alone must NOT open it
+    grip.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 11, clientY: 5 }));
+    expect(document.querySelectorAll('.mp-menu .mp-menu-label').length).toBeGreaterThan(0); // the click does
   });
 
   it('Delete row removes the card', () => {
