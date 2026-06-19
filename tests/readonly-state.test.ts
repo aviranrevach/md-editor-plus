@@ -8,12 +8,13 @@ function setup() {
   const toggleSwitch = document.createElement('button');
   const pill = document.createElement('span');
   pill.hidden = true;
+  const saveIndicator = document.createElement('span');
   const editableCalls: boolean[] = [];
   const ctrl = createReadOnlyController({
-    root, toggleSwitch, pill,
+    root, toggleSwitch, pill, saveIndicator,
     setEditable: (e) => editableCalls.push(e),
   });
-  return { root, toggleSwitch, pill, editableCalls, ctrl };
+  return { root, toggleSwitch, pill, saveIndicator, editableCalls, ctrl };
 }
 
 describe('readonlyState controller', () => {
@@ -22,18 +23,19 @@ describe('readonlyState controller', () => {
   });
 
   test('set(true) locks everything', () => {
-    const { root, toggleSwitch, pill, editableCalls, ctrl } = setup();
+    const { root, toggleSwitch, pill, saveIndicator, editableCalls, ctrl } = setup();
     ctrl.set(true);
     expect(ctrl.get()).toBe(true);
     expect(root.classList.contains('read-only')).toBe(true);
     expect(toggleSwitch.classList.contains('on')).toBe(true);
     expect(toggleSwitch.getAttribute('aria-checked')).toBe('true');
     expect(pill.hidden).toBe(false);
+    expect(saveIndicator.hidden).toBe(true); // pill replaces the save indicator
     expect(editableCalls).toEqual([false]);
   });
 
   test('set(false) unlocks everything', () => {
-    const { root, toggleSwitch, pill, editableCalls, ctrl } = setup();
+    const { root, toggleSwitch, pill, saveIndicator, editableCalls, ctrl } = setup();
     ctrl.set(true);
     ctrl.set(false);
     expect(ctrl.get()).toBe(false);
@@ -41,6 +43,7 @@ describe('readonlyState controller', () => {
     expect(toggleSwitch.classList.contains('on')).toBe(false);
     expect(toggleSwitch.getAttribute('aria-checked')).toBe('false');
     expect(pill.hidden).toBe(true);
+    expect(saveIndicator.hidden).toBe(false); // save indicator returns when editable
     expect(editableCalls).toEqual([false, true]);
   });
 

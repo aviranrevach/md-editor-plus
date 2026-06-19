@@ -2895,7 +2895,8 @@ html.read-only .block-handle { display: none !important; }
   padding: 2px 9px; font-size: 12px; font-weight: 600; cursor: pointer;
 }
 .readonly-pill[hidden] { display: none; }
-.readonly-pill svg { width: 13px; height: 13px; }
+/* Lock icon matches the label's font size exactly (1em). */
+.readonly-pill svg { width: 1em; height: 1em; }
 
 /* Read-only row in the ⋯ actions menu — push the switch to the right edge, and
    pointer-events:none lets a click anywhere on the row drive the toggle once. */

@@ -199,6 +199,7 @@ function init(): void {
     root: document.documentElement,
     toggleSwitch: readOnlyToggle,
     pill: readOnlyPill,
+    saveIndicator: document.getElementById('save-indicator'),
     setEditable: (editable) => setReadOnly(!editable),
   });
   const roNotice = createReadOnlyNotice({

@@ -12,6 +12,8 @@ export interface ReadOnlyDeps {
   toggleSwitch: HTMLElement | null;
   /** the toolbar pill; shown only while read-only; null-safe. */
   pill: HTMLElement | null;
+  /** the save indicator; hidden while read-only so the pill takes its place. */
+  saveIndicator?: HTMLElement | null;
   /** flips the editor's editability (wraps editor.setEditable). */
   setEditable: (editable: boolean) => void;
 }
@@ -32,6 +34,8 @@ export function createReadOnlyController(deps: ReadOnlyDeps): ReadOnlyController
       deps.toggleSwitch.setAttribute('aria-checked', String(on));
     }
     if (deps.pill) deps.pill.hidden = !on;
+    // The pill replaces the save indicator while read-only (they share the spot).
+    if (deps.saveIndicator) deps.saveIndicator.hidden = on;
     deps.setEditable(!on);
   }
 
