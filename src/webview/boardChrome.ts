@@ -7,6 +7,7 @@ import type { BoardRendererCtx } from './boardBlock';
 import { renderPropertiesContent, promptNewField } from './boardProperties';
 import { requestHeaderRename } from './boardTableRender';
 import { createFilterPill, type FilterPill } from './boardFilterPanel';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 export interface ChromeHandle {
   el: HTMLElement;
@@ -174,6 +175,7 @@ export function buildHeaderMore(
   }
 
   let removeOutside: (() => void) | null = null;
+  let placement: PlacementHandle | null = null;
 
   // Single, stable renderPropertiesContent instance per menu open. refreshProps
   // calls its rebuild() to update the field list in-place, preserving any
@@ -194,7 +196,9 @@ export function buildHeaderMore(
   }
 
   function openMenu(): void {
+    placement?.destroy();
     menu.classList.remove('bd-hidden');
+    placement = placeFloating(menu, btn, { preferX: 'right' });
     btn.setAttribute('aria-expanded', 'true');
     refreshViewSeg();
     // Force a fresh render on each open in case viewName changed (kanban↔table).
@@ -215,6 +219,8 @@ export function buildHeaderMore(
 
   function closeMenu(): void {
     menu.classList.add('bd-hidden');
+    placement?.destroy();
+    placement = null;
     btn.setAttribute('aria-expanded', 'false');
     propsHost.innerHTML = '';
     propsHandle = null;

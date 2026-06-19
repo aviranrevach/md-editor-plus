@@ -7,6 +7,7 @@ import type { BoardRendererCtx } from './boardBlock';
 import type { Board, ColumnDef } from './boardModel';
 import { getStatusOptions } from './boardModel';
 import { applyFilter, EMPTY_VALUE } from './boardFilter';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 interface FilterableField { name: string; values: ColumnDef[]; }
 
@@ -66,9 +67,12 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
   wrap.appendChild(panel);
 
   let outsideHandler: ((e: MouseEvent) => void) | null = null;
+  let placement: PlacementHandle | null = null;
 
   function closePanel(): void {
     panel.classList.add('bd-hidden');
+    placement?.destroy();
+    placement = null;
     pill.classList.remove('is-open');
     if (outsideHandler) {
       document.removeEventListener('mousedown', outsideHandler, true);
@@ -78,7 +82,9 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
 
   function openPanel(): void {
     buildPanel();
+    placement?.destroy();
     panel.classList.remove('bd-hidden');
+    placement = placeFloating(panel, pill, { preferX: 'right' });
     pill.classList.add('is-open');
     outsideHandler = (e: MouseEvent) => {
       if (!wrap.contains(e.target as Node)) closePanel();

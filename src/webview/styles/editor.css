@@ -279,8 +279,6 @@ body {
 /* Settings dropdown panel */
 .settings-panel {
   position: fixed;
-  top: 50px;
-  right: 16px;
   width: 280px;
   background: var(--bg);
   border: 1px solid var(--border);
