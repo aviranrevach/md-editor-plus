@@ -2235,6 +2235,13 @@ html.source-full-width #source-view {
   opacity: 0.85;
 }
 
+/* Turn-into flyout: a child of the action menu, offset to its right. Reuses
+   .block-picker chrome; no search field, no footer of its own. */
+.block-picker-flyout {
+  width: 230px;
+  margin-left: 8px;   /* visual gap from the action panel; placeFloating sets left/top */
+}
+
 .block-picker-emoji-icon {
   display: inline-flex;
   align-items: center;

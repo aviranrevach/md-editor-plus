@@ -597,11 +597,16 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
   let popover: Popover | null = null;
   let actionMode = false;   // opened over a block (dragger) -> show action menu
-  let turnIntoOpen = false; // inside the flat "Turn into" target list
   // Each rendered row registers its activation callback here, indexed to match
   // the DOM order used by arrow-key navigation. Lets Enter activate any row
   // type (action OR convert target) without a per-type branch in keydown.
   let activeRows: Array<() => void> = [];
+
+  // --- flyout (Turn-into child popover) ---
+  let flyoutPop: Popover | null = null;
+  let flyoutList: HTMLElement | null = null;
+  let flyoutRows: Array<() => void> = [];
+  let flyoutIdx = 0;
 
   function isActiveItem(block: BlockDef): boolean {
     const ab = context.activeBlock;
@@ -631,8 +636,72 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   const footVerb = el.querySelector<HTMLElement>('.bp-foot-verb')!;
   const footHints = el.querySelector<HTMLElement>('.block-picker-foot-hints')!;
 
+  function ensureFlyout(): Popover {
+    if (flyoutPop) return flyoutPop;
+    flyoutPop = createPopover({
+      className: 'block-picker block-picker-flyout',
+      parent: popover!,            // child: keeps the action menu open, shares dismissal
+      preferX: 'right',
+      maxHeight: 440,
+    });
+    flyoutList = document.createElement('div');
+    flyoutList.className = 'block-picker-list';
+    flyoutPop.el.appendChild(flyoutList);
+    return flyoutPop;
+  }
+
+  function isFlyoutOpen(): boolean { return !!flyoutPop?.isOpen(); }
+
   function currentSource(): BlockDef[] {
     return drillParent?.subItems ?? BLOCK_DEFS;
+  }
+
+  function renderFlyout(): void {
+    const flist = flyoutList!;
+    flist.innerHTML = '';
+    flyoutRows = [];
+    const { targets, aiItems } = turnIntoFlyoutItems(BLOCK_DEFS);
+
+    const makeFlyRow = (iconHtml: string, label: string, activate: () => void, current = false) => {
+      const row = document.createElement('div');
+      row.className = 'block-picker-item';
+      if (current) row.classList.add('current');
+      row.dataset.idx = String(flyoutRows.length);
+      const check = current ? '<span class="block-picker-current-mark">✓</span>' : '';
+      row.innerHTML = `<span class="block-picker-icon">${iconHtml}</span><span class="block-picker-label">${label}</span>${check}`;
+      row.addEventListener('mousedown', (e) => { e.preventDefault(); activate(); });
+      flist.appendChild(row);
+      flyoutRows.push(activate);
+    };
+
+    targets.forEach((t) => makeFlyRow(t.iconHtml, t.label, () => convertActive(t), isActiveItem(t)));
+    if (aiItems.length) {
+      const sub = document.createElement('div');
+      sub.className = 'block-picker-section-label';
+      sub.textContent = '✨ Using AI';
+      flist.appendChild(sub);
+      aiItems.forEach((t) => makeFlyRow(t.iconHtml, t.label, () => convertActiveWithAi(t.id, t.label)));
+    }
+    flyoutIdx = 0;
+    updateFlyoutActive();
+  }
+
+  function updateFlyoutActive(): void {
+    flyoutList!.querySelectorAll<HTMLElement>('.block-picker-item').forEach((row, i) => {
+      row.classList.toggle('active', i === flyoutIdx);
+    });
+  }
+
+  function openFlyout(rowEl: HTMLElement): void {
+    ensureFlyout();
+    if (!flyoutPop!.isOpen()) flyoutPop!.open(rowEl);  // positions right/flip-left via placeFloating
+    renderFlyout();
+    footVerb.textContent = footerCloseVerb(true);      // action-panel footer: esc Back
+  }
+
+  function closeFlyout(): void {
+    if (flyoutPop?.isOpen()) flyoutPop.close();
+    footVerb.textContent = footerCloseVerb(false);     // esc Close
   }
 
   function renderList(items: BlockDef[]): void {
@@ -719,7 +788,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function runAction(id: ActionId): void {
-    if (id === 'turn-into') { openTurnInto(); return; }
+    if (id === 'turn-into') { const row = list.querySelector<HTMLElement>('[data-turn-into="1"]'); if (row) openFlyout(row); return; }
     if (id === 'delete')    { deleteActiveBlock(); return; }
     if (id === 'duplicate') { duplicateActiveBlock(); return; }
   }
@@ -738,9 +807,17 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     const { actions, targets } = searchBlockActions(input.value, BLOCK_DEFS);
 
     actions.forEach((a) => {
-      makeRow(ACTION_ICONS[a.id], a.label, () => runAction(a.id),
-        { caret: a.id === 'turn-into' && !input.value.trim(), danger: a.id === 'delete' });
-      if (a.id === 'turn-into' && !input.value.trim() && actions.length > 1) {
+      const isTurn = a.id === 'turn-into' && !input.value.trim();
+      const row = makeRow(ACTION_ICONS[a.id], a.label,
+        () => runAction(a.id),
+        { caret: isTurn, danger: a.id === 'delete' });
+      if (isTurn) {
+        row.dataset.turnInto = '1';
+        row.addEventListener('mouseenter', () => openFlyout(row));
+      } else {
+        row.addEventListener('mouseenter', () => closeFlyout());
+      }
+      if (isTurn && actions.length > 1) {
         const sep = document.createElement('div');
         sep.className = 'block-picker-sep';
         list.appendChild(sep);
@@ -768,58 +845,6 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     }
     activeIdx = 0;
     updateActive();
-  }
-
-  // The flat "Turn into" target list (reached via the Turn into row).
-  function renderTurnInto(): void {
-    list.innerHTML = '';
-    activeRows = [];
-    const back = document.createElement('div');
-    back.className = 'block-picker-back';
-    back.innerHTML = `<span class="block-picker-back-icon">‹</span><span class="block-picker-back-label">Turn into</span>`;
-    back.addEventListener('mousedown', (e) => { e.preventDefault(); closeTurnInto(); });
-    list.appendChild(back);
-
-    const { targets, aiItems: allAi } = turnIntoFlyoutItems(BLOCK_DEFS);
-    const q = input.value.toLowerCase().trim();
-    const items = targets.filter(
-      t => !q || t.label.toLowerCase().includes(q) ||
-           t.description.toLowerCase().includes(q) ||
-           (t.aliases ?? []).some(a => a.toLowerCase().includes(q)),
-    );
-    items.forEach((t) => {
-      makeRow(t.iconHtml, t.label, () => convertActive(t), { current: isActiveItem(t) });
-    });
-
-    const aiItems = allAi.filter((t) => !q || t.label.toLowerCase().includes(q));
-    if (aiItems.length) {
-      const sub = document.createElement('div');
-      sub.className = 'block-picker-section-label';
-      sub.textContent = '✨ Using AI';
-      list.appendChild(sub);
-      aiItems.forEach((t) => {
-        makeRow(t.iconHtml, t.label, () => convertActiveWithAi(t.id, t.label));
-      });
-    }
-
-    activeIdx = 0;
-    updateActive();
-  }
-
-  function openTurnInto(): void {
-    turnIntoOpen = true;
-    input.value = '';
-    input.placeholder = 'Turn into…';
-    renderTurnInto();
-    input.focus();
-  }
-
-  function closeTurnInto(): void {
-    turnIntoOpen = false;
-    input.value = '';
-    input.placeholder = 'Search actions…';
-    renderActionMenu();
-    input.focus();
   }
 
   // Convert the active block into the target type, or no-op if it already is.
@@ -973,8 +998,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
   input.addEventListener('input', () => {
     if (actionMode) {
-      if (turnIntoOpen) renderTurnInto();
-      else renderActionMenu();
+      closeFlyout();
+      renderActionMenu();
       return;
     }
     filtered = filterBlocks(input.value, currentSource());
@@ -999,10 +1024,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
         select(filtered[activeIdx]);
       }
     } else if (e.key === 'Escape') {
-      if (actionMode && turnIntoOpen) {
-        e.preventDefault();
-        closeTurnInto();
-      } else if (drillParent) {
+      if (drillParent) {
         drillParent = null;
         input.placeholder = 'Filter blocks…';
         input.value = '';
@@ -1021,7 +1043,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     el.classList.remove('open');
     drillParent = null;
     actionMode = false;
-    turnIntoOpen = false;
+    closeFlyout();
     context = {};
     input.value = '';
     searchEl.style.display = '';
@@ -1031,7 +1053,6 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     currentPos = insertPos;
     context = ctx;
     drillParent = null;
-    turnIntoOpen = false;
     searchEl.style.display = '';
     input.value = '';
 
