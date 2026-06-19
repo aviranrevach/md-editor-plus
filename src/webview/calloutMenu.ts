@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 interface CalloutTypeDef {
   id: 'note' | 'tip' | 'important' | 'warning' | 'caution';
@@ -33,6 +34,7 @@ export interface CalloutMenu {
 
 export function createCalloutMenu(editor: Editor): CalloutMenu {
   let pos = 0;
+  let placement: PlacementHandle | null = null;
 
   const el = document.createElement('div');
   el.className = 'callout-menu';
@@ -218,18 +220,7 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
       const currentEmoji = (node.attrs.emoji as string) ?? DEFAULT_EMOJI_BY_TYPE[currentType];
       render(currentType, currentEmoji);
       el.classList.add('open');
-      const rect = anchorEl.getBoundingClientRect();
-      el.style.left = `${rect.left}px`;
-      el.style.top = `${rect.bottom + 6}px`;
-      requestAnimationFrame(() => {
-        const r = el.getBoundingClientRect();
-        if (r.bottom > window.innerHeight - 12) {
-          el.style.top = `${rect.top - r.height - 6}px`;
-        }
-        if (r.right > window.innerWidth - 12) {
-          el.style.left = `${window.innerWidth - r.width - 12}px`;
-        }
-      });
+      placement = placeFloating(el, anchorEl);
     } catch (err) {
       console.error('[md-editor-plus] calloutMenu.open failed', err);
     }
@@ -237,6 +228,8 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
 
   function close(): void {
     el.classList.remove('open');
+    placement?.destroy();
+    placement = null;
   }
 
   document.addEventListener('mousedown', (e) => {
