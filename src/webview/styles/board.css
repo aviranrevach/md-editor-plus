@@ -204,6 +204,45 @@
   background: var(--board-border);
 }
 
+/* ===== Standard menu scrollbar — applied by placeFloating() via .is-scroll =====
+   Hidden until hover, matching .board-columns. Menus are overflow:visible by
+   default; placeFloating only adds .is-scroll when content exceeds its side. */
+.is-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.15s;
+}
+.is-scroll:hover { scrollbar-color: var(--board-border) transparent; }
+.is-scroll::-webkit-scrollbar { width: 6px; }
+.is-scroll::-webkit-scrollbar-track { background: transparent; }
+.is-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; transition: background 0.15s; }
+.is-scroll:hover::-webkit-scrollbar-thumb { background: var(--board-border); }
+.is-scroll::-webkit-scrollbar-thumb:hover { background: #9aa2ad; }
+
+/* ===== Shared Menu component (menu.ts) ===== */
+.mp-menu {
+  min-width: 200px; background: var(--bg); color: var(--text, inherit);
+  border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08); z-index: 1100;
+}
+.mp-menu-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 10px; border: 0; border-radius: 6px; background: transparent;
+  font: inherit; font-size: 13px; color: inherit; text-align: left; cursor: pointer;
+}
+.mp-menu-item:hover:not(:disabled) { background: var(--block-hover, rgba(127,127,127,0.10)); }
+.mp-menu-item:disabled { opacity: 0.45; cursor: default; }
+.mp-menu-item.is-danger { color: #d23f3f; }
+.mp-menu-icon { width: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary, #888); flex-shrink: 0; }
+.mp-menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-menu-check, .mp-menu-caret { color: var(--text-secondary, #888); flex-shrink: 0; }
+.mp-menu-trailing { flex-shrink: 0; }
+.mp-menu-section { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary, #888); padding: 6px 10px 4px; }
+.mp-menu-divider { height: 1px; background: var(--border); margin: 5px 4px; }
+.mp-menu-back .mp-menu-label { color: var(--text-secondary, #888); }
+
 /* ===== Single column ===== */
 .board-column {
   flex: 0 0 244px;
@@ -1355,9 +1394,6 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 }
 .bd-more-btn:hover { background: var(--toolbar-btn-hover, var(--block-hover)); color: var(--text-primary); }
 .bd-more-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
   min-width: 240px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -1365,8 +1401,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
   padding: 8px;
   z-index: 6;
-  max-height: 70vh;
-  overflow-y: auto;
+  /* Height + scroll are owned by placeFloating()/.is-scroll (single source of
+     truth). A self-scroll here showed the native dark scrollbar whenever
+     placeFloating decided it fit and did not add .is-scroll. */
 }
 .bd-more-menu.bd-hidden { display: none; }
 .bd-more-sep { height: 1px; background: var(--border); margin: 8px 0; }
@@ -1707,6 +1744,15 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-tags-pop { position:absolute; z-index:20; min-width:220px; background:var(--board-bg-card,#fff); border:1px solid var(--board-border,#e5e7eb); border-radius:11px; box-shadow:0 16px 40px rgba(20,30,50,.18); padding:6px; }
 .bd-tags-filter { width:100%; box-sizing:border-box; border:0; border-bottom:1px solid var(--board-border-soft,#f1f3f5); background:transparent; color:inherit; font:inherit; padding:6px 8px; outline:none; }
 .bd-tags-list { display:flex; flex-direction:column; gap:2px; padding-top:4px; max-height:240px; overflow:auto; }
+/* Standard hidden-until-hover scrollbar (this inner list self-scrolls at 240px,
+   so it's not placeFloating-managed — style its bar so the native dark one never shows). */
+.bd-tags-list { scrollbar-width: thin; scrollbar-color: transparent transparent; transition: scrollbar-color 0.15s; }
+.bd-tags-list:hover { scrollbar-color: var(--board-border) transparent; }
+.bd-tags-list::-webkit-scrollbar { width: 6px; }
+.bd-tags-list::-webkit-scrollbar-track { background: transparent; }
+.bd-tags-list::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; transition: background 0.15s; }
+.bd-tags-list:hover::-webkit-scrollbar-thumb { background: var(--board-border); }
+.bd-tags-list::-webkit-scrollbar-thumb:hover { background: #9aa2ad; }
 .bd-tags-opt, .bd-tags-create { display:flex; align-items:center; gap:8px; width:100%; border:0; background:transparent; padding:6px 8px; border-radius:7px; cursor:pointer; text-align:left; font:inherit; color:inherit; }
 .bd-tags-opt:hover, .bd-tags-create:hover { background:var(--board-hover,#f5f7fa); }
 .bd-tags-check { margin-left:auto; color:#2b6cff; }
@@ -1769,11 +1815,6 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-filter-btn:not(.has-count) .bd-filter-count { display: none; }
 
 .bd-filter-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  /* Anchor to the funnel's right edge and open leftward, like the ⋯ menu — the
-     button sits near the right of the board chrome, so left:0 ran off-screen. */
-  right: 0;
   z-index: 40;
   min-width: 250px;
   max-width: 340px;

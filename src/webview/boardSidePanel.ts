@@ -5,6 +5,7 @@ import { createDetachedEditor, type DetachedEditorHandle } from './editor';
 import { promptNewField, openFieldActionMenu } from './boardProperties';
 import { openTagsPicker } from './boardTagsPicker';
 import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
+import { placeFloating } from './menuPosition';
 
 let panel: HTMLElement | null = null;
 let currentBoard: Board | null = null;
@@ -434,11 +435,8 @@ function openStatusDropdown(anchor: HTMLElement, field: FieldDef): void {
   menu.className = 'board-status-dropdown';
   document.body.appendChild(menu);
 
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
-  menu.style.minWidth = `${rect.width}px`;
+  const placement = placeFloating(menu, anchor);
+  menu.style.minWidth = `${anchor.getBoundingClientRect().width}px`;
 
   for (const col of getStatusOptions(board, field.name)) {
     const opt = document.createElement('button');
@@ -459,6 +457,7 @@ function openStatusDropdown(anchor: HTMLElement, field: FieldDef): void {
   }
 
   function close(): void {
+    placement.destroy();
     menu.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }

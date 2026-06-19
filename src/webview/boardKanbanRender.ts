@@ -11,6 +11,7 @@ import { applyFilter } from './boardFilter';
 import { resolveImageSrc } from './mediaResolve';
 import { firstImageSrc } from './boardImageLinks';
 import { attachSmartTypography } from './extensions/smartTypography';
+import { createPopover } from './popover';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
@@ -712,16 +713,7 @@ function openColumnColorPicker(
   col: { name: string; color: string },
   mutate: (next: Board) => void,
 ): void {
-  document.querySelectorAll('.board-column-menu').forEach((n) => n.remove());
-
-  const menu = document.createElement('div');
-  menu.className = 'board-column-menu board-column-menu-color-only';
-  document.body.appendChild(menu);
-
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 6}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const popover = createPopover({ className: 'board-column-menu board-column-menu-color-only' });
 
   const colorRow = document.createElement('div');
   colorRow.className = 'board-color-swatches';
@@ -731,36 +723,19 @@ function openColumnColorPicker(
     swatch.className = `board-color-swatch color-${tok}`;
     swatch.title = tok;
     if (col.color === tok) swatch.classList.add('is-selected');
-    swatch.addEventListener('click', () => {
+    swatch.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       const cols = board.columns.map((c) =>
         c.name === col.name ? { ...c, color: tok } : c,
       );
       mutate({ ...board, columns: cols });
-      closeMenu();
+      popover.close();
     });
     colorRow.appendChild(swatch);
   }
-  menu.appendChild(colorRow);
+  popover.el.appendChild(colorRow);
 
-  function closeMenu(): void {
-    menu.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  function onOutside(e: MouseEvent): void {
-    if (!menu.contains(e.target as Node) && e.target !== anchor) {
-      closeMenu();
-    }
-  }
-  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
-  // Edge-aware: nudge left if it would overflow the right edge.
-  requestAnimationFrame(() => {
-    const r = menu.getBoundingClientRect();
-    const overflowRight = r.right - window.innerWidth;
-    if (overflowRight > 0) {
-      menu.style.left = `${Math.max(8, parseFloat(menu.style.left) - overflowRight - 8)}px`;
-    }
-  });
+  popover.open(anchor);
 }
 
 function openColumnMenu(
@@ -769,17 +744,8 @@ function openColumnMenu(
   col: { name: string; color: string },
   mutate: (next: Board) => void,
 ): void {
-  // Close any existing menu first
-  document.querySelectorAll('.board-column-menu').forEach((n) => n.remove());
-
-  const menu = document.createElement('div');
-  menu.className = 'board-column-menu';
-  document.body.appendChild(menu);
-
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const popover = createPopover({ className: 'board-column-menu' });
+  const menu = popover.el;
 
   const section = (label: string) => {
     const s = document.createElement('div');
@@ -788,17 +754,20 @@ function openColumnMenu(
     menu.appendChild(s);
   };
 
-  const row = (icon: string, label: string, variant: '' | 'danger', onClick: () => void) => {
+  const row = (icon: string, label: string, variant: '' | 'danger', onSelect: () => void) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'board-column-menu-row' + (variant ? ` is-${variant}` : '');
     btn.innerHTML = `<span class="board-column-menu-icon">${icon}</span><span class="board-column-menu-label">${label}</span>`;
-    btn.addEventListener('click', onClick);
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      onSelect();
+    });
     menu.appendChild(btn);
     return btn;
   };
 
-  // Color picker
+  // Color picker section (custom HTML grid — not a standard menu item)
   section('Color');
   const colorRow = document.createElement('div');
   colorRow.className = 'board-color-swatches';
@@ -808,12 +777,13 @@ function openColumnMenu(
     swatch.className = `board-color-swatch color-${tok}`;
     swatch.title = tok;
     if (col.color === tok) swatch.classList.add('is-selected');
-    swatch.addEventListener('click', () => {
+    swatch.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       const cols = board.columns.map((c) =>
         c.name === col.name ? { ...c, color: tok } : c,
       );
       mutate({ ...board, columns: cols });
-      closeMenu();
+      popover.close();
     });
     colorRow.appendChild(swatch);
   }
@@ -825,7 +795,7 @@ function openColumnMenu(
 
   // Rename — focuses the inline column name input on the source column
   row(ICON_EDIT, 'Rename', '', () => {
-    closeMenu();
+    popover.close();
     // Find the column DOM and focus its name span. The board re-renders on
     // mutate, so reading the live DOM right now is safe.
     const colEl = document.querySelector(`.board-column[data-column="${cssEscape(col.name)}"]`);
@@ -846,7 +816,7 @@ function openColumnMenu(
     const others = board.cards.filter((c) => (c.values.Status || '') !== col.name);
     inCol.sort((a, b) => (a.values.Title || '').localeCompare(b.values.Title || ''));
     mutate({ ...board, cards: [...others, ...inCol] });
-    closeMenu();
+    popover.close();
   });
 
   const divider2 = document.createElement('div');
@@ -863,7 +833,7 @@ function openColumnMenu(
         otherCols[0]?.name || '',
       );
       if (choice === null) {
-        closeMenu();
+        popover.close();
         return; // canceled
       }
       let nextCards: Card[];
@@ -881,23 +851,11 @@ function openColumnMenu(
     } else {
       mutate({ ...board, columns: board.columns.filter((c) => c.name !== col.name) });
     }
-    closeMenu();
+    popover.close();
   });
 
-  function closeMenu(): void {
-    menu.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  function onOutside(e: MouseEvent): void {
-    if (!menu.contains(e.target as Node) && e.target !== anchor) {
-      closeMenu();
-    }
-  }
-  setTimeout(() => {
-    document.addEventListener('mousedown', onOutside, true);
-  }, 0);
+  popover.open(anchor);
 }
-
 // ---------------------------------------------------------------------------
 // Edge-scroll while dragging
 // ---------------------------------------------------------------------------

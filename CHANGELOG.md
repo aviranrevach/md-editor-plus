@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Menus now share one component** — every click-anchored menu (tags picker, the + / slash menu and its drill-downs, board table & kanban column menus, status dropdowns, the Properties / field-action / add-property menus, the status-options editor, the callout menu, the board view switcher, the filter panel, the image manager) is built on a single shared `Popover` primitive and `Menu` builder. Behavior is now consistent everywhere: open/close, outside-click **and Escape** dismissal, only one menu open at a time, drill-downs, and the edge-aware positioning + scrollbar from before. Internal refactor — no change to what menus do, only how they're built. (Popover component)
+
+### Fixed
+
+- **Menus no longer crop off-screen** — every popover, dropdown, and drill-down (the + / slash menu and its **Turn into** drill-downs, the board table & kanban **column menus**, the **tags picker**, status dropdowns, the **Properties** and add-property menus, the date picker, the callout menu, the board **view switcher**, the **Filter** panel, the **display / appearance** panel, and the link popover) now positions through one shared helper. A menu opened near a screen edge **flips** to the other side, **nudges** itself fully on-screen, and **never covers the button that opened it**. A menu taller than the space available caps its height and scrolls inside instead of running off the bottom. (c34)
+- **One consistent menu scrollbar** — menus that scroll now use a single hidden-until-hover scrollbar (matching the board columns), and a scrollbar only appears when the menu's content genuinely overflows — no more phantom scrollbar when everything already fits. (c34)
+
 ## [0.6.0] - 2026-06-18
 
 ### Added

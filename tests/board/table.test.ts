@@ -252,11 +252,12 @@ describe('status chip + dropdown', () => {
     ) as HTMLElement;
     statusCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    // Click the second option (Doing)
+    // Mousedown the second option (Doing) — the new Popover-backed implementation
+    // uses mousedown+preventDefault on each option (same pattern as createMenu items).
     const dropdown = document.querySelector('.board-status-dropdown')!;
     const options = dropdown.querySelectorAll('.board-status-option');
     (options[1] as HTMLElement).dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
     );
 
     expect(boardRef.current.cards[0].values.Status).toBe('Doing');
@@ -289,7 +290,7 @@ describe('status chip + dropdown', () => {
     const options = dropdown.querySelectorAll('.board-status-option');
     expect(options).toHaveLength(2);
 
-    (options[1] as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    (options[1] as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(boardRef.current.cards[0].values.Impact).toBe('High');
     expect(boardRef.current.cards[0].values.Status).toBe('Todo');
 
@@ -743,7 +744,7 @@ describe('column-header ⋯ menu Edit options item', () => {
 
     const menu = document.querySelector('.bd-col-menu') as HTMLElement;
     expect(menu).not.toBeNull();
-    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    const labels = Array.from(menu.querySelectorAll('.mp-menu-label')).map(el => el.textContent);
     expect(labels).toContain('Edit options');
 
     ops.destroy();
@@ -759,7 +760,7 @@ describe('column-header ⋯ menu Edit options item', () => {
 
     const menu = document.querySelector('.bd-col-menu') as HTMLElement;
     expect(menu).not.toBeNull();
-    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    const labels = Array.from(menu.querySelectorAll('.mp-menu-label')).map(el => el.textContent);
     expect(labels).not.toContain('Edit options');
 
     ops.destroy();

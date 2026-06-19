@@ -7,6 +7,7 @@ import type { BoardRendererCtx } from './boardBlock';
 import { renderPropertiesContent, promptNewField } from './boardProperties';
 import { requestHeaderRename } from './boardTableRender';
 import { createFilterPill, type FilterPill } from './boardFilterPanel';
+import { createPopover } from './popover';
 
 export interface ChromeHandle {
   el: HTMLElement;
@@ -18,8 +19,6 @@ export function renderChrome(
   mutate: (next: Board) => void,
   readOnly: boolean,
   ctx: BoardRendererCtx,
-  registerMenuClose: (cb: () => void) => void,
-  unregisterMenuClose: () => void,
 ): ChromeHandle {
   const chrome = document.createElement('div');
   chrome.className = 'board-chrome';
@@ -80,7 +79,7 @@ export function renderChrome(
     });
     chrome.appendChild(addPropBtn);
 
-    const moreResult = buildHeaderMore(ctx, registerMenuClose, unregisterMenuClose);
+    const moreResult = buildHeaderMore(ctx);
     chrome.appendChild(moreResult.el);
     refreshViewSeg = moreResult.refreshViewSeg;
     refreshPropsIfOpen = () => {
@@ -108,8 +107,6 @@ export function renderChrome(
 
 export function buildHeaderMore(
   ctx: BoardRendererCtx,
-  registerMenuClose: (cb: () => void) => void,
-  unregisterMenuClose: () => void,
 ): { el: HTMLElement; refreshViewSeg: () => void; refreshProps: () => void; isMenuOpen: () => boolean } {
   const wrap = document.createElement('div');
   wrap.className = 'bd-more';
@@ -122,9 +119,11 @@ export function buildHeaderMore(
   btn.setAttribute('aria-expanded', 'false');
   btn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>`;
 
-  const menu = document.createElement('div');
-  menu.className = 'bd-more-menu bd-hidden';
-  menu.setAttribute('role', 'menu');
+  wrap.appendChild(btn);
+
+  // Popover (central registry handles outside-click, Escape, one-open-at-a-time).
+  const popover = createPopover({ className: 'bd-more-menu', preferX: 'right' });
+  popover.el.setAttribute('role', 'menu');
 
   const viewRow = document.createElement('div');
   viewRow.className = 'bd-more-view';
@@ -142,19 +141,19 @@ export function buildHeaderMore(
   const tableBtn  = mkSeg('table',  'Table');
   seg.append(kanbanBtn, tableBtn);
   viewRow.appendChild(seg);
-  menu.appendChild(viewRow);
+  popover.el.appendChild(viewRow);
 
   const sep = document.createElement('div');
   sep.className = 'bd-more-sep';
-  menu.appendChild(sep);
+  popover.el.appendChild(sep);
 
   const propsHost = document.createElement('div');
   propsHost.className = 'bd-more-props';
-  menu.appendChild(propsHost);
+  popover.el.appendChild(propsHost);
 
   const delSep = document.createElement('div');
   delSep.className = 'bd-more-sep';
-  menu.appendChild(delSep);
+  popover.el.appendChild(delSep);
 
   const delRow = document.createElement('button');
   delRow.type = 'button';
@@ -162,18 +161,14 @@ export function buildHeaderMore(
   delRow.setAttribute('role', 'menuitem');
   delRow.innerHTML =
     '<svg viewBox="0 0 256 256" width="14" height="14" fill="currentColor"><path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16ZM96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm16 152a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Zm48 0a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Z"/></svg><span>Delete board</span>';
-  delRow.addEventListener('click', () => { closeMenu(); ctx.requestDelete(); });
-  menu.appendChild(delRow);
-
-  wrap.append(btn, menu);
+  delRow.addEventListener('click', () => { popover.close(); ctx.requestDelete(); });
+  popover.el.appendChild(delRow);
 
   function refreshViewSeg(): void {
     const cur = ctx.getBoard().activeView;
     kanbanBtn.classList.toggle('bd-view-seg-active', !cur || cur === 'kanban');
     tableBtn.classList.toggle('bd-view-seg-active', cur === 'table');
   }
-
-  let removeOutside: (() => void) | null = null;
 
   // Single, stable renderPropertiesContent instance per menu open. refreshProps
   // calls its rebuild() to update the field list in-place, preserving any
@@ -185,63 +180,51 @@ export function buildHeaderMore(
       return;
     }
     propsHost.innerHTML = '';
+    // Pass `popover` as `selfPopover` so child menus (field-action, add-field
+    // picker) open as children of this popover — they don't dismiss it.
     propsHandle = renderPropertiesContent(
       propsHost,
       () => ctx.getBoard(),
       ctx.mutate,
       ctx.getBoard().activeView ?? 'kanban',
+      popover,
     );
   }
 
   function openMenu(): void {
-    menu.classList.remove('bd-hidden');
-    btn.setAttribute('aria-expanded', 'true');
+    if (popover.isOpen()) { popover.close(); return; }
     refreshViewSeg();
-    // Force a fresh render on each open in case viewName changed (kanban↔table).
+    // Force a fresh render on each open in case viewName changed (kanban<->table).
     propsHandle = null;
+    propsHost.innerHTML = '';
     refreshProps();
-
-    function onOutside(e: MouseEvent): void {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.closest('.bd-more-menu, .board-field-action-menu, .board-add-field-picker, .board-confirm-overlay')) return;
-      closeMenu();
-    }
-    removeOutside = () => document.removeEventListener('mousedown', onOutside, true);
-    setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
-    registerMenuClose(closeMenu);
+    popover.open(btn);
+    btn.setAttribute('aria-expanded', 'true');
   }
 
-  function closeMenu(): void {
-    menu.classList.add('bd-hidden');
+  // Sync aria-expanded when the central registry closes the popover (outside
+  // click, Escape, another top-level popover opening).
+  const origClose = popover.close.bind(popover);
+  (popover as { close: () => void }).close = () => {
+    origClose();
     btn.setAttribute('aria-expanded', 'false');
     propsHost.innerHTML = '';
     propsHandle = null;
-    removeOutside?.();
-    removeOutside = null;
-    unregisterMenuClose();
-  }
+  };
 
-  btn.addEventListener('click', () => {
-    if (menu.classList.contains('bd-hidden')) {
-      openMenu();
-    } else {
-      closeMenu();
-    }
-  });
+  btn.addEventListener('click', openMenu);
 
   kanbanBtn.addEventListener('click', () => {
     ctx.mutate({ ...ctx.getBoard(), activeView: 'kanban' });
-    closeMenu();
+    popover.close();
   });
 
   tableBtn.addEventListener('click', () => {
     ctx.mutate({ ...ctx.getBoard(), activeView: 'table' });
-    closeMenu();
+    popover.close();
   });
 
-  return { el: wrap, refreshViewSeg, refreshProps, isMenuOpen: () => !menu.classList.contains('bd-hidden') };
+  return { el: wrap, refreshViewSeg, refreshProps, isMenuOpen: () => popover.isOpen() };
 }
 
 function selectAllText(el: HTMLElement): void {

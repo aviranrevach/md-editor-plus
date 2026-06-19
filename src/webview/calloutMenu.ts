@@ -1,4 +1,5 @@
 import { Editor } from '@tiptap/core';
+import { createPopover, type Popover } from './popover';
 
 interface CalloutTypeDef {
   id: 'note' | 'tip' | 'important' | 'warning' | 'caution';
@@ -34,9 +35,8 @@ export interface CalloutMenu {
 export function createCalloutMenu(editor: Editor): CalloutMenu {
   let pos = 0;
 
-  const el = document.createElement('div');
-  el.className = 'callout-menu';
-  document.body.appendChild(el);
+  const popover: Popover = createPopover({ className: 'callout-menu' });
+  const el = popover.el;
 
   function setAttrs(nextType: CalloutTypeDef['id'] | null, nextEmoji: string | null): void {
     editor
@@ -217,40 +217,15 @@ export function createCalloutMenu(editor: Editor): CalloutMenu {
       const currentType = (node.attrs.type as CalloutTypeDef['id']) ?? 'note';
       const currentEmoji = (node.attrs.emoji as string) ?? DEFAULT_EMOJI_BY_TYPE[currentType];
       render(currentType, currentEmoji);
-      el.classList.add('open');
-      const rect = anchorEl.getBoundingClientRect();
-      el.style.left = `${rect.left}px`;
-      el.style.top = `${rect.bottom + 6}px`;
-      requestAnimationFrame(() => {
-        const r = el.getBoundingClientRect();
-        if (r.bottom > window.innerHeight - 12) {
-          el.style.top = `${rect.top - r.height - 6}px`;
-        }
-        if (r.right > window.innerWidth - 12) {
-          el.style.left = `${window.innerWidth - r.width - 12}px`;
-        }
-      });
+      popover.open(anchorEl);
     } catch (err) {
       console.error('[md-editor-plus] calloutMenu.open failed', err);
     }
   }
 
   function close(): void {
-    el.classList.remove('open');
+    popover.close();
   }
-
-  document.addEventListener('mousedown', (e) => {
-    if (!el.contains(e.target as Node)) close();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && el.classList.contains('open')) close();
-  });
-  // Close on any scroll — the popover is anchored to a viewport position,
-  // so scrolling makes it visually disconnect from the callout it opened
-  // from. capture:true catches scrolls on every ancestor.
-  window.addEventListener('scroll', () => {
-    if (el.classList.contains('open')) close();
-  }, { capture: true, passive: true });
 
   // Open the menu when the user clicks the emoji icon inside a rendered callout.
   editor.view.dom.addEventListener('click', (e) => {

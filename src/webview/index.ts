@@ -17,6 +17,7 @@ import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { initBoardSidePanel } from './boardSidePanel';
 import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 import { nextSaveState, describeSaveState, SaveState, SaveEvent } from './saveState';
 import { common, createLowlight } from 'lowlight';
 
@@ -173,6 +174,8 @@ function init(): void {
 
   const settingsBtn   = document.getElementById('settings-btn') as HTMLElement;
   const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
+  let settingsPlacement: PlacementHandle | null = null;
+  let dotsPlacement: PlacementHandle | null = null;
   const fullWidthTog  = document.getElementById('full-width-toggle') as HTMLElement;
   const widthSlider   = document.getElementById('width-slider') as HTMLInputElement;
   const widthValue    = document.getElementById('width-value') as HTMLElement;
@@ -709,6 +712,8 @@ function init(): void {
 
   function closeDotsPanel(): void {
     actionsPanelDots.classList.add('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = null;
     closeSubmenu();
     actionsBtn.classList.remove('active');
     syncToolbarPanelState();
@@ -725,6 +730,8 @@ function init(): void {
   }
   function closeSettingsPanel(): void {
     settingsPanel.classList.add('hidden');
+    settingsPlacement?.destroy();
+    settingsPlacement = null;
     settingsBtn.classList.remove('active');
     syncToolbarPanelState();
   }
@@ -829,6 +836,13 @@ function init(): void {
     findBar?.close();
     settingsPanel.classList.toggle('hidden');
     settingsBtn.classList.toggle('active');
+    if (!settingsPanel.classList.contains('hidden')) {
+      settingsPlacement?.destroy();
+      settingsPlacement = placeFloating(settingsPanel, settingsBtn, { preferX: 'right' });
+    } else {
+      settingsPlacement?.destroy();
+      settingsPlacement = null;
+    }
     syncToolbarPanelState();
   });
 
@@ -838,6 +852,8 @@ function init(): void {
     closeFilenamePanel();
     findBar?.close();
     actionsPanelDots.classList.remove('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = placeFloating(actionsPanelDots, actionsBtn, { preferX: 'right' });
     actionsBtn.classList.add('active');
     syncToolbarPanelState();
   }

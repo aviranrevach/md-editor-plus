@@ -38,6 +38,8 @@ function position(target: HTMLElement): void {
     placement = 'bottom';
   }
 
+  top = Math.max(margin, Math.min(top, window.innerHeight - tr.height - margin));
+
   const maxLeft = window.innerWidth - tr.width - margin;
   if (left < margin) left = margin;
   if (left > maxLeft) left = maxLeft;

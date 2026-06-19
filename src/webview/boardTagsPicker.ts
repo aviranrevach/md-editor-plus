@@ -1,6 +1,7 @@
 import { getStatusOptions, addTagOption, toggleTagOnCard, sanitizeTagName } from './boardModel';
 import type { Board } from './boardModel';
 import { buildChip } from './boardSidePanel';
+import { createPopover } from './popover';
 
 /**
  * Multi-select tag picker: a checklist of the field's tag options (toggle each
@@ -13,14 +14,8 @@ export function openTagsPicker(
   cardId: string,
   onChange: (next: Board) => void,
 ): void {
-  document.querySelectorAll('.bd-tags-pop').forEach(n => n.remove());
-  const pop = document.createElement('div');
-  pop.className = 'bd-tags-pop';
-  document.body.appendChild(pop);
-  const rect = anchor.getBoundingClientRect();
-  pop.style.position = 'absolute';
-  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  pop.style.left = `${rect.left + window.scrollX}px`;
+  const popover = createPopover({ className: 'bd-tags-pop' });
+  const pop = popover.el;
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -88,11 +83,6 @@ export function openTagsPicker(
 
   pop.append(input, list);
   render();
+  popover.open(anchor);
   input.focus();
-
-  function onOutside(e: MouseEvent) {
-    if (!pop.contains(e.target as Node) && e.target !== anchor) close();
-  }
-  function close() { pop.remove(); document.removeEventListener('mousedown', onOutside, true); }
-  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
 }

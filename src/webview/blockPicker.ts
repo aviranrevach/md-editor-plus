@@ -11,6 +11,7 @@ import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
+import { createPopover, type Popover } from './popover';
 
 export interface BlockDef {
   id: string;
@@ -570,6 +571,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     close();
   }
 
+  let popover: Popover | null = null;
   let actionMode = false;   // opened over a block (dragger) -> show action menu
   let turnIntoOpen = false; // inside the flat "Turn into" target list
   // Each rendered row registers its activation callback here, indexed to match
@@ -583,15 +585,14 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     return block.isActive(ab.typeName, ab.attrs);
   }
 
-  const el = document.createElement('div');
-  el.className = 'block-picker';
+  popover = createPopover({ className: 'block-picker', onClose: resetState });
+  const el = popover.el;
   el.innerHTML = `
     <div class="block-picker-search">
       <input class="block-picker-input" placeholder="Filter blocks…" autocomplete="off" spellcheck="false" />
     </div>
     <div class="block-picker-list"></div>
   `;
-  document.body.appendChild(el);
 
   const input = el.querySelector<HTMLInputElement>('.block-picker-input')!;
   const list  = el.querySelector<HTMLElement>('.block-picker-list')!;
@@ -980,6 +981,18 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     }
   });
 
+  // Called by the popover's onClose callback (registry-triggered dismiss) to
+  // reset internal state without recursively calling popover.close() again.
+  function resetState(): void {
+    el.classList.remove('open');
+    drillParent = null;
+    actionMode = false;
+    turnIntoOpen = false;
+    context = {};
+    input.value = '';
+    searchEl.style.display = '';
+  }
+
   function open(anchorEl: HTMLElement, insertPos: number, ctx: PickerContext = {}): void {
     currentPos = insertPos;
     context = ctx;
@@ -1001,48 +1014,18 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       filtered = BLOCK_DEFS;
       renderList(BLOCK_DEFS);
     }
+    // Delegate lifecycle + dismissal to the popover registry (outside-click,
+    // Escape, scroll are all handled centrally). Keep the .open class for
+    // CSS visibility; the registry appends/removes the element from the DOM.
+    popover!.open(anchorEl);
     el.classList.add('open');
-    positionPopover(anchorEl);
-  }
-
-  function positionPopover(anchorEl: HTMLElement): void {
-    const rect = anchorEl.getBoundingClientRect();
-    el.style.left = `${rect.left}px`;
-    el.style.top  = `${rect.bottom + 6}px`;
-    requestAnimationFrame(() => {
-      const pickerRect = el.getBoundingClientRect();
-      if (pickerRect.bottom > window.innerHeight - 12) {
-        el.style.top = `${rect.top - pickerRect.height - 6}px`;
-      }
-      input.focus();
-    });
+    requestAnimationFrame(() => input.focus());
   }
 
   function close(): void {
-    el.classList.remove('open');
-    drillParent = null;
-    actionMode = false;
-    turnIntoOpen = false;
-    context = {};
-    input.value = '';
-    searchEl.style.display = '';
+    popover!.close();
+    // resetState() is called via onClose callback when popover.close() fires.
   }
-
-  // Capture phase: decide containment BEFORE the row handlers run. A row's
-  // mousedown re-renders the list (detaching the clicked node), so a bubble-phase
-  // check would see a now-detached target and wrongly close the picker.
-  document.addEventListener('mousedown', e => {
-    if (!el.contains(e.target as Node)) close();
-  }, true);
-  // Close on scroll — the popover is anchored to a viewport position and
-  // would otherwise drift away from its trigger. Ignore scrolls that
-  // originate inside the picker itself (the list scrolls when items overflow).
-  window.addEventListener('scroll', (e) => {
-    if (!el.classList.contains('open')) return;
-    const target = e.target as Node | null;
-    if (target && el.contains(target)) return;
-    close();
-  }, { capture: true, passive: true });
 
   return { open, close };
 }
