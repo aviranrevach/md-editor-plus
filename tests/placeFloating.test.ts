@@ -48,3 +48,34 @@ test('destroy() disconnects the observer and is safe to call', () => {
   const handle = placeFloating(menu, anchor);
   expect(() => handle.destroy()).not.toThrow();
 });
+
+test('does not loop: the observer callback fired by our own re-observe is swallowed', () => {
+  // Capture the ResizeObserver callback + count observe() calls so we can prove
+  // the self-triggered resize is ignored (the fix for the flickering scrollbar).
+  let roCb: (() => void) | null = null;
+  let observeCount = 0;
+  (window as any).ResizeObserver = class {
+    constructor(cb: () => void) { roCb = cb; }
+    observe() { observeCount++; }
+    disconnect() {}
+  };
+
+  const anchor = document.body.appendChild(document.createElement('div'));
+  anchor.getBoundingClientRect = () => ({ top: 380, left: 40, width: 120, height: 30, right: 160, bottom: 410, x: 40, y: 380, toJSON() {} } as DOMRect);
+  const menu = document.body.appendChild(document.createElement('div'));
+  Object.defineProperty(menu, 'isConnected', { value: true, configurable: true });
+  sized(menu, 220, 700); // taller than its side → is-scroll, so reposition mutates size
+
+  placeFloating(menu, anchor);
+  // Initial reposition re-observes exactly once.
+  expect(observeCount).toBe(1);
+
+  // The first observer callback is the one our own re-observe triggers — it must
+  // be swallowed (no reposition, so no new observe()).
+  roCb!();
+  expect(observeCount).toBe(1);
+
+  // A subsequent, genuine resize IS handled (reposition → re-observe again).
+  roCb!();
+  expect(observeCount).toBe(2);
+});

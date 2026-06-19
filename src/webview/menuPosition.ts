@@ -67,7 +67,19 @@ export interface PlacementHandle { reposition(): void; destroy(): void; }
 export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceOpts = {}): PlacementHandle {
   el.style.position = 'fixed';
 
+  // reposition() mutates el's own height/overflow (the max-height cap and the
+  // .is-scroll class), which itself resizes el. If the ResizeObserver below
+  // simply re-ran reposition() on every resize, our own writes would retrigger
+  // it forever — a feedback loop that visibly flickers the scrollbar (and lets
+  // the native bar flash through). To break it we DISCONNECT the observer
+  // while mutating, then re-observe on the next frame; re-observing fires one
+  // initial callback for the settled size, which `skipNext` swallows. Only a
+  // genuine later resize (a drill-down swapping content) gets through.
+  let ro: ResizeObserver | null = null;
+  let skipNext = false;
+
   function reposition(): void {
+    ro?.disconnect();
     el.classList.remove('is-scroll');
     el.style.maxHeight = 'none';
     const a = anchor.getBoundingClientRect();
@@ -81,18 +93,25 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
     el.style.top = `${p.top}px`;
     if (p.scroll) { el.classList.add('is-scroll'); el.style.maxHeight = `${p.maxHeight ?? 0}px`; }
     else { el.style.maxHeight = ''; }
+    if (ro) {
+      requestAnimationFrame(() => {
+        if (!el.isConnected || !ro) return;
+        skipNext = true;
+        ro.observe(el);
+      });
+    }
   }
 
-  // Measure after layout.
+  if (typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(() => {
+      if (skipNext) { skipNext = false; return; }
+      reposition();
+    });
+  }
+
+  // Measure after layout (this first reposition also starts the observation).
   requestAnimationFrame(reposition);
 
-  // Re-position when the element resizes (drill-downs swap content) or the
-  // window resizes.
-  let ro: ResizeObserver | null = null;
-  if (typeof ResizeObserver !== 'undefined') {
-    ro = new ResizeObserver(() => reposition());
-    ro.observe(el);
-  }
   const onWinResize = () => reposition();
   window.addEventListener('resize', onWinResize);
 
