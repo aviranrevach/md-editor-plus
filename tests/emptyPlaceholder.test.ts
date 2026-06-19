@@ -1,4 +1,4 @@
-import { shouldShowPlaceholder, PLACEHOLDER_TEXT } from '../src/webview/extensions/emptyPlaceholder';
+import { shouldShowPlaceholder, PLACEHOLDER_TEXT, isPlaceholderBlockType } from '../src/webview/extensions/emptyPlaceholder';
 
 describe('shouldShowPlaceholder', () => {
   it('shows on the focused empty block', () => {
@@ -19,5 +19,17 @@ describe('shouldShowPlaceholder', () => {
 
   it('exposes the approved copy', () => {
     expect(PLACEHOLDER_TEXT).toBe('Start writing, or press / for commands');
+  });
+});
+
+describe('isPlaceholderBlockType', () => {
+  it('accepts paragraph and heading', () => {
+    expect(isPlaceholderBlockType('paragraph')).toBe(true);
+    expect(isPlaceholderBlockType('heading')).toBe(true);
+  });
+
+  it('rejects codeBlock and other types', () => {
+    expect(isPlaceholderBlockType('codeBlock')).toBe(false);
+    expect(isPlaceholderBlockType('blockquote')).toBe(false);
   });
 });

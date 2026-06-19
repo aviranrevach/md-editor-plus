@@ -5,6 +5,11 @@ import type { EditorState } from '@tiptap/pm/state';
 
 export const PLACEHOLDER_TEXT = 'Start writing, or press / for commands';
 
+/** Only plain paragraphs and headings receive the empty-state hint (not code blocks, etc.). */
+export function isPlaceholderBlockType(typeName: string): boolean {
+  return typeName === 'paragraph' || typeName === 'heading';
+}
+
 export function shouldShowPlaceholder(flags: {
   isEmpty: boolean;
   isFocused: boolean;
@@ -21,8 +26,9 @@ function buildDecorations(state: EditorState): DecorationSet {
   let topIndex = -1;
   doc.forEach((node, pos) => {
     topIndex++;
-    // Only plain text blocks get the hint (paragraph / heading).
+    // Only plain paragraphs and headings get the hint (not code blocks, etc.).
     if (!node.isTextblock) return;
+    if (!isPlaceholderBlockType(node.type.name)) return;
     const isEmpty = node.content.size === 0;
     const isFocused = selection.empty && selection.$from.parent === node;
     const isFirstBlock = topIndex === 0;
