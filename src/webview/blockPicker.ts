@@ -625,6 +625,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   const list  = el.querySelector<HTMLElement>('.block-picker-list')!;
   const searchEl = el.querySelector<HTMLElement>('.block-picker-search')!;
   const footVerb = el.querySelector<HTMLElement>('.bp-foot-verb')!;
+  const footHints = el.querySelector<HTMLElement>('.block-picker-foot-hints')!;
 
   function currentSource(): BlockDef[] {
     return drillParent?.subItems ?? BLOCK_DEFS;
@@ -678,6 +679,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
     activeIdx = 0;
     updateActive();
+    footHints.style.display = '';
     footVerb.textContent = footerCloseVerb(!!drillParent);
   }
 
@@ -909,6 +911,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     // otherwise keystrokes hit the still-focused filter input and its `input`
     // handler re-renders the list, wiping this field away.
     searchEl.style.display = 'none';
+    footHints.style.display = 'none';
+    footVerb.textContent = 'Back';
     list.innerHTML = '';
 
     const back = document.createElement('div');
