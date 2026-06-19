@@ -4,6 +4,7 @@ import { PluginKey, NodeSelection } from '@tiptap/pm/state';
 import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -395,6 +396,7 @@ export function createBubbleMenu(editor: Editor): void {
   let lpRange: { from: number; to: number } | null = null;
   let lpHideTimer: ReturnType<typeof setTimeout> | null = null;
   let lpEl: HTMLElement | null = null; // current link element being shown
+  let lpPlacement: PlacementHandle | null = null;
 
   function findLinkRange(domPos: number): { from: number; to: number; href: string } | null {
     const $pos = editor.state.doc.resolve(domPos);
@@ -443,17 +445,9 @@ export function createBubbleMenu(editor: Editor): void {
     lpView.style.display = 'flex';
     lpEdit.style.display = 'none';
     linkPop.style.display = 'block';
-    // Position above the link
-    const r = anchor.getBoundingClientRect();
-    const popH = linkPop.offsetHeight || 38;
-    let top = r.top - popH - 8;
-    if (top < 8) top = r.bottom + 8;
-    let left = r.left;
-    const maxLeft = window.innerWidth - linkPop.offsetWidth - 8;
-    if (left > maxLeft) left = maxLeft;
-    if (left < 8) left = 8;
-    linkPop.style.top = `${top}px`;
-    linkPop.style.left = `${left}px`;
+    // Destroy any previous placement handle before creating a new one
+    lpPlacement?.destroy();
+    lpPlacement = placeFloating(linkPop, anchor);
   }
 
   function isEditing(): boolean {
@@ -466,6 +460,7 @@ export function createBubbleMenu(editor: Editor): void {
     if (isEditing()) return;
     if (lpHideTimer) clearTimeout(lpHideTimer);
     lpHideTimer = setTimeout(() => {
+      lpPlacement?.destroy(); lpPlacement = null;
       linkPop.style.display = 'none';
       lpEl = null;
       lpRange = null;
@@ -478,6 +473,7 @@ export function createBubbleMenu(editor: Editor): void {
 
   function closeLinkPopHard(): void {
     if (lpHideTimer) { clearTimeout(lpHideTimer); lpHideTimer = null; }
+    lpPlacement?.destroy(); lpPlacement = null;
     linkPop.style.display = 'none';
     lpView.style.display = 'flex';
     lpEdit.style.display = 'none';
@@ -563,7 +559,7 @@ export function createBubbleMenu(editor: Editor): void {
           .unsetMark('link')
           .run();
       }
-      linkPop.style.display = 'none';
+      closeLinkPopHard();
       return;
     }
     if (action === 'cancel') {

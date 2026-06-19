@@ -56,10 +56,17 @@ function showTooltip(tooltip: HTMLElement, targetEl: HTMLElement, text: string):
   const rect = targetEl.getBoundingClientRect();
   tooltip.style.left = `${rect.left + rect.width / 2}px`;
   tooltip.style.top  = `${rect.top - tooltip.offsetHeight - 6}px`;
-  // Correct left after measuring width
+  // Correct left/top after measuring size, with viewport-edge clamping
   requestAnimationFrame(() => {
-    const tw = tooltip.offsetWidth;
-    tooltip.style.left = `${rect.left + rect.width / 2 - tw / 2}px`;
+    const margin = 8;
+    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    let left = rect.left + rect.width / 2 - tw / 2;
+    left = Math.max(margin, Math.min(left, window.innerWidth - tw - margin));
+    let top = rect.top - th - 6;
+    if (top < margin) top = rect.bottom + 6;  // flip below if no room above
+    top = Math.max(margin, Math.min(top, window.innerHeight - th - margin));
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top  = `${top}px`;
   });
 }
 
