@@ -11,6 +11,7 @@ import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 
 export interface BlockDef {
   id: string;
@@ -570,6 +571,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     close();
   }
 
+  let placement: PlacementHandle | null = null;
   let actionMode = false;   // opened over a block (dragger) -> show action menu
   let turnIntoOpen = false; // inside the flat "Turn into" target list
   // Each rendered row registers its activation callback here, indexed to match
@@ -1006,19 +1008,14 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function positionPopover(anchorEl: HTMLElement): void {
-    const rect = anchorEl.getBoundingClientRect();
-    el.style.left = `${rect.left}px`;
-    el.style.top  = `${rect.bottom + 6}px`;
-    requestAnimationFrame(() => {
-      const pickerRect = el.getBoundingClientRect();
-      if (pickerRect.bottom > window.innerHeight - 12) {
-        el.style.top = `${rect.top - pickerRect.height - 6}px`;
-      }
-      input.focus();
-    });
+    placement?.destroy();
+    placement = placeFloating(el, anchorEl);
+    requestAnimationFrame(() => input.focus());
   }
 
   function close(): void {
+    placement?.destroy();
+    placement = null;
     el.classList.remove('open');
     drillParent = null;
     actionMode = false;
