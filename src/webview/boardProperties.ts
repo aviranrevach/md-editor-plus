@@ -605,11 +605,7 @@ export function promptNewField(
   pop.className = 'board-add-field-picker board-add-field-picker--types-only';
   document.body.appendChild(pop);
 
-  const rect = anchor.getBoundingClientRect();
-  pop.style.position = 'absolute';
-  // Provisional placement (refined in rAF below once we know the popover's size).
-  pop.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  pop.style.left = `${rect.left + window.scrollX}px`;
+  const placement = placeFloating(pop, anchor);
 
   const sectionLabel = document.createElement('div');
   sectionLabel.className = 'board-add-field-section';
@@ -635,24 +631,6 @@ export function promptNewField(
     });
     list.appendChild(row);
   }
-
-  // Edge-aware positioning: flip above the anchor if no room below, and clamp
-  // horizontally so the popover never overflows either side.
-  requestAnimationFrame(() => {
-    const r = pop.getBoundingClientRect();
-    const margin = 8;
-    if (r.bottom > window.innerHeight - margin) {
-      const flippedTop = rect.top + window.scrollY - r.height - 4;
-      if (flippedTop > margin) pop.style.top = `${flippedTop}px`;
-      else pop.style.top = `${window.scrollY + window.innerHeight - r.height - margin}px`;
-    }
-    const r2 = pop.getBoundingClientRect();
-    if (r2.right > window.innerWidth - margin) {
-      pop.style.left = `${window.scrollX + window.innerWidth - r2.width - margin}px`;
-    } else if (r2.left < margin) {
-      pop.style.left = `${window.scrollX + margin}px`;
-    }
-  });
 
   function showStatusSetup(): void {
     list.remove();
@@ -726,6 +704,7 @@ export function promptNewField(
     if (e.key === 'Escape') { e.preventDefault(); closePop(); }
   }
   function closePop() {
+    placement.destroy();
     pop.remove();
     document.removeEventListener('mousedown', onOutside, true);
     document.removeEventListener('keydown', onKey, true);
