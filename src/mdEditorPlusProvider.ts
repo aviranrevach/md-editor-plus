@@ -964,11 +964,6 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <div class="settings-divider"></div>
     <div class="settings-section">
       <div class="settings-label">Editing</div>
-      <div class="settings-row" data-tip="Lock this file — blocks typing and structural edits (never persists; reopen to edit)">
-        <span class="settings-row-icon">${iLock}</span>
-        <span class="settings-row-label">Read only</span>
-        <button class="toggle-switch" id="readonly-toggle" role="switch" aria-checked="false"></button>
-      </div>
       <div class="settings-row" data-tip="Replace typed sequences like -&gt; with → and -- with — as you type (never inside code)">
         <span class="settings-row-icon">${iArrowsH}</span>
         <span class="settings-row-label">Smart typography</span>
@@ -991,6 +986,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   </div>
   <div class="actions-panel hidden" id="actions-panel-dots" data-anchor="dots">
     <button class="settings-action act-find" data-tip="Find text in this document (⌘F / Ctrl+F)">${iSearch}<span class="settings-action-label">Find in page</span></button>
+    <div class="actions-sep"></div>
+    <div class="settings-action readonly-row" id="readonly-row" data-tip="Lock this file — blocks typing and structural edits (never persists; reopen to edit)">${iLock}<span class="settings-action-label">Read only</span><button class="toggle-switch" id="readonly-toggle" role="switch" aria-checked="false" tabindex="-1"></button></div>
     <div class="actions-sep"></div>
     <button class="settings-action act-copy" data-tip="Copy the entire markdown to clipboard">${iCopy}<span class="settings-action-label">Copy page content</span></button>
     <button class="settings-action act-copy-path" data-tip="Copy the absolute file path to clipboard">${iLink}<span class="settings-action-label">Copy file path</span></button>

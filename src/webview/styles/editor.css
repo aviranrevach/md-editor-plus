@@ -2897,6 +2897,10 @@ html.read-only .block-handle { display: none !important; }
 .readonly-pill[hidden] { display: none; }
 .readonly-pill svg { width: 13px; height: 13px; }
 
+/* Read-only row in the ⋯ actions menu — push the switch to the right edge, and
+   pointer-events:none lets a click anywhere on the row drive the toggle once. */
+.readonly-row .toggle-switch { margin-left: auto; pointer-events: none; }
+
 /* Read-only "you tried to edit" notification — dark, top-right, one line. */
 .readonly-notice {
   position: fixed; top: 52px; right: 14px; z-index: 1000;

@@ -191,6 +191,7 @@ function init(): void {
   const smartTypographyToggle = document.getElementById('smart-typography-toggle') as HTMLElement;
   const readOnlyToggle = document.getElementById('readonly-toggle') as HTMLElement | null;
   const readOnlyPill   = document.getElementById('readonly-pill')   as HTMLElement | null;
+  const readOnlyRow    = document.getElementById('readonly-row')    as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
 
@@ -273,7 +274,9 @@ function init(): void {
     setSmartTypography(!smartTypographyToggle.classList.contains('on'));
   });
 
-  readOnlyToggle?.addEventListener('click', () => {
+  // The whole row toggles (the switch inside has pointer-events:none, so a click
+  // anywhere on the row — label or switch — flips read-only exactly once).
+  readOnlyRow?.addEventListener('click', () => {
     applyReadOnly(!roController.get());
   });
   readOnlyPill?.addEventListener('click', () => {
