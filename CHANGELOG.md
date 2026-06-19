@@ -8,9 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Empty-state hint and plain `/` trigger (c42)** — empty blocks now show a hint: "Start writing, or press / for commands". Typing `/` on an empty block opens the block picker; `⌘/` continues to work everywhere.
 - **Board table row actions (c36)** — hover a row and **click the ⠿ grip** to open a row menu: **Open in side panel**, **Duplicate**, **Insert row above / below**, and **Delete row**. Dragging the grip still reorders, and in a grouped table **dragging a row into another group now re-assigns its group field** (like moving a kanban card between columns). The grip stays clickable even when the table is sorted — only the Insert options hide, since position is computed there. (c36)
 
 ### Changed
+
+- **Notion-style block handle (c42)** — the gutter `⠿` handle is now a larger SVG ＋ and a 6-dot drag grip, each with a soft rounded background that appears on hover only, aligned to each block's first line.
 
 - **Menus now share one component** — every click-anchored menu (tags picker, the + / slash menu and its drill-downs, board table & kanban column menus, status dropdowns, the Properties / field-action / add-property menus, the status-options editor, the callout menu, the board view switcher, the filter panel, the image manager) is built on a single shared `Popover` primitive and `Menu` builder. Behavior is now consistent everywhere: open/close, outside-click **and Escape** dismissal, only one menu open at a time, drill-downs, and the edge-aware positioning + scrollbar from before. Internal refactor — no change to what menus do, only how they're built. (Popover component)
 - **Read-only is now a real toggle** — the "Read only" control in the ⋯ menu is a proper on/off switch (like the other settings), not a button with a hard-to-read blue highlight. (c45)

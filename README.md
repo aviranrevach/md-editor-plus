@@ -330,7 +330,7 @@ Type `/board kanban` or `/board table` to drop a project board. Two views over t
 
 ### Drag handle
 
-Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. **Drag** it to move the block anywhere; **click** it to open the **block action menu** — the same for every block type:
+Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. **Drag** it to move the block anywhere; **click** it to open the **block action menu** — the same for every block type. Empty blocks show a hint — "Start writing, or press / for commands" — and pressing `/` on an empty block opens the block picker (⌘/ works everywhere).
 
 - **Turn into** — convert to paragraph, heading, list, quote, code block, **table**, **Board: Table**, or any callout type (the current type is checkmarked). At the bottom, a **✨ Using AI** section offers AI-powered conversions for targets without a direct converter (Ask AI…, Board: Kanban, Mermaid, Summary, Action items, Outline, Timeline) — it reuses the same clipboard-prompt flow as the bubble menu, scoped to the active block
 - **Duplicate** — drop an identical copy right below (duplicating a board mints a fresh id, so the copy stays independent and saves cleanly)
@@ -359,6 +359,7 @@ YAML (`---`) and TOML (`+++`) frontmatter is **detected automatically** and hidd
 
 | Shortcut | Action |
 | --- | --- |
+| `/` | Open the block picker on an empty block |
 | `⌘/`  /  `Ctrl+/` | Open the block picker at the cursor |
 | `⌘B`  /  `Ctrl+B` | Bold |
 | `⌘I`  /  `Ctrl+I` | Italic |
