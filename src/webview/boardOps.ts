@@ -1,4 +1,4 @@
-import type { Board, ViewDef } from './boardModel';
+import type { Board, Card, ViewDef } from './boardModel';
 import { mintCardId } from './boardModel';
 
 function ensureView(board: Board, viewName: string): ViewDef {
@@ -102,6 +102,51 @@ export function moveCard(board: Board, fromId: string, beforeId: string | null):
   const insertIdx = board.cards.findIndex(c => c.id === beforeId);
   if (insertIdx < 0) { board.cards.push(card); return; }
   board.cards.splice(insertIdx, 0, card);
+}
+
+export function deleteCard(board: Board, id: string): void {
+  board.cards = board.cards.filter(c => c.id !== id);
+}
+
+export function duplicateCard(board: Board, id: string): string {
+  const idx = board.cards.findIndex(c => c.id === id);
+  if (idx < 0) return id;
+  const src = board.cards[idx];
+  const newId = mintCardId(board.cards.map(c => c.id));
+  const clone: Card = { id: newId, values: { ...src.values, id: newId }, body: src.body };
+  board.cards.splice(idx + 1, 0, clone);
+  return newId;
+}
+
+/** Create a blank card (via addCard) and position it before `beforeId`
+ *  (or at the end when null). Returns the new card id. */
+export function insertCardAt(
+  board: Board,
+  beforeId: string | null,
+  presets: Partial<Record<string, string>> = {},
+): string {
+  const id = addCard(board, presets);
+  moveCard(board, id, beforeId);
+  return id;
+}
+
+/** Re-assign a card's group field to `value`, then position it before
+ *  `beforeId` (or at the end of the array when null). Used for cross-group
+ *  drag in the table. */
+export function moveCardToGroup(
+  board: Board,
+  cardId: string,
+  groupByField: string,
+  value: string,
+  beforeId: string | null,
+): void {
+  const idx = board.cards.findIndex(c => c.id === cardId);
+  if (idx < 0) return;
+  board.cards[idx] = {
+    ...board.cards[idx],
+    values: { ...board.cards[idx].values, [groupByField]: value },
+  };
+  moveCard(board, cardId, beforeId);
 }
 
 export function deleteField(board: Board, field: string): void {
