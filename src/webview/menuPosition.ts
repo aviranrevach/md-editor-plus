@@ -60,3 +60,46 @@ export function computePlacement(input: PlacementInput): Placement {
 
   return { left, top, side, maxHeight, scroll };
 }
+
+export interface PlaceOpts { margin?: number; gap?: number; preferX?: 'left' | 'right'; }
+export interface PlacementHandle { reposition(): void; destroy(): void; }
+
+export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceOpts = {}): PlacementHandle {
+  el.style.position = 'fixed';
+
+  function reposition(): void {
+    el.classList.remove('is-scroll');
+    el.style.maxHeight = 'none';
+    const a = anchor.getBoundingClientRect();
+    const p = computePlacement({
+      anchor: { top: a.top, left: a.left, width: a.width, height: a.height },
+      size: { width: el.offsetWidth, height: el.offsetHeight },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      margin: opts.margin, gap: opts.gap, preferX: opts.preferX,
+    });
+    el.style.left = `${p.left}px`;
+    el.style.top = `${p.top}px`;
+    if (p.scroll) { el.classList.add('is-scroll'); el.style.maxHeight = `${p.maxHeight ?? 0}px`; }
+    else { el.style.maxHeight = ''; }
+  }
+
+  // Measure after layout.
+  requestAnimationFrame(reposition);
+
+  // Re-position when the element resizes (drill-downs swap content) or the
+  // window resizes.
+  let ro: ResizeObserver | null = null;
+  if (typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(() => reposition());
+    ro.observe(el);
+  }
+  const onWinResize = () => reposition();
+  window.addEventListener('resize', onWinResize);
+
+  function destroy(): void {
+    if (ro) ro.disconnect();
+    window.removeEventListener('resize', onWinResize);
+  }
+
+  return { reposition, destroy };
+}
