@@ -85,7 +85,6 @@ interface SavedDefaults {
   shortenCodeSnippets?: boolean;
   smartTypography?: boolean;
   outlineVisible?: boolean;
-  readOnly?: boolean;
   sourceWordWrap?: boolean;
 }
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
@@ -194,6 +193,20 @@ function init(): void {
   const readOnlyPill   = document.getElementById('readonly-pill')   as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
+
+  const roController = createReadOnlyController({
+    root: document.documentElement,
+    toggleSwitch: readOnlyToggle,
+    pill: readOnlyPill,
+    setEditable: (editable) => setReadOnly(!editable),
+  });
+  const roNotice = createReadOnlyNotice({
+    container: document.body,
+    onEnableEditing: () => applyReadOnly(false),
+  });
+  function applyReadOnly(on: boolean): void {
+    roController.set(on);
+  }
 
   function setAlwaysDarkCode(on: boolean): void {
     document.documentElement.classList.toggle('code-always-dark', on);
@@ -949,20 +962,6 @@ function init(): void {
     setSmartTypography(d.smartTypography ?? true); // default ON (unlike the Boolean()-defaulted toggles above)
     applyReadOnly(false);
     applySourceWordWrap(Boolean(d.sourceWordWrap));
-  }
-
-  const roController = createReadOnlyController({
-    root: document.documentElement,
-    toggleSwitch: readOnlyToggle,
-    pill: readOnlyPill,
-    setEditable: (editable) => setReadOnly(!editable),
-  });
-  const roNotice = createReadOnlyNotice({
-    container: document.body,
-    onEnableEditing: () => applyReadOnly(false),
-  });
-  function applyReadOnly(on: boolean): void {
-    roController.set(on);
   }
 
   document.addEventListener('keydown', (e) => {
