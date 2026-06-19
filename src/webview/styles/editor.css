@@ -5132,3 +5132,14 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   background: var(--toolbar-btn-hover);
   color: var(--text-primary);
 }
+
+/* Empty-state hint — shown on the focused empty block and on a brand-new
+   empty document's first line. The float/height:0 trick avoids needing the
+   block to be positioned. */
+.ProseMirror .is-empty-block::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: #c4c3c0;
+}

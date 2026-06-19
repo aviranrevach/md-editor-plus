@@ -16,6 +16,7 @@ import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
+import { EmptyPlaceholder } from './extensions/emptyPlaceholder';
 import { common, createLowlight } from 'lowlight';
 import { Markdown } from 'tiptap-markdown';
 import Callout, { preprocessMarkdownCallouts } from './extensions/callout';
@@ -157,6 +158,7 @@ function buildRichEditor(
       SearchExtension,
       ImagePasteDrop,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
+      EmptyPlaceholder,
     ],
     editorProps: {
       attributes: { spellcheck: 'true' },
