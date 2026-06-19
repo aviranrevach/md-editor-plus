@@ -49,33 +49,42 @@ test('destroy() disconnects the observer and is safe to call', () => {
   expect(() => handle.destroy()).not.toThrow();
 });
 
-test('does not loop: the observer callback fired by our own re-observe is swallowed', () => {
-  // Capture the ResizeObserver callback + count observe() calls so we can prove
-  // the self-triggered resize is ignored (the fix for the flickering scrollbar).
+function sizes(el: HTMLElement, ow: number, oh: number, sh: number, ch: number) {
+  Object.defineProperty(el, 'offsetWidth', { value: ow, configurable: true });
+  Object.defineProperty(el, 'offsetHeight', { value: oh, configurable: true });
+  Object.defineProperty(el, 'scrollHeight', { value: sh, configurable: true });
+  Object.defineProperty(el, 'clientHeight', { value: ch, configurable: true });
+}
+
+test('observer ignores our own cap resize but repositions on real content growth', () => {
+  // The observer must distinguish a resize WE caused (applying max-height — the
+  // natural/scrollHeight content size is unchanged) from a real content change
+  // (late-appended rows / drill-down — natural height jumps). This is what makes
+  // a menu that populates AFTER placeFloating still cap/flip at the screen edge.
   let roCb: (() => void) | null = null;
-  let observeCount = 0;
   (window as any).ResizeObserver = class {
     constructor(cb: () => void) { roCb = cb; }
-    observe() { observeCount++; }
-    disconnect() {}
+    observe() {} disconnect() {}
   };
 
   const anchor = document.body.appendChild(document.createElement('div'));
-  anchor.getBoundingClientRect = () => ({ top: 380, left: 40, width: 120, height: 30, right: 160, bottom: 410, x: 40, y: 380, toJSON() {} } as DOMRect);
+  // anchor near the bottom: a tall menu can't fit below → must cap (is-scroll).
+  anchor.getBoundingClientRect = () => ({ top: 700, left: 40, width: 120, height: 30, right: 160, bottom: 730, x: 40, y: 700, toJSON() {} } as DOMRect);
   const menu = document.body.appendChild(document.createElement('div'));
-  Object.defineProperty(menu, 'isConnected', { value: true, configurable: true });
-  sized(menu, 220, 700); // taller than its side → is-scroll, so reposition mutates size
 
+  // Open "empty"/short — fits, so no scroll cap.
+  sizes(menu, 220, 180, 180, 178);
   placeFloating(menu, anchor);
-  // Initial reposition re-observes exactly once.
-  expect(observeCount).toBe(1);
+  expect(menu.classList.contains('is-scroll')).toBe(false);
 
-  // The first observer callback is the one our own re-observe triggers — it must
-  // be swallowed (no reposition, so no new observe()).
+  // A resize with the SAME natural height (e.g. our own cap) → ignored.
   roCb!();
-  expect(observeCount).toBe(1);
+  expect(menu.classList.contains('is-scroll')).toBe(false);
 
-  // A subsequent, genuine resize IS handled (reposition → re-observe again).
+  // Rows get appended → natural (scroll) height jumps well past the viewport →
+  // the observer repositions and the menu caps.
+  sizes(menu, 220, 900, 900, 898);
   roCb!();
-  expect(observeCount).toBe(2);
+  expect(menu.classList.contains('is-scroll')).toBe(true);
+  expect(menu.style.maxHeight).not.toBe('');
 });

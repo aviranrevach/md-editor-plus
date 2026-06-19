@@ -67,29 +67,27 @@ export interface PlacementHandle { reposition(): void; destroy(): void; }
 export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceOpts = {}): PlacementHandle {
   el.style.position = 'fixed';
 
-  // reposition() mutates el's own height/overflow (the max-height cap and the
-  // .is-scroll class), which itself resizes el. If the ResizeObserver below
-  // simply re-ran reposition() on every resize, our own writes would retrigger
-  // it forever — a feedback loop that visibly flickers the scrollbar (and lets
-  // the native bar flash through). To break it we DISCONNECT the observer
-  // while mutating, then re-observe on the next frame; re-observing fires one
-  // initial callback for the settled size, which `skipNext` swallows. Only a
-  // genuine later resize (a drill-down swapping content) gets through.
   let ro: ResizeObserver | null = null;
-  let skipNext = false;
+  let lastNaturalH = -1;
+
+  // Natural (uncapped) border-box height WITHOUT removing the cap: scrollHeight
+  // is the full content height even while max-height + overflow are applied, so
+  // this value is INVARIANT to our own .is-scroll cap — it only moves when the
+  // real content changes. That lets the observer below tell our own resizes
+  // (ignore) apart from genuine content changes like late-appended rows or a
+  // drill-down swap (reposition). It also means we never strip .is-scroll to
+  // remeasure, which used to flash the native (dark) scrollbar every call.
+  function naturalHeight(): number {
+    return el.scrollHeight + (el.offsetHeight - el.clientHeight);
+  }
 
   function reposition(): void {
-    ro?.disconnect();
     const a = anchor.getBoundingClientRect();
-    // Natural (uncapped) border-box height WITHOUT removing the cap: scrollHeight
-    // is the full content height even while max-height + overflow are applied, so
-    // we never strip .is-scroll to remeasure. Stripping it every reposition made
-    // the native scrollbar flash (dark) on each call — visible during a window
-    // drag, where reposition fires continuously.
-    const naturalHeight = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+    const natH = naturalHeight();
+    lastNaturalH = natH;
     const p = computePlacement({
       anchor: { top: a.top, left: a.left, width: a.width, height: a.height },
-      size: { width: el.offsetWidth, height: naturalHeight },
+      size: { width: el.offsetWidth, height: natH },
       viewport: { width: window.innerWidth, height: window.innerHeight },
       margin: opts.margin, gap: opts.gap, preferX: opts.preferX,
     });
@@ -97,28 +95,23 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
     el.style.top = `${p.top}px`;
     if (p.scroll) { el.classList.add('is-scroll'); el.style.maxHeight = `${p.maxHeight ?? 0}px`; }
     else { el.classList.remove('is-scroll'); el.style.maxHeight = ''; }
-    if (ro) {
-      requestAnimationFrame(() => {
-        if (!el.isConnected || !ro) return;
-        skipNext = true;
-        ro.observe(el);
-      });
-    }
   }
 
+  // Place synchronously so the menu never paints at the wrong spot. Callers
+  // reveal the element before calling placeFloating, so reading offset/scroll
+  // sizes here forces a valid synchronous layout.
+  reposition();
+
+  // Observe AFTER the first placement so the initial observation (which reports
+  // the size we just settled) is a no-op. Menus that append their rows AFTER
+  // calling placeFloating grow the content → naturalHeight jumps → reposition,
+  // so they still cap/flip at the screen edge.
   if (typeof ResizeObserver !== 'undefined') {
     ro = new ResizeObserver(() => {
-      if (skipNext) { skipNext = false; return; }
-      reposition();
+      if (Math.abs(naturalHeight() - lastNaturalH) > FUZZ) reposition();
     });
+    ro.observe(el);
   }
-
-  // Place synchronously so the menu never paints a frame at the wrong spot /
-  // uncapped (that 1-frame gap was a visible flash on first open). Callers
-  // reveal the element (remove the hidden class) before calling placeFloating,
-  // so reading offset/scrollHeight here forces a valid synchronous layout. This
-  // first reposition also starts the observation.
-  reposition();
 
   const onWinResize = () => reposition();
   window.addEventListener('resize', onWinResize);
