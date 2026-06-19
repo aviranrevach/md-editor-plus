@@ -7,7 +7,7 @@ import type { BoardRendererCtx } from './boardBlock';
 import type { Board, ColumnDef } from './boardModel';
 import { getStatusOptions } from './boardModel';
 import { applyFilter, EMPTY_VALUE } from './boardFilter';
-import { placeFloating, type PlacementHandle } from './menuPosition';
+import { createPopover, type Popover } from './popover';
 
 interface FilterableField { name: string; values: ColumnDef[]; }
 
@@ -61,43 +61,30 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
   pill.appendChild(countEl);
   wrap.appendChild(pill);
 
-  const panel = document.createElement('div');
-  panel.className = 'bd-filter-panel bd-hidden';
-  panel.setAttribute('role', 'dialog');
-  wrap.appendChild(panel);
-
-  let outsideHandler: ((e: MouseEvent) => void) | null = null;
-  let placement: PlacementHandle | null = null;
+  let popover: Popover | null = null;
 
   function closePanel(): void {
-    panel.classList.add('bd-hidden');
-    placement?.destroy();
-    placement = null;
+    popover?.close();
+    popover = null;
     pill.classList.remove('is-open');
-    if (outsideHandler) {
-      document.removeEventListener('mousedown', outsideHandler, true);
-      outsideHandler = null;
-    }
   }
 
   function openPanel(): void {
+    popover = createPopover({
+      className: 'bd-filter-panel',
+      preferX: 'right',
+      onClose: () => { popover = null; pill.classList.remove('is-open'); },
+    });
+    popover.el.setAttribute('role', 'dialog');
     buildPanel();
-    placement?.destroy();
-    panel.classList.remove('bd-hidden');
-    placement = placeFloating(panel, pill, { preferX: 'right' });
+    popover.open(pill);
     pill.classList.add('is-open');
-    outsideHandler = (e: MouseEvent) => {
-      if (!wrap.contains(e.target as Node)) closePanel();
-    };
-    // Capture phase so opening this pill also closes any other open popover
-    // (their own outside-mousedown listeners fire and dismiss them).
-    document.addEventListener('mousedown', outsideHandler, true);
   }
 
   pill.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (panel.classList.contains('bd-hidden')) openPanel();
-    else closePanel();
+    if (popover?.isOpen()) closePanel();
+    else openPanel();
   });
 
   // Toggle one value on/off. Default is all-on, so we track the ON set: all on
@@ -116,6 +103,8 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
   }
 
   function buildPanel(): void {
+    if (!popover) return;
+    const panel = popover.el;
     panel.innerHTML = '';
     const board = ctx.getBoard();
     const filter = ctx.getFilter();
