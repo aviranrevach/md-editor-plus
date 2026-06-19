@@ -1231,14 +1231,12 @@ function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: B
   input.type = 'date';
   input.value = card.values[field.name] ?? '';
   input.className = 'bd-date-input';
-  const r = anchor.getBoundingClientRect();
-  input.style.position = 'fixed';
-  input.style.left = `${r.left}px`;
-  input.style.top  = `${r.top}px`;
   document.body.appendChild(input);
+  const placement = placeFloating(input, anchor);
   input.focus();
   const commit = () => {
     const v = input.value;
+    placement.destroy();
     input.remove();
     document.removeEventListener('mousedown', onOutside, true);
     if (v !== (card.values[field.name] ?? '')) {
