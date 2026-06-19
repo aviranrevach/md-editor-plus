@@ -9,7 +9,7 @@ import {
 import { parseBoardSource, duplicateBoardSource, mintBoardId } from './boardModel';
 import { tableToBoardSource } from './tableToBoard';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { AI_TRANSFORMS, type AiTarget } from './aiTransforms';
+import { type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
 import { createPopover, type Popover } from './popover';
