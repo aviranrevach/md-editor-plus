@@ -13,6 +13,7 @@ import { type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
 import { createPopover, type Popover } from './popover';
+import { placeFlyout } from './menuPosition';
 
 export interface BlockDef {
   id: string;
@@ -602,9 +603,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   // type (action OR convert target) without a per-type branch in keydown.
   let activeRows: Array<() => void> = [];
 
-  // --- flyout (Turn-into child popover) ---
-  let flyoutPop: Popover | null = null;
-  let flyoutList: HTMLElement | null = null;
+  // --- flyout (Turn-into panel, contained inside the action popover el) ---
   let flyoutRows: Array<() => void> = [];
   let flyoutIdx = 0;
 
@@ -636,28 +635,29 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   const footVerb = el.querySelector<HTMLElement>('.bp-foot-verb')!;
   const footHints = el.querySelector<HTMLElement>('.block-picker-foot-hints')!;
 
-  function ensureFlyout(): Popover {
-    if (flyoutPop) return flyoutPop;
-    flyoutPop = createPopover({
-      className: 'block-picker block-picker-flyout',
-      parent: popover!,            // child: keeps the action menu open, shares dismissal
-      preferX: 'right',
-      maxHeight: 440,
-    });
-    flyoutList = document.createElement('div');
-    flyoutList.className = 'block-picker-list';
-    flyoutPop.el.appendChild(flyoutList);
-    return flyoutPop;
-  }
+  // Flyout: a fixed-position element contained inside the action popover el.
+  // It is NOT a child popover — it sits in the DOM inside `el` but is positioned
+  // via placeFlyout so it appears beside the action panel.
+  // Note: uses only `block-picker-flyout` (not `block-picker`) so that
+  // querySelectorAll('.block-picker') in tests and the popover registry never
+  // accidentally returns this element.
+  const flyoutEl = document.createElement('div');
+  flyoutEl.className = 'block-picker-flyout';
+  flyoutEl.style.position = 'fixed';
+  flyoutEl.style.display = 'none';
+  const flyoutList = document.createElement('div');
+  flyoutList.className = 'block-picker-list';
+  flyoutEl.appendChild(flyoutList);
+  el.appendChild(flyoutEl);
 
-  function isFlyoutOpen(): boolean { return !!flyoutPop?.isOpen(); }
+  function isFlyoutOpen(): boolean { return flyoutEl.style.display !== 'none'; }
 
   function currentSource(): BlockDef[] {
     return drillParent?.subItems ?? BLOCK_DEFS;
   }
 
   function renderFlyout(): void {
-    const flist = flyoutList!;
+    const flist = flyoutList;
     flist.innerHTML = '';
     flyoutRows = [];
     const { targets, aiItems } = turnIntoFlyoutItems(BLOCK_DEFS);
@@ -687,20 +687,32 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function updateFlyoutActive(): void {
-    flyoutList!.querySelectorAll<HTMLElement>('.block-picker-item').forEach((row, i) => {
+    flyoutList.querySelectorAll<HTMLElement>('.block-picker-item').forEach((row, i) => {
       row.classList.toggle('active', i === flyoutIdx);
     });
   }
 
+  let flyoutAnchorRow: HTMLElement | null = null;
+  function positionFlyout(): void {
+    if (!flyoutAnchorRow || flyoutEl.style.display === 'none') return;
+    placeFlyout(flyoutEl, el, flyoutAnchorRow, { maxHeight: 440 });
+  }
+  const onFlyoutResize = () => positionFlyout();
+
   function openFlyout(rowEl: HTMLElement): void {
-    ensureFlyout();
-    if (!flyoutPop!.isOpen()) flyoutPop!.open(rowEl);  // positions right/flip-left via placeFloating
+    flyoutAnchorRow = rowEl;
+    flyoutEl.style.display = '';
     renderFlyout();
+    positionFlyout();
+    window.addEventListener('resize', onFlyoutResize);
     footVerb.textContent = footerCloseVerb(true);      // action-panel footer: esc Back
   }
 
   function closeFlyout(): void {
-    if (flyoutPop?.isOpen()) flyoutPop.close();
+    if (flyoutEl.style.display === 'none') return;
+    flyoutEl.style.display = 'none';
+    window.removeEventListener('resize', onFlyoutResize);
+    flyoutAnchorRow = null;
     footVerb.textContent = footerCloseVerb(false);     // esc Close
   }
 
@@ -802,6 +814,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   // The dragger action menu. Empty search -> grouped (Turn into › / Duplicate /
   // Delete). Non-empty -> matching actions + flattened convert targets.
   function renderActionMenu(): void {
+    closeFlyout();
     list.innerHTML = '';
     activeRows = [];
     const { actions, targets } = searchBlockActions(input.value, BLOCK_DEFS);

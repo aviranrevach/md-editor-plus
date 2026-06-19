@@ -2235,12 +2235,36 @@ html.source-full-width #source-view {
   opacity: 0.85;
 }
 
-/* Turn-into flyout: a child of the action menu, offset to its right. Reuses
-   .block-picker chrome; no search field, no footer of its own. */
+/* Turn-into flyout: contained in the action panel el, placed via placeFlyout().
+   Carries its own visual chrome (not .block-picker) so querySelectorAll('.block-picker')
+   never accidentally picks it up — it uses block-picker-flyout as its sole class. */
 .block-picker-flyout {
+  position: fixed;
   width: 230px;
-  margin-left: 8px;   /* visual gap from the action panel; placeFloating sets left/top */
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px 6px 0;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 1050;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.2) transparent;
 }
+
+.theme-dark .block-picker-flyout {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+.block-picker-flyout::-webkit-scrollbar { width: 6px; height: 6px; }
+.block-picker-flyout::-webkit-scrollbar-track { background: transparent; }
+.block-picker-flyout::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.18);
+  border-radius: 3px;
+}
+
+.block-picker-flyout.is-scroll { overflow-y: auto; }
 
 .block-picker-emoji-icon {
   display: inline-flex;

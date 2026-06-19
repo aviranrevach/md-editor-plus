@@ -134,3 +134,75 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
 
   return { reposition, destroy };
 }
+
+export interface FlyoutInput {
+  panel: Rect;                                  // the action panel's bounding rect
+  row: Rect;                                    // the Turn-into row's rect (vertical anchor)
+  size: { width: number; height: number };      // the flyout's natural size
+  viewport: { width: number; height: number };
+  gap?: number;       // gap between panel and flyout (default 8)
+  margin?: number;    // viewport margin (default 8)
+  maxHeight?: number; // absolute height ceiling (default: none)
+}
+
+export function computeFlyoutPlacement(input: FlyoutInput): { left: number; top: number; side: 'right' | 'left'; maxHeight: number | null; scroll: boolean } {
+  const gap = input.gap ?? 8;
+  const margin = input.margin ?? 8;
+  const { panel, row, size, viewport: vp } = input;
+
+  const spaceRight = vp.width - (panel.left + panel.width) - gap - margin;
+  const spaceLeft = panel.left - gap - margin;
+  let side: 'right' | 'left';
+  if (size.width <= spaceRight + FUZZ)      side = 'right';
+  else if (size.width <= spaceLeft + FUZZ)  side = 'left';
+  else if (spaceRight >= spaceLeft)         side = 'right';
+  else                                      side = 'left';
+
+  let left = side === 'right' ? panel.left + panel.width + gap : panel.left - gap - size.width;
+  left = clamp(left, margin, vp.width - size.width - margin);
+
+  const cappedH = Math.min(size.height, input.maxHeight ?? Infinity);
+  const avail = vp.height - 2 * margin;
+  const effH = Math.max(0, Math.min(cappedH, avail));
+  const scroll = size.height > effH + FUZZ;
+  const maxHeight = scroll ? effH : null;
+
+  let top = clamp(row.top, margin, vp.height - effH - margin);
+  return { left, top, side, maxHeight, scroll };
+}
+
+/**
+ * Measure `flyoutEl`, call `computeFlyoutPlacement`, and apply the result
+ * directly to `flyoutEl.style`.  All coordinate writes stay in menuPosition.ts
+ * (excluded from the c34 hand-roll guardrail) so blockPicker.ts never touches
+ * `.style.left / .style.top` directly.
+ *
+ * Call this after `flyoutEl` is visible (display != 'none') so that
+ * offsetWidth / scrollHeight return real values.
+ */
+export function placeFlyout(
+  flyoutEl: HTMLElement,
+  panelEl: HTMLElement,
+  anchorRowEl: HTMLElement,
+  opts: { maxHeight?: number } = {},
+): void {
+  const panel = panelEl.getBoundingClientRect();
+  const row = anchorRowEl.getBoundingClientRect();
+  const natH = flyoutEl.scrollHeight + (flyoutEl.offsetHeight - flyoutEl.clientHeight);
+  const p = computeFlyoutPlacement({
+    panel: { top: panel.top, left: panel.left, width: panel.width, height: panel.height },
+    row:   { top: row.top,   left: row.left,   width: row.width,   height: row.height   },
+    size:  { width: flyoutEl.offsetWidth, height: natH },
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    maxHeight: opts.maxHeight,
+  });
+  flyoutEl.style.left = `${p.left}px`;
+  flyoutEl.style.top  = `${p.top}px`;
+  if (p.scroll) {
+    flyoutEl.classList.add('is-scroll');
+    flyoutEl.style.maxHeight = `${p.maxHeight ?? 0}px`;
+  } else {
+    flyoutEl.classList.remove('is-scroll');
+    flyoutEl.style.maxHeight = '';
+  }
+}

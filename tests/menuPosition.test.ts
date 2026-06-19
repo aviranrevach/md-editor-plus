@@ -1,4 +1,4 @@
-import { computePlacement } from '../src/webview/menuPosition';
+import { computePlacement, computeFlyoutPlacement } from '../src/webview/menuPosition';
 
 const VP = { width: 1000, height: 800 };
 
@@ -95,4 +95,53 @@ test('maxHeight is further capped by the available side space', () => {
   const bottom = p.top + (p.maxHeight as number);
   expect(p.top).toBeGreaterThanOrEqual(8);
   expect(bottom).toBeLessThanOrEqual(800 - 8);
+});
+
+// --- computeFlyoutPlacement tests ---
+
+const PANEL  = { left: 100, top: 200, width: 210, height: 120 };
+const ROW    = { left: 100, top: 230, width: 210, height: 30  };
+const SIZE   = { width: 230, height: 300 };
+const VPF    = { width: 1000, height: 800 };
+
+test('flyout: room on the right → side right, correct left, top aligned to row, no scroll', () => {
+  // spaceRight = 1000 - (100+210) - 8 - 8 = 674 >= 230 → right
+  const p = computeFlyoutPlacement({ panel: PANEL, row: ROW, size: SIZE, viewport: VPF });
+  expect(p.side).toBe('right');
+  // left = panel.left + panel.width + gap = 100 + 210 + 8 = 318
+  expect(p.left).toBe(318);
+  // top = clamp(row.top=230, 8, 800 - 300 - 8 = 492) = 230
+  expect(p.top).toBe(230);
+  expect(p.scroll).toBe(false);
+  expect(p.maxHeight).toBeNull();
+});
+
+test('flyout: no room on right but room on left → side left, correct left', () => {
+  // panel.left=740, panel.width=210 → right edge 950, spaceRight=1000-950-8-8=34 < 230
+  // spaceLeft = 740 - 8 - 8 = 724 >= 230 → left
+  const panel = { left: 740, top: 200, width: 210, height: 120 };
+  const row   = { left: 740, top: 230, width: 210, height: 30  };
+  const p = computeFlyoutPlacement({ panel, row, size: SIZE, viewport: VPF });
+  expect(p.side).toBe('left');
+  // left = panel.left - gap - size.width = 740 - 8 - 230 = 502
+  expect(p.left).toBe(502);
+});
+
+test('flyout: row near the bottom → top clamped so flyout stays on screen', () => {
+  const row = { left: 100, top: 740, width: 210, height: 30 };
+  const p = computeFlyoutPlacement({ panel: PANEL, row, size: SIZE, viewport: VPF });
+  // top + effH must be <= vp.height - margin
+  expect(p.top + (p.maxHeight ?? SIZE.height)).toBeLessThanOrEqual(VPF.height - 8);
+  expect(p.top).toBeGreaterThanOrEqual(8);
+});
+
+test('flyout: maxHeight cap smaller than content → scroll true, maxHeight = cap', () => {
+  const p = computeFlyoutPlacement({
+    panel: PANEL, row: ROW,
+    size: { width: 230, height: 600 },
+    viewport: VPF,
+    maxHeight: 440,
+  });
+  expect(p.scroll).toBe(true);
+  expect(p.maxHeight).toBe(440);
 });
