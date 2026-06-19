@@ -2213,10 +2213,15 @@ html.source-full-width #source-view {
   align-items: center;
   justify-content: space-between;
   padding: 7px 12px 5px;
-  margin-top: 2px;
   border-top: 1px solid var(--border);
   font-size: 11px;            /* caption — smaller than Notion */
   color: var(--text-secondary);
+  /* Pin to the bottom of the (scrolling) picker so it stays visible while the
+     block list scrolls underneath. The picker itself is the scroll container
+     (placeFloating caps its height + adds .is-scroll). */
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
 }
 .block-picker-footer .bp-key {
   font-size: 10px;
