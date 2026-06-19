@@ -608,7 +608,10 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     return block.isActive(ab.typeName, ab.attrs);
   }
 
-  popover = createPopover({ className: 'block-picker', onClose: resetState });
+  // Cap the picker height so a long block list scrolls inside the menu
+  // (Notion-style) instead of growing to fill the screen and getting shoved
+  // away from the cursor. placeFloating further caps this to the side space.
+  popover = createPopover({ className: 'block-picker', onClose: resetState, maxHeight: 440 });
   const el = popover.el;
   el.innerHTML = `
     <div class="block-picker-search">

@@ -59,3 +59,40 @@ test('short menu in a corner never scrolls', () => {
   expect(p.left + 220).toBeLessThanOrEqual(1000 - 8);
   expect(p.top).toBeGreaterThanOrEqual(8);
 });
+
+test('maxHeight caps a tall menu and scrolls even when the side has room', () => {
+  // Anchor near the top: 658px of room below, content is 700px. Without a cap
+  // the menu would fit below at full height. With a 440px cap it stays compact,
+  // scrolls, and still opens right below the anchor (no jump to the top).
+  const p = computePlacement({
+    anchor: { top: 40, left: 40, width: 120, height: 30 },
+    size: { width: 220, height: 700 }, viewport: VP, maxHeight: 440,
+  });
+  expect(p.side).toBe('below');
+  expect(p.top).toBe(40 + 30 + 4);     // sits at the anchor, not clamped away
+  expect(p.scroll).toBe(true);
+  expect(p.maxHeight).toBe(440);
+});
+
+test('maxHeight larger than the content has no effect', () => {
+  const p = computePlacement({
+    anchor: { top: 40, left: 40, width: 120, height: 30 },
+    size: { width: 220, height: 200 }, viewport: VP, maxHeight: 440,
+  });
+  expect(p.scroll).toBe(false);
+  expect(p.maxHeight).toBeNull();
+});
+
+test('maxHeight is further capped by the available side space', () => {
+  // Anchor mid-screen: each side ~ 358px. A 440px cap can't be honored, so the
+  // menu caps to the side space and scrolls, never covering the anchor.
+  const p = computePlacement({
+    anchor: { top: 380, left: 40, width: 120, height: 30 },
+    size: { width: 220, height: 700 }, viewport: VP, maxHeight: 440,
+  });
+  expect(p.scroll).toBe(true);
+  expect(p.maxHeight as number).toBeLessThanOrEqual(440);
+  const bottom = p.top + (p.maxHeight as number);
+  expect(p.top).toBeGreaterThanOrEqual(8);
+  expect(bottom).toBeLessThanOrEqual(800 - 8);
+});
