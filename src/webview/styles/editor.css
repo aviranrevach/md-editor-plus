@@ -327,10 +327,9 @@ body {
   animation: actions-dropdown-in-center 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-/* Dots anchor — pinned to top-right, grows from top-right */
+/* Dots anchor — position owned by placeFloating() (preferX:'right') so it
+   flips / clamps / scrolls near the viewport edge instead of cropping. */
 .actions-panel[data-anchor="dots"] {
-  right: 16px;
-  top: 50px;
   transform-origin: top right;
   animation: dropdown-in 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }

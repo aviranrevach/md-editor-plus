@@ -175,6 +175,7 @@ function init(): void {
   const settingsBtn   = document.getElementById('settings-btn') as HTMLElement;
   const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
   let settingsPlacement: PlacementHandle | null = null;
+  let dotsPlacement: PlacementHandle | null = null;
   const fullWidthTog  = document.getElementById('full-width-toggle') as HTMLElement;
   const widthSlider   = document.getElementById('width-slider') as HTMLInputElement;
   const widthValue    = document.getElementById('width-value') as HTMLElement;
@@ -711,6 +712,8 @@ function init(): void {
 
   function closeDotsPanel(): void {
     actionsPanelDots.classList.add('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = null;
     closeSubmenu();
     actionsBtn.classList.remove('active');
     syncToolbarPanelState();
@@ -849,6 +852,8 @@ function init(): void {
     closeFilenamePanel();
     findBar?.close();
     actionsPanelDots.classList.remove('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = placeFloating(actionsPanelDots, actionsBtn, { preferX: 'right' });
     actionsBtn.classList.add('active');
     syncToolbarPanelState();
   }
