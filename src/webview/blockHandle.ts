@@ -1,6 +1,7 @@
 import { Editor } from '@tiptap/core';
 import { createBlockPicker } from './blockPicker';
 import { createCalloutMenu } from './calloutMenu';
+import { slashShouldOpenPicker } from './slashTrigger';
 
 function getInsertPosFromHandle(editor: Editor, handleEl: HTMLElement): number {
   const rect = handleEl.getBoundingClientRect();
@@ -177,9 +178,14 @@ export function createBlockHandle(editor: Editor): void {
 
   }, 100);
 
-  // ⌘/ keyboard shortcut — opens picker at current cursor position
+  // ⌘/ anywhere, or plain "/" on an empty block — opens picker at the cursor.
   editor.view.dom.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
+    const metaSlash = e.key === '/' && (e.metaKey || e.ctrlKey);
+    const sel = editor.state.selection;
+    const plainSlash =
+      e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey &&
+      slashShouldOpenPicker(sel.$from.parent.textContent, sel.empty);
+    if (metaSlash || plainSlash) {
       e.preventDefault();
       const { from } = editor.state.selection;
       const $pos  = editor.view.state.doc.resolve(from);
