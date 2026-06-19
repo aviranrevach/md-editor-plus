@@ -1269,6 +1269,8 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
   const pop = document.createElement('div');
   pop.className = 'board-status-dropdown';
 
+  let placement: PlacementHandle;
+
   function closeOnOutside(e: MouseEvent): void {
     if (!pop.contains(e.target as Node)) {
       placement.destroy();
@@ -1301,7 +1303,7 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
     pop.appendChild(item);
   }
   document.body.appendChild(pop);
-  const placement: PlacementHandle = placeFloating(pop, anchor);
+  placement = placeFloating(pop, anchor);
   currentStatusOutside = closeOnOutside;
   document.addEventListener('mousedown', closeOnOutside, true);
 }
