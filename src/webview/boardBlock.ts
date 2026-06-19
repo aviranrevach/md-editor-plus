@@ -163,18 +163,11 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
   // Chrome (name + ⋯ menu) is built once and prepended to dom before bodyEl.
   // It stays in the DOM across body re-renders so popovers inside the chrome
   // survive mutate() calls.
-  let closeOpenMenu: (() => void) | null = null;
-  function registerMenuClose(cb: () => void): void { closeOpenMenu = cb; }
-  function unregisterMenuClose(): void { closeOpenMenu = null; }
-  void closeOpenMenu; // referenced via closure in renderers that may call registerMenuClose
-
   const chromeHandle: ChromeHandle = renderChrome(
     board,
     mutate,
     opts.isReadOnly(),
     ctx,
-    registerMenuClose,
-    unregisterMenuClose,
   );
   dom.appendChild(chromeHandle.el);
   dom.appendChild(bodyEl);
