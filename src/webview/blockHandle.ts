@@ -177,7 +177,15 @@ export function createBlockHandle(editor: Editor): void {
 
   }, 100);
 
-  // ⌘/ keyboard shortcut — opens picker at current cursor position
+  // ⌘/ keyboard shortcut — opens picker at current cursor position.
+  // A single persistent 0×0 anchor element, repositioned per invocation and
+  // NEVER removed while a menu may be open: placeFloating keeps a reference and
+  // re-reads its rect on resize/content changes, so a detached anchor would
+  // report a zero rect and snap the menu to the top-left corner.
+  const caretAnchor = document.createElement('div');
+  caretAnchor.style.cssText = 'position:fixed;width:0;height:0;pointer-events:none';
+  document.body.appendChild(caretAnchor);
+
   editor.view.dom.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === '/' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -187,13 +195,11 @@ export function createBlockHandle(editor: Editor): void {
       while (depth > 1) depth--;
       const insertPos = $pos.end(depth);
 
-      // Position picker near cursor
+      // Move the persistent anchor to the caret, then open against it.
       const coords = editor.view.coordsAtPos(from);
-      const anchor = document.createElement('div');
-      anchor.style.cssText = `position:fixed;left:${coords.left}px;top:${coords.bottom}px;width:0;height:0`;
-      document.body.appendChild(anchor);
-      picker.open(anchor, insertPos);
-      requestAnimationFrame(() => anchor.remove());
+      caretAnchor.style.left = `${coords.left}px`;
+      caretAnchor.style.top  = `${coords.bottom}px`;
+      picker.open(caretAnchor, insertPos);
     }
   });
 }
