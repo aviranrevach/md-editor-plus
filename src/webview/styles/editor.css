@@ -112,6 +112,9 @@ body {
   user-select: none;
   transition: color 120ms ease, opacity 120ms ease;
 }
+/* `.hidden`/[hidden] otherwise loses to the explicit display above — needed so
+   the read-only pill can replace the save indicator (c44). */
+.save-indicator[hidden] { display: none; }
 .save-ind-saved    { color: var(--save-ok, #2e9e5b); }
 .save-ind-unsaved  { color: var(--save-warn, #c9821f); }
 .save-ind-saving   { color: var(--toolbar-fg-muted, #8a8a8a); }
@@ -2887,12 +2890,40 @@ html.read-only .ProseMirror { caret-color: transparent; }
 html.read-only .global-drag-handle,
 html.read-only .ProseMirror-menubar,
 html.read-only .block-handle { display: none !important; }
-.settings-action.act-toggle-readonly.active {
-  color: var(--link);
+/* Read-only toolbar pill — visible only while read-only; click to enable editing. */
+.readonly-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--link-subtle-bg, #eef1ff); color: var(--link, #3b53d6);
+  border: 1px solid var(--link-subtle-border, #d4dcff); border-radius: 999px;
+  padding: 2px 9px; font-size: 12px; font-weight: 600; cursor: pointer;
 }
-.settings-action.act-toggle-readonly.active svg {
-  color: var(--link);
+.readonly-pill[hidden] { display: none; }
+/* Lock icon matches the label's font size exactly (1em). */
+.readonly-pill svg { width: 1em; height: 1em; }
+
+/* Read-only row in the ⋯ actions menu — push the switch to the right edge, and
+   pointer-events:none lets a click anywhere on the row drive the toggle once. */
+.readonly-row .toggle-switch { margin-left: auto; pointer-events: none; }
+
+/* Read-only "you tried to edit" notification — dark, top-right, one line. */
+.readonly-notice {
+  position: fixed; top: 52px; right: 14px; z-index: 1000;
+  width: max-content; background: #2b2b29; color: #f5f5f3;
+  border-radius: 8px; box-shadow: 0 8px 26px rgba(0,0,0,.30);
+  font-family: var(--font-board, sans-serif);
 }
+.readonly-notice-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 12px 13px 10px; font-size: 13px; white-space: nowrap;
+}
+.readonly-notice-msg b { color: #fff; }
+.readonly-notice-x { opacity: .4; cursor: pointer; font-size: 12px; padding-left: 6px; }
+.readonly-notice-acts { display: flex; justify-content: flex-end; gap: 8px; padding: 0 13px 12px; }
+.readonly-notice-dismiss, .readonly-notice-enable {
+  font-size: 12px; border-radius: 5px; padding: 4px 11px; cursor: pointer; border: none;
+}
+.readonly-notice-dismiss { color: #cfcfcb; background: transparent; border: 1px solid #4a4a47; }
+.readonly-notice-enable { background: var(--link, #2383e2); color: #fff; font-weight: 600; }
 
 /* ---------- Source-view word wrap ------------------------------------- */
 html.source-word-wrap #source-view .cb-content {
