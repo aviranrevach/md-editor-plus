@@ -189,3 +189,39 @@ describe('chrome popover CSS self-position check (c34)', () => {
     expect(bodyWithoutPositionFixed).not.toMatch(COORD_PROPS);
   });
 });
+
+describe('placeFloating popovers must not carry their own scroll (c34)', () => {
+  // placeFloating() owns height + scroll via the .is-scroll class. A migrated
+  // popover that ALSO declares overflow-y:auto/scroll in CSS shows the native
+  // (unstyled, dark) scrollbar whenever placeFloating decides it fits and does
+  // NOT add .is-scroll — the bug behind the flickering dark scrollbar. So the
+  // top-level popover class must not self-scroll. (Inner lists like
+  // .bd-tags-list / .block-picker-list are a separate concern, not listed here.)
+  const SELF_SCROLL = /overflow(-x|-y)?\s*:\s*(auto|scroll)/;
+  const board = () => fs.readFileSync(path.join(__dirname, '..', 'src', 'webview', 'styles', 'board.css'), 'utf8');
+  const editor = () => fs.readFileSync(path.join(__dirname, '..', 'src', 'webview', 'styles', 'editor.css'), 'utf8');
+
+  // These popover rules have no nested braces, so the body is everything from
+  // `selector {` up to the first `}`. Strip comments so prose can't false-match.
+  function ruleBody(css: string, selector: string): string {
+    const re = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^}]*)\\}');
+    const m = css.match(re);
+    return m ? m[1].replace(/\/\*[\s\S]*?\*\//g, '') : '';
+  }
+
+  const POPOVERS: Array<[string, () => string]> = [
+    ['.bd-more-menu', board], ['.bd-filter-panel', board], ['.bd-col-menu', board],
+    ['.board-properties-menu', board], ['.board-field-action-menu', board],
+    ['.board-add-field-picker', board], ['.bd-opt-popover', board],
+    ['.bd-tags-pop', board], ['.board-status-dropdown', board],
+    ['.block-picker', editor], ['.callout-menu', editor], ['.settings-panel', editor],
+  ];
+
+  for (const [selector, css] of POPOVERS) {
+    test(`${selector} does not declare overflow:auto/scroll (placeFloating owns it)`, () => {
+      const body = ruleBody(css(), selector);
+      expect(body.length).toBeGreaterThan(0); // selector must exist (catch renames)
+      expect(body).not.toMatch(SELF_SCROLL);
+    });
+  }
+});

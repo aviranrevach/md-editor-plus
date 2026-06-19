@@ -113,8 +113,12 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
     });
   }
 
-  // Measure after layout (this first reposition also starts the observation).
-  requestAnimationFrame(reposition);
+  // Place synchronously so the menu never paints a frame at the wrong spot /
+  // uncapped (that 1-frame gap was a visible flash on first open). Callers
+  // reveal the element (remove the hidden class) before calling placeFloating,
+  // so reading offset/scrollHeight here forces a valid synchronous layout. This
+  // first reposition also starts the observation.
+  reposition();
 
   const onWinResize = () => reposition();
   window.addEventListener('resize', onWinResize);

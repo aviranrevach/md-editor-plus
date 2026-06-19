@@ -209,6 +209,7 @@
    default; placeFloating only adds .is-scroll when content exceeds its side. */
 .is-scroll {
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.15s;
@@ -1378,8 +1379,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
   padding: 8px;
   z-index: 6;
-  max-height: 70vh;
-  overflow-y: auto;
+  /* Height + scroll are owned by placeFloating()/.is-scroll (single source of
+     truth). A self-scroll here showed the native dark scrollbar whenever
+     placeFloating decided it fit and did not add .is-scroll. */
 }
 .bd-more-menu.bd-hidden { display: none; }
 .bd-more-sep { height: 1px; background: var(--border); margin: 8px 0; }

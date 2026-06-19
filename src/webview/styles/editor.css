@@ -1998,9 +1998,8 @@ html.source-full-width #source-view {
   padding: 6px;
   box-shadow: 0 12px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
   z-index: 1050;
-  max-height: 420px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Height + scroll owned by placeFloating()/.is-scroll — no self-scroll here
+     (it showed the native dark bar when placeFloating didn't add .is-scroll). */
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.2) transparent;
 }
