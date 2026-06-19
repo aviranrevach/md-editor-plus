@@ -767,6 +767,66 @@ describe('column-header ⋯ menu Edit options item', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// 13. Row grip actions menu
+// ---------------------------------------------------------------------------
+
+// Helper: simulate a plain click (mousedown + mouseup, no movement) on an element.
+function clickNoDrag(el: Element): void {
+  el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 5, clientY: 5 }));
+}
+
+describe('row grip actions menu', () => {
+  it('opens a menu with the full action set on grip click (unsorted)', () => {
+    const { ctx } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    clickNoDrag(grip);
+    const labels = Array.from(document.querySelectorAll('.mp-menu .mp-menu-label'))
+      .map(el => el.textContent);
+    expect(labels).toEqual([
+      'Open in side panel', 'Duplicate', 'Insert row above', 'Insert row below', 'Delete row',
+    ]);
+  });
+
+  it('Delete row removes the card', () => {
+    const { ctx, boardRef } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const firstGrip = ctx.root.querySelector('tr.bd-table-row .bd-row-grip')!;
+    clickNoDrag(firstGrip);
+    const del = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
+      .find(el => el.textContent?.includes('Delete row'))!;
+    del.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(boardRef.current.cards.map(c => c.id)).toEqual(['c2']);
+  });
+
+  it('Duplicate adds a clone directly after the source', () => {
+    const { ctx, boardRef } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const firstGrip = ctx.root.querySelector('tr.bd-table-row .bd-row-grip')!;
+    clickNoDrag(firstGrip);
+    const dup = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
+      .find(el => el.textContent?.includes('Duplicate'))!;
+    dup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(boardRef.current.cards).toHaveLength(3);
+    expect(boardRef.current.cards[0].id).toBe('c1');
+    expect(boardRef.current.cards[1].id).not.toBe('c1'); // clone sits after source
+  });
+
+  it('omits Insert items and drops drag affordance when the view is sorted', () => {
+    const board = makeBoard({ views: [{ name: 'table', sort: { field: 'Title', dir: 'asc' } }] });
+    const { ctx } = makeCtx(board);
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    expect(grip.hasAttribute('data-board-drag')).toBe(false);
+    clickNoDrag(grip);
+    const labels = Array.from(document.querySelectorAll('.mp-menu .mp-menu-label'))
+      .map(el => el.textContent);
+    expect(labels).toEqual(['Open in side panel', 'Duplicate', 'Delete row']);
+  });
+});
+
 describe('id cell is read-only (c17)', () => {
   function boardWithId(): Board {
     return {

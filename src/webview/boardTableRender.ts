@@ -16,7 +16,7 @@ import { getStatusOptions, autoColorPublic, mintCardId } from './boardModel';
 import { applyFilter } from './boardFilter';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
-import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
+import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard, moveCardToGroup, deleteCard, duplicateCard, insertCardAt } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
 import { attachSmartTypography } from './extensions/smartTypography';
 import { openStatusOptionsEditor } from './boardStatusOptions';
@@ -27,6 +27,7 @@ import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
 import { imageFilesFrom } from './extensions/imagePasteDrop';
 import { createMenu } from './menu';
+import type { MenuSection } from './menu';
 import { createPopover } from './popover';
 
 interface Group { key: string; cards: Card[]; }
@@ -208,47 +209,50 @@ function startRowDrag(
   card: Card,
   group: Group,
   ctx: BoardRendererCtx,
+  groups: Group[],
+  groupBy: string | undefined,
+  onClick: () => void,
 ): () => void {
   const ind = dropIndicator();
   ind.style.position = 'fixed';
   document.body.appendChild(ind);
   let dropBeforeId: string | null = null;
-  let isReject = false;
+  let dropGroupKey: string | null = null;   // null = same group (reorder only)
   let hasValidDrop = false;
   return startDrag(e, {
     onMove: (ev) => {
       const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('tr.bd-table-row') as HTMLElement | null;
-      if (!target) { ind.hide(); return; }
+      if (!target) { ind.hide(); hasValidDrop = false; return; }
       const targetCardId = target.dataset.cardId!;
-      const targetCard = group.cards.find(c => c.id === targetCardId);
-      if (!targetCard) {
-        isReject = true;
-        hasValidDrop = false;
-        ind.classList.add('bd-drop-line-reject');
-        const r = target.getBoundingClientRect();
-        ind.show(r.left, r.top, r.width, 2);
-        return;
-      }
-      isReject = false;
+      const targetGroup = groups.find(g => g.cards.some(c => c.id === targetCardId));
+      if (!targetGroup) { ind.hide(); hasValidDrop = false; return; }
       hasValidDrop = true;
       ind.classList.remove('bd-drop-line-reject');
       const r = target.getBoundingClientRect();
       const above = ev.clientY < r.top + r.height / 2;
       const y = above ? r.top : r.bottom;
       ind.show(r.left, y - 1, r.width, 2);
-      dropBeforeId = above ? targetCardId : (group.cards[group.cards.indexOf(targetCard) + 1]?.id ?? null);
+      const idxInGroup = targetGroup.cards.findIndex(c => c.id === targetCardId);
+      dropBeforeId = above ? targetCardId : (targetGroup.cards[idxInGroup + 1]?.id ?? null);
+      // Cross-group only matters when the view is grouped and the target
+      // group differs from the card's source group.
+      dropGroupKey = (groupBy && targetGroup.key !== group.key) ? targetGroup.key : null;
     },
     onDrop: () => {
       ind.remove();
       suppressNextClick();
-      if (hasValidDrop && !isReject) {
-        const cur = ctx.getBoard();
-        const b2: Board = { ...cur, cards: [...cur.cards] };
+      if (!hasValidDrop) return;
+      const cur = ctx.getBoard();
+      const b2: Board = { ...cur, cards: [...cur.cards] };
+      if (dropGroupKey !== null && groupBy) {
+        moveCardToGroup(b2, card.id, groupBy, groupKeyToValue(dropGroupKey), dropBeforeId);
+      } else {
         moveCard(b2, card.id, dropBeforeId);
-        ctx.mutate(b2);
       }
+      ctx.mutate(b2);
     },
     onCancel: () => ind.remove(),
+    onClick,
   });
 }
 
@@ -556,20 +560,15 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           const grip = document.createElement('span');
           grip.className = 'bd-row-grip';
           if (v.sort) {
-            // Row reorder is disabled when the table is sort-ordered (the user's
-            // sort would just snap back on the next render). Show the grip in a
-            // disabled state with an explanatory tooltip rather than hiding it,
-            // so the affordance stays discoverable.
-            grip.classList.add('bd-row-grip-disabled');
-            grip.title = 'Clear sort to reorder rows';
+            // Sorted: order is computed, so dragging to reorder is meaningless — no
+            // drag affordance. The grip stays clickable for the row-actions menu.
+            grip.title = 'Row actions';
           } else {
             grip.setAttribute('data-board-drag', '');
-            grip.title = 'Drag to reorder row';
+            grip.title = 'Drag to reorder · click for actions';
           }
           grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
           gutter.appendChild(grip);
-          // mousedown is wired via the document-level delegated listener; the
-          // listener checks `data-board-drag` so disabled grips don't trigger.
         }
         tr.appendChild(gutter);
         for (const f of visibleFields) {
@@ -772,17 +771,21 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       const b = ctx.getBoard();
       const card = b.cards.find(c => c.id === cardId);
       if (!card) return;
-      // Find the group this card belongs to (matches the rendered grouping).
-      // NOTE: when grouped by a tag, a multi-tag card appears in several buckets;
-      // this resolves to the FIRST matching bucket, so dragging it from another of
-      // its buckets reorders relative to the first. moveCard works on the global
-      // cards array by id (no duplication/loss) — this is a known, accepted limit.
-      const group = lastGroups.find(g => g.cards.some(c => c.id === cardId)) ?? { key: '', cards: [card] };
       e.preventDefault();
       e.stopPropagation();
-      tr?.classList.add('bd-tr-dragging');
-      cancelRowDrag = startRowDrag(e, card, group, ctx);
-      document.addEventListener('mouseup', () => tr?.classList.remove('bd-tr-dragging'), { once: true });
+      const openMenu = (): void => openRowMenu(gripEl, card, ctx);
+      if (gripEl.hasAttribute('data-board-drag')) {
+        const v = b.views.find(x => x.name === 'table');
+        // First matching bucket (a multi-tag card can appear in several); moveCard
+        // works by id on the global array so there's no duplication/loss.
+        const group = lastGroups.find(g => g.cards.some(c => c.id === cardId)) ?? { key: '', cards: [card] };
+        tr?.classList.add('bd-tr-dragging');
+        cancelRowDrag = startRowDrag(e, card, group, ctx, lastGroups, v?.groupBy, openMenu);
+        document.addEventListener('mouseup', () => tr?.classList.remove('bd-tr-dragging'), { once: true });
+      } else {
+        // Sorted view: no drag, but a click still opens the menu.
+        startDrag(e, { onMove: () => {}, onDrop: () => {}, onClick: openMenu });
+      }
       return;
     }
   }
@@ -843,6 +846,14 @@ function groupColor(b: Board, field: string, key: string): ColorToken | null {
   return null;
 }
 
+/** Map a rendered group key back to the stored field value. The empty/
+ *  catch-all buckets render as '—' (generic/tags) or 'Uncategorized'
+ *  (status); both mean "no value". Mirrors the add-row preset at the
+ *  group header. */
+function groupKeyToValue(key: string): string {
+  return (key === '—' || key === 'Uncategorized') ? '' : key;
+}
+
 function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
   if (!v.groupBy) return [{ key: '', cards }];
   const field = v.groupBy;
@@ -885,6 +896,59 @@ function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
 
   for (const c of cards) push((c.values[field] ?? '') || '—', c);
   return Array.from(bucket.keys()).sort(alpha).map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
+}
+
+// One reused menu instance for all row grips (matches the column-menu pattern;
+// opening it dismisses any other floating panel via the popover registry).
+const rowMenu = createMenu({ className: 'bd-row-menu' });
+
+// Inline icons (stroke-based, 16px) for the row-actions menu.
+const RM_ICON = {
+  open: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M21 3l-9 9M10 5H5a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5"/></svg>',
+  duplicate: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>',
+  insert: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>',
+};
+
+function openRowMenu(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): void {
+  const board = ctx.getBoard();
+  const v = board.views.find(x => x.name === 'table');
+  const sorted = !!v?.sort;
+  const groupBy = v?.groupBy;
+  // Preset the group field so inserted rows land in the same group as `card`.
+  const insertPresets: Partial<Record<string, string>> = groupBy
+    ? { [groupBy]: card.values[groupBy] ?? '' }
+    : {};
+
+  const cloneBoard = (): Board => ({ ...ctx.getBoard(), cards: [...ctx.getBoard().cards] });
+
+  const sections: MenuSection[] = [
+    { items: [
+      { icon: RM_ICON.open, label: 'Open in side panel', onSelect: () => ctx.openSidePanel(card.id) },
+    ] },
+    { items: [
+      { icon: RM_ICON.duplicate, label: 'Duplicate', onSelect: () => {
+        const b2 = cloneBoard(); duplicateCard(b2, card.id); ctx.mutate(b2);
+      } },
+      ...(sorted ? [] : [
+        { icon: RM_ICON.insert, label: 'Insert row above', onSelect: () => {
+          const b2 = cloneBoard(); insertCardAt(b2, card.id, insertPresets); ctx.mutate(b2);
+        } },
+        { icon: RM_ICON.insert, label: 'Insert row below', onSelect: () => {
+          const b2 = cloneBoard();
+          const after = b2.cards[b2.cards.findIndex(c => c.id === card.id) + 1]?.id ?? null;
+          insertCardAt(b2, after, insertPresets); ctx.mutate(b2);
+        } },
+      ]),
+    ] },
+    { items: [
+      { icon: RM_ICON.trash, label: 'Delete row', variant: 'danger', onSelect: () => {
+        const b2 = cloneBoard(); deleteCard(b2, card.id); ctx.mutate(b2);
+      } },
+    ] },
+  ];
+
+  rowMenu.open(anchor, sections);
 }
 
 // Phosphor Bold 16px icons for the column header menu.
