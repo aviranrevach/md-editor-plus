@@ -204,6 +204,22 @@
   background: var(--board-border);
 }
 
+/* ===== Standard menu scrollbar — applied by placeFloating() via .is-scroll =====
+   Hidden until hover, matching .board-columns. Menus are overflow:visible by
+   default; placeFloating only adds .is-scroll when content exceeds its side. */
+.is-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.15s;
+}
+.is-scroll:hover { scrollbar-color: var(--board-border) transparent; }
+.is-scroll::-webkit-scrollbar { width: 6px; }
+.is-scroll::-webkit-scrollbar-track { background: transparent; }
+.is-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; transition: background 0.15s; }
+.is-scroll:hover::-webkit-scrollbar-thumb { background: var(--board-border); }
+.is-scroll::-webkit-scrollbar-thumb:hover { background: #9aa2ad; }
+
 /* ===== Single column ===== */
 .board-column {
   flex: 0 0 244px;
