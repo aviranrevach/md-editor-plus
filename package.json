@@ -169,11 +169,6 @@
           "default": false,
           "description": "Show the outline panel (left gutter) by default"
         },
-        "mdEditorPlus.readOnly": {
-          "type": "boolean",
-          "default": false,
-          "description": "Open files in read-only mode by default (disables editing)"
-        },
         "mdEditorPlus.sourceWordWrap": {
           "type": "boolean",
           "default": false,
