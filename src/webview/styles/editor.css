@@ -1998,7 +1998,9 @@ html.source-full-width #source-view {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 6px;
+  /* No bottom padding: the sticky footer bleeds to the bottom edge itself, so
+     a scrolling row can't peek through a gap beneath it. */
+  padding: 6px 6px 0;
   box-shadow: 0 12px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
   z-index: 1050;
   /* Height + scroll owned by placeFloating()/.is-scroll — no self-scroll here
@@ -2212,8 +2214,13 @@ html.source-full-width #source-view {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px 5px;
+  /* Bleed over the picker's 6px side padding to the inner edges, and round the
+     bottom corners to match the picker — so the footer fully seals the bottom
+     and nothing peeks past it. Text stays aligned with the rows (18px). */
+  margin: 0 -6px;
+  padding: 8px 18px;
   border-top: 1px solid var(--border);
+  border-radius: 0 0 11px 11px;
   font-size: 11px;            /* caption — smaller than Notion */
   color: var(--text-secondary);
   /* Pin to the bottom of the (scrolling) picker so it stays visible while the
