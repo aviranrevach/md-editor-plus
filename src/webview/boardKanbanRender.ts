@@ -11,6 +11,7 @@ import { applyFilter } from './boardFilter';
 import { resolveImageSrc } from './mediaResolve';
 import { firstImageSrc } from './boardImageLinks';
 import { attachSmartTypography } from './extensions/smartTypography';
+import { placeFloating } from './menuPosition';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
@@ -718,10 +719,7 @@ function openColumnColorPicker(
   menu.className = 'board-column-menu board-column-menu-color-only';
   document.body.appendChild(menu);
 
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 6}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const placement = placeFloating(menu, anchor);
 
   const colorRow = document.createElement('div');
   colorRow.className = 'board-color-swatches';
@@ -743,6 +741,7 @@ function openColumnColorPicker(
   menu.appendChild(colorRow);
 
   function closeMenu(): void {
+    placement.destroy();
     menu.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }
@@ -752,15 +751,6 @@ function openColumnColorPicker(
     }
   }
   setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
-  // Edge-aware: nudge left if it would overflow the right edge.
-  requestAnimationFrame(() => {
-    const r = menu.getBoundingClientRect();
-    const overflowRight = r.right - window.innerWidth;
-    if (overflowRight > 0) {
-      menu.style.left = `${Math.max(8, parseFloat(menu.style.left) - overflowRight - 8)}px`;
-    }
-  });
 }
 
 function openColumnMenu(
@@ -776,10 +766,7 @@ function openColumnMenu(
   menu.className = 'board-column-menu';
   document.body.appendChild(menu);
 
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const placement = placeFloating(menu, anchor);
 
   const section = (label: string) => {
     const s = document.createElement('div');
@@ -885,6 +872,7 @@ function openColumnMenu(
   });
 
   function closeMenu(): void {
+    placement.destroy();
     menu.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }
