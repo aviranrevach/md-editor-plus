@@ -4,7 +4,8 @@ import { COLOR_TOKENS_PUBLIC } from './boardModel';
 import { FIELD_TYPE_ICONS, FIELD_TYPE_LABELS } from './boardIcons';
 import { setViewColumns, hideFieldInView, showFieldInView } from './boardOps';
 import { buildOptionsEditor, openStatusOptionsEditor } from './boardStatusOptions';
-import { placeFloating } from './menuPosition';
+import { createPopover } from './popover';
+import { createMenu } from './menu';
 
 const DEFAULT_STATUS_OPTIONS: ColumnDef[] = [
   { name: 'Todo',        color: 'blue' },
@@ -247,87 +248,87 @@ function showConfirm(
  * Small per-field action menu used from BOTH the Properties popover row's
  * "more" button AND the side-panel row-label click. Same actions, same
  * styling, same wiring.
+ *
+ * `parentPopover` is optional: when supplied (e.g. opened from the Properties
+ * popover's "more" button) the menu is registered as a child so it does not
+ * dismiss its parent.
  */
 export function openFieldActionMenu(
   anchor: HTMLElement,
   board: Board,
   field: FieldDef,
   onChange: (next: Board) => void,
-  options: { onRename?: () => void } = {},
+  options: { onRename?: () => void; parentPopover?: import('./popover').Popover } = {},
   viewName = 'kanban',
 ): void {
-  document.querySelectorAll('.board-field-action-menu').forEach((n) => n.remove());
-
   const isLocked = field.name === 'Title' || field.name === 'Status' || field.name === 'Description';
 
-  const menu = document.createElement('div');
-  menu.className = 'board-field-action-menu';
-  document.body.appendChild(menu);
-
-  const placement = placeFloating(menu, anchor);
-
-  const addItem = (icon: string, label: string, variant: '' | 'danger', disabled: boolean, handler: () => void) => {
-    const it = document.createElement('button');
-    it.type = 'button';
-    it.className = 'board-field-action-item' + (variant ? ` is-${variant}` : '');
-    it.disabled = disabled;
-    it.innerHTML = `<span class="board-field-action-icon">${icon}</span><span class="board-field-action-label">${label}</span>`;
-    it.addEventListener('click', () => { handler(); close(); });
-    menu.appendChild(it);
+  // Visibility toggle item (Show on card / Hide on card / Show column / Hide column)
+  const visibilityItem = () => {
+    if (viewName === 'table') {
+      const tableView = board.views.find(x => x.name === 'table');
+      const isHiddenInTable = !!tableView?.hidden?.includes(field.name);
+      return {
+        icon: isHiddenInTable ? ICON_EYE : ICON_EYE_OFF,
+        label: isHiddenInTable ? 'Show column' : 'Hide column',
+        disabled: isLocked,
+        onSelect: () => {
+          const b2: Board = { ...board, views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })) };
+          if (isHiddenInTable) showFieldInView(b2, 'table', field.name);
+          else                 hideFieldInView(b2, 'table', field.name);
+          onChange(b2);
+        },
+      };
+    }
+    return {
+      icon: field.visibleOnCard ? ICON_EYE_OFF : ICON_EYE,
+      label: field.visibleOnCard ? 'Hide on card' : 'Show on card',
+      disabled: isLocked,
+      onSelect: () => onChange(toggleFieldVisibility(board, field.name)),
+    };
   };
 
-  addItem(ICON_EDIT, 'Rename', '', isLocked, () => options.onRename?.());
-  if (field.type === 'status' || field.type === 'tags') {
-    let liveBoard = board;
-    addItem(ICON_EDIT, 'Edit options', '', false, () => {
-      openStatusOptionsEditor(
-        anchor,
-        () => liveBoard,
-        field.name,
-        (next) => { liveBoard = next; onChange(next); },
-      );
-    });
-  }
-  if (viewName === 'table') {
-    const tableView = board.views.find(x => x.name === 'table');
-    const isHiddenInTable = !!tableView?.hidden?.includes(field.name);
-    addItem(
-      isHiddenInTable ? ICON_EYE : ICON_EYE_OFF,
-      isHiddenInTable ? 'Show column' : 'Hide column',
-      '',
-      isLocked,
-      () => {
-        const b2: Board = { ...board, views: board.views.map(v2 => ({ ...v2, hidden: v2.hidden ? [...v2.hidden] : undefined })) };
-        if (isHiddenInTable) showFieldInView(b2, 'table', field.name);
-        else                 hideFieldInView(b2, 'table', field.name);
-        onChange(b2);
-      },
-    );
-  } else {
-    addItem(
-      field.visibleOnCard ? ICON_EYE_OFF : ICON_EYE,
-      field.visibleOnCard ? 'Hide on card' : 'Show on card',
-      '',
-      isLocked,
-      () => onChange(toggleFieldVisibility(board, field.name)),
-    );
-  }
-  const divider = document.createElement('div');
-  divider.className = 'board-field-action-divider';
-  menu.appendChild(divider);
-  addItem(ICON_TRASH, 'Delete property', 'danger', isLocked, () => {
-    deleteFieldWithConfirm(board, field.name, onChange);
-  });
+  const mainItems = [
+    {
+      icon: ICON_EDIT,
+      label: 'Rename',
+      disabled: isLocked,
+      onSelect: () => options.onRename?.(),
+    },
+    ...(field.type === 'status' || field.type === 'tags'
+      ? [{
+          icon: ICON_EDIT,
+          label: 'Edit options',
+          disabled: false,
+          onSelect: () => {
+            let liveBoard = board;
+            openStatusOptionsEditor(
+              anchor,
+              () => liveBoard,
+              field.name,
+              (next) => { liveBoard = next; onChange(next); },
+            );
+          },
+        }]
+      : []),
+    visibilityItem(),
+  ];
 
-  function onOutside(e: MouseEvent) {
-    if (!menu.contains(e.target as Node) && e.target !== anchor) close();
-  }
-  function close() {
-    placement.destroy();
-    menu.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+  const dangerItems = [
+    {
+      icon: ICON_TRASH,
+      label: 'Delete property',
+      variant: 'danger' as const,
+      disabled: isLocked,
+      onSelect: () => deleteFieldWithConfirm(board, field.name, onChange),
+    },
+  ];
+
+  const menu = createMenu({ className: 'board-field-action-menu', parent: options.parentPopover });
+  menu.open(anchor, [
+    { items: mainItems },
+    { items: dangerItems },
+  ]);
 }
 
 // ===== Properties popover (the chrome ⚙ icon target) =====
@@ -342,12 +343,17 @@ export function openFieldActionMenu(
  * function the caller can call to refresh the field list from `boardGetter()`
  * without tearing down the popover DOM (which would destroy any in-flight
  * picker / sub-popover state and confuse focus).
+ *
+ * `selfPopover` is optional: when supplied (i.e. called from `openPropertiesMenu`),
+ * field-row "more" buttons open the field-action menu as a child so the
+ * properties menu stays open.
  */
 export function renderPropertiesContent(
   host: HTMLElement,
   boardGetter: () => Board,
   onChange: (next: Board) => void,
   viewName: string,
+  selfPopover?: import('./popover').Popover,
 ): { rebuild: () => void } {
   const header = document.createElement('div');
   header.className = 'board-properties-section';
@@ -368,7 +374,7 @@ export function renderPropertiesContent(
     const cur = boardGetter();
     list.innerHTML = '';
     for (const field of cur.fields) {
-      list.appendChild(renderFieldRow(cur, field, list, wrappedOnChange, viewName));
+      list.appendChild(renderFieldRow(cur, field, list, wrappedOnChange, viewName, selfPopover));
     }
     // Synthetic "Description" row — surfaces card.body. Visible in both views:
     // table-side toggle controls the Description column, kanban-side toggle
@@ -380,6 +386,7 @@ export function renderPropertiesContent(
       list,
       wrappedOnChange,
       viewName,
+      selfPopover,
     ));
   }
   rebuildList();
@@ -391,7 +398,7 @@ export function renderPropertiesContent(
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>
     <span>Add a property (column)</span>
   `;
-  add.addEventListener('click', () => promptNewField(add, boardGetter(), wrappedOnChange));
+  add.addEventListener('click', () => promptNewField(add, boardGetter(), wrappedOnChange, selfPopover));
   host.appendChild(add);
 
   return { rebuild: rebuildList };
@@ -403,37 +410,20 @@ export function openPropertiesMenu(
   onChange: (next: Board) => void,
   viewName = 'kanban',
 ): void {
-  document.querySelectorAll('.board-properties-menu').forEach((n) => n.remove());
+  const popover = createPopover({ className: 'board-properties-menu', preferX: 'right' });
+  const menuEl = popover.el;
 
-  const menu = document.createElement('div');
-  menu.className = 'board-properties-menu';
-  document.body.appendChild(menu);
-  const placement = placeFloating(menu, anchor, { preferX: 'right' });
-
-  // Legacy free-floating popover (no live caller in chrome path; kept for
-  // back-compat). Snapshot the board once since this path has no live getter.
+  // Snapshot the board once; the chrome path uses a live getter via renderPropertiesContent.
+  // Pass `popover` as `selfPopover` so field-row "more" menus and the add-field
+  // picker open as children (nested in the registry) and don't dismiss this menu.
   let snapshot = board;
   const wrappedChange = (next: Board) => { snapshot = next; onChange(next); result.rebuild(); };
-  const result = renderPropertiesContent(menu, () => snapshot, wrappedChange, viewName);
+  const result = renderPropertiesContent(menuEl, () => snapshot, wrappedChange, viewName, popover);
 
-  function onOutside(e: MouseEvent) {
-    const t = e.target as HTMLElement | null;
-    if (!t) return;
-    // Treat sub-popovers (action menu / type picker / confirm dialog) as
-    // "inside" so a click in those doesn't close the parent menu.
-    if (t.closest('.board-properties-menu, .board-field-action-menu, .board-add-field-picker, .board-confirm-overlay')) return;
-    if (t === anchor || (anchor && anchor.contains(t))) return;
-    closeMenu();
-  }
-  function closeMenu() {
-    placement.destroy();
-    menu.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
+  popover.open(anchor);
 }
 
-function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onChange: (next: Board) => void, viewName: string): HTMLElement {
+function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onChange: (next: Board) => void, viewName: string, parentPopover?: import('./popover').Popover): HTMLElement {
   const row = document.createElement('div');
   row.className = 'board-properties-row';
   row.dataset.fieldName = field.name;
@@ -574,6 +564,7 @@ function renderFieldRow(board: Board, field: FieldDef, listEl: HTMLElement, onCh
             sel?.addRange(range);
           }
         },
+        parentPopover,
       }, viewName);
     });
   }
@@ -598,14 +589,13 @@ export function promptNewField(
   anchor: HTMLElement,
   board: Board,
   onChange: (next: Board, newFieldName: string) => void,
+  parentPopover?: import('./popover').Popover,
 ): void {
-  document.querySelectorAll('.board-add-field-picker').forEach((n) => n.remove());
-
-  const pop = document.createElement('div');
-  pop.className = 'board-add-field-picker board-add-field-picker--types-only';
-  document.body.appendChild(pop);
-
-  const placement = placeFloating(pop, anchor);
+  const popover = createPopover({
+    className: 'board-add-field-picker board-add-field-picker--types-only',
+    parent: parentPopover,
+  });
+  const pop = popover.el;
 
   const sectionLabel = document.createElement('div');
   sectionLabel.className = 'board-add-field-section';
@@ -675,7 +665,7 @@ export function promptNewField(
       },
       name,
     );
-    closePop();
+    popover.close();
   }
 
   const commit = (type: FieldType) => {
@@ -692,25 +682,8 @@ export function promptNewField(
       },
       name,
     );
-    closePop();
+    popover.close();
   };
 
-  function onOutside(e: MouseEvent) {
-    if (!pop.contains(e.target as Node) && e.target !== anchor) {
-      closePop();
-    }
-  }
-  function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape') { e.preventDefault(); closePop(); }
-  }
-  function closePop() {
-    placement.destroy();
-    pop.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-    document.removeEventListener('keydown', onKey, true);
-  }
-  setTimeout(() => {
-    document.addEventListener('mousedown', onOutside, true);
-    document.addEventListener('keydown', onKey, true);
-  }, 0);
+  popover.open(anchor);
 }

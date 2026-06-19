@@ -197,7 +197,8 @@ describe('Edit options works for tags', () => {
     const b = mk();
     const a = document.createElement('button'); document.body.appendChild(a);
     openFieldActionMenu(a, b, b.fields[2], () => {});
-    const labels = Array.from(document.querySelectorAll('.board-field-action-label')).map(n => n.textContent);
+    // createMenu renders labels as .mp-menu-label (replaces old .board-field-action-label)
+    const labels = Array.from(document.querySelectorAll('.board-field-action-menu .mp-menu-label')).map(n => n.textContent);
     expect(labels).toContain('Edit options');
   });
 

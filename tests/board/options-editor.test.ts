@@ -108,8 +108,9 @@ function fieldMenuBoard(): Board {
 
 describe('field action menu — Edit options', () => {
   const anchor = () => { const a = document.createElement('button'); document.body.appendChild(a); return a; };
+  // createMenu renders items with .mp-menu-label (replaces old .board-field-action-label)
   const labels = () =>
-    Array.from(document.querySelectorAll('.board-field-action-label')).map((n) => n.textContent);
+    Array.from(document.querySelectorAll('.board-field-action-menu .mp-menu-label')).map((n) => n.textContent);
 
   it('shows "Edit options" for a status field', () => {
     const b = fieldMenuBoard();
@@ -127,6 +128,7 @@ describe('field action menu — Edit options', () => {
 describe('field action menu — Edit options: sequential edits compose (no stale snapshot)', () => {
   beforeEach(() => {
     // Remove any leftover menus/editors from previous tests in this file.
+    // createMenu produces .mp-menu.board-field-action-menu; querySelector still matches by class.
     document.querySelectorAll('.board-field-action-menu, .bd-opt-editor, .bd-opt-popover').forEach((n) => n.remove());
   });
 
@@ -137,10 +139,11 @@ describe('field action menu — Edit options: sequential edits compose (no stale
 
     openFieldActionMenu(a, b, b.fields[1], (next) => { latest = next; });
 
-    const editBtn = Array.from(document.querySelectorAll('.board-field-action-item'))
+    // createMenu renders items as .mp-menu-item buttons (replaces old .board-field-action-item)
+    const editBtn = Array.from(document.querySelectorAll('.board-field-action-menu .mp-menu-item'))
       .find((n) => /edit options/i.test(n.textContent || '')) as HTMLElement;
     expect(editBtn).not.toBeNull();
-    editBtn.click(); // opens editor (appended to body); also closes the action menu
+    editBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true })); // createMenu uses mousedown
 
     // buildOptionsEditor sets host.className = 'bd-opt-editor', so the popover
     // element's class is 'bd-opt-editor'. Query the add button directly.
