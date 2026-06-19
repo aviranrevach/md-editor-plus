@@ -3,8 +3,7 @@ import { resolveImageSrc } from './mediaResolve';
 import { parseImageLinks, appendImageLink, removeImageLinkAt, replaceImageLinkAt } from './boardImageLinks';
 import { compressImage } from './imageCompress';
 import { sanitizeImageFileName, extensionForMime } from '../imageAssets';
-import { placeFloating } from './menuPosition';
-import type { PlacementHandle } from './menuPosition';
+import { createPopover } from './popover';
 
 let stylesInjected = false;
 function injectStyles(): void {
@@ -48,20 +47,8 @@ export function openBoardImageManager(
   injectStyles();
   let value = currentValue;
 
-  const el = document.createElement('div');
-  el.className = 'bd-image-mgr';
-  document.body.appendChild(el);
-  const placement: PlacementHandle = placeFloating(el, anchor);
-
-  let done = false;
-  function finish(): void {
-    if (done) return;
-    done = true;
-    placement.destroy();
-    el.remove();
-    document.removeEventListener('mousedown', onDocDown, true);
-  }
-  function onDocDown(e: MouseEvent): void { if (!el.contains(e.target as Node)) finish(); }
+  const popover = createPopover({ className: 'bd-image-mgr' });
+  const el = popover.el;
 
   function commit(next: string): void { value = next; onChange(value); render(); }
 
@@ -177,5 +164,5 @@ export function openBoardImageManager(
   }
 
   render();
-  setTimeout(() => document.addEventListener('mousedown', onDocDown, true), 0);
+  popover.open(anchor);
 }
