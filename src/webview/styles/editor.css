@@ -2199,6 +2199,22 @@ html.source-full-width #source-view {
   font-weight: 500;
 }
 
+.block-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px 5px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;            /* caption — smaller than Notion */
+  color: var(--text-secondary);
+}
+.block-picker-footer .bp-key {
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
 .block-picker-emoji-icon {
   display: inline-flex;
   align-items: center;

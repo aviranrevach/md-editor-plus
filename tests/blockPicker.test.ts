@@ -1,4 +1,4 @@
-import { filterBlocks, BLOCK_DEFS } from '../src/webview/blockPicker';
+import { filterBlocks, BLOCK_DEFS, footerCloseVerb } from '../src/webview/blockPicker';
 
 describe('filterBlocks', () => {
   it('returns all blocks when query is empty', () => {
@@ -27,6 +27,16 @@ describe('filterBlocks', () => {
   it('finds image block when querying "image"', () => {
     const ids = filterBlocks('image').map(b => b.id);
     expect(ids).toContain('image');
+  });
+});
+
+describe('footerCloseVerb', () => {
+  it('says "Close" at the root list', () => {
+    expect(footerCloseVerb(false)).toBe('Close');
+  });
+
+  it('says "Back" inside a drill-down', () => {
+    expect(footerCloseVerb(true)).toBe('Back');
   });
 });
 

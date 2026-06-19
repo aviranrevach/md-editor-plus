@@ -516,6 +516,12 @@ export const BLOCK_DEFS: BlockDef[] = [
   },
 ];
 
+// Footer hint: Esc closes the root menu, but inside a drilled-down sub-list
+// Esc goes back one level. The footer verb reflects that.
+export function footerCloseVerb(isDrilled: boolean): 'Close' | 'Back' {
+  return isDrilled ? 'Back' : 'Close';
+}
+
 export function filterBlocks(query: string, source: BlockDef[] = BLOCK_DEFS): BlockDef[] {
   if (!query.trim()) return source;
   const q = query.toLowerCase();
@@ -592,11 +598,16 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       <input class="block-picker-input" placeholder="Filter blocks…" autocomplete="off" spellcheck="false" />
     </div>
     <div class="block-picker-list"></div>
+    <div class="block-picker-footer">
+      <span class="block-picker-foot-hints"><span class="bp-key">↑↓</span> Navigate&nbsp;&nbsp;<span class="bp-key">↵</span> Select</span>
+      <span class="block-picker-foot-close"><span class="bp-key">esc</span> <span class="bp-foot-verb">Close</span></span>
+    </div>
   `;
 
   const input = el.querySelector<HTMLInputElement>('.block-picker-input')!;
   const list  = el.querySelector<HTMLElement>('.block-picker-list')!;
   const searchEl = el.querySelector<HTMLElement>('.block-picker-search')!;
+  const footVerb = el.querySelector<HTMLElement>('.bp-foot-verb')!;
 
   function currentSource(): BlockDef[] {
     return drillParent?.subItems ?? BLOCK_DEFS;
@@ -650,6 +661,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
     activeIdx = 0;
     updateActive();
+    footVerb.textContent = footerCloseVerb(!!drillParent);
   }
 
   function deleteActiveBlock(): void {
