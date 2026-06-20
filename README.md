@@ -36,7 +36,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 - **Text** — paragraph, H1, H2, H3
 - **Lists** — bullet, numbered, task lists with real checkboxes that round-trip to `- [ ]` / `- [x]`
-- **Tables** — GFM pipe syntax, inline cell editing, add rows/columns from the bubble menu
+- **Tables** — GFM pipe syntax, inline cell editing, add rows/columns from the bubble menu, plus a `⠿` **row handle** to drag-reorder rows or open a row menu (insert / duplicate / delete)
 - **Code blocks** — syntax highlighting for \~50 languages, line-number gutter, drag lines to reorder, copy button, optional auto-collapse for long snippets
 - **Callouts** — GFM `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]` with colored backgrounds and icons
 - **Toggles** — collapsible `<details>` sections
@@ -257,6 +257,8 @@ Type `->` and `<-` and they become `→` and `←` as you go — Notion-style. A
 ### Tables
 
 Insert a plain Markdown table from the block picker (under **Lists**) — a 3×3 starter with a header row — then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table. It's a distinct block from **Board: Table**, so typing `table` in the picker surfaces both.
+
+**Row handle** — hover any row and a `⠿` grip appears in the left margin. **Drag** it to reorder the row, or **click** it for a row menu: **Insert row above / below**, **Duplicate row**, **Delete row**. The header row stays first and present — its menu only offers **Insert row below**.
 
 Outgrown a simple grid? Use the `⠿` handle → **Turn into → Board: Table** to convert it into a full board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the view toggle.
 

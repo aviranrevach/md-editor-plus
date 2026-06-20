@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Row handle for regular tables (c46)** — plain markdown tables now get the same Notion-style row handle the board table got in c36. **Hover a row** and a `⠿` grip appears in the left margin; **drag** it to reorder the row, or **click** it to open a row menu: **Insert row above / below**, **Duplicate row**, and **Delete row**. The header row stays put — its menu only offers **Insert row below**, and it can't be dragged, deleted, or pushed down, so the table always keeps a valid header. The grip only shows when the document is editable, and never appears on board tables (which have their own). (c46)
 - **Click below the page to add a block (c51)** — clicking the empty space beneath the last block now lands your cursor in a new paragraph, so you can always keep typing at the bottom of a doc. Previously this was a no-op whenever the document ended in a block with no place for the caret (a board, code block, image, or table). **Hovering** that area first previews a faint "Start writing, or press / for commands" hint so it reads as clickable before you click. If the doc already ends in an empty paragraph, the click just focuses it instead of stacking another. In **read-only** docs nothing is shown and nothing is added — and the empty-state hint no longer appears there either, since you can't write. (c51)
 
 ## [0.7.0] - 2026-06-20

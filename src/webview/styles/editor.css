@@ -1989,6 +1989,51 @@ html.source-full-width #source-view {
   font-size: 10px;
 }
 
+/* c46 — regular-table row handle. One floating grip that follows the hovered
+   row; drag reorders, click opens the row-actions menu. Matches the block
+   handle's grip language (.block-handle-drag). */
+.tbl-row-handle {
+  position: fixed;
+  z-index: 999;
+  display: none; /* set to flex on hover by the row-handle module */
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 22px;
+  color: #b3b2af;
+  background: transparent;
+  border-radius: 4px;
+  cursor: grab;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+}
+.tbl-row-handle svg { width: 11px; height: 17px; display: block; }
+.tbl-row-handle:hover {
+  background: rgba(55, 53, 47, 0.09);
+  color: #5f5e5b;
+}
+.tbl-row-handle.tbl-row-handle-dragging {
+  cursor: grabbing;
+  color: #5f5e5b;
+  background: rgba(55, 53, 47, 0.12);
+}
+
+/* While the pointer is over a regular-table row, suppress the whole-table block
+   handle so only the row grip shows (mirrors .drag-handle.hide-cb). */
+body.tbl-row-active .drag-handle { display: none !important; }
+
+/* Drop indicator — a separate blue line between rows, never a row outline
+   (twin of .cb-drop-line). */
+.tbl-drop-line {
+  position: fixed;
+  height: 2px;
+  background: var(--link);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1100;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 28%, transparent);
+}
+
 /* Block picker — matches the bubble-menu "Turn into" submenu */
 .block-picker {
   position: fixed;
@@ -2626,6 +2671,8 @@ html.source-full-width #source-view {
 .is-printing .bubble-menu,
 .is-printing .drag-handle,
 .is-printing .block-handle-tooltip,
+.is-printing .tbl-row-handle,
+.is-printing .tbl-drop-line,
 .is-printing #source-view {
   display: none !important;
 }
