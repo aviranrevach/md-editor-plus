@@ -606,6 +606,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   // --- flyout (Turn-into panel, contained inside the action popover el) ---
   let flyoutRows: Array<() => void> = [];
   let flyoutIdx = 0;
+  let flyoutFocused = false;   // true → ↑↓/Enter drive the flyout, not the action list
 
   function isActiveItem(block: BlockDef): boolean {
     const ab = context.activeBlock;
@@ -716,6 +717,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     flyoutEl.style.display = 'none';
     window.removeEventListener('resize', onFlyoutResize);
     flyoutAnchorRow = null;
+    flyoutFocused = false;
     footVerb.textContent = footerCloseVerb(false);     // esc Close
   }
 
@@ -986,6 +988,19 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     setTimeout(() => field.focus(), 0);
   }
 
+  // Is the action highlight currently on the Turn-into row?
+  function isTurnIntoHighlighted(): boolean {
+    const rows = list.querySelectorAll<HTMLElement>('.block-picker-item');
+    return rows[activeIdx]?.dataset.turnInto === '1';
+  }
+  // When arrowing the action list, open the flyout as Turn-into gains the
+  // highlight and close it as the highlight leaves (mirrors hover).
+  function syncFlyoutToHighlight(): void {
+    const row = list.querySelector<HTMLElement>('[data-turn-into="1"]');
+    if (isTurnIntoHighlighted() && row) openFlyout(row);
+    else closeFlyout();
+  }
+
   function select(block: BlockDef): void {
     if (block.subItems?.length) {
       drillParent = block;
@@ -1023,33 +1038,49 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   });
 
   input.addEventListener('keydown', e => {
+    if (actionMode) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (flyoutFocused) { flyoutIdx = Math.min(flyoutIdx + 1, flyoutRows.length - 1); updateFlyoutActive(); }
+        else { activeIdx = Math.min(activeIdx + 1, activeRows.length - 1); updateActive(); syncFlyoutToHighlight(); }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (flyoutFocused) { flyoutIdx = Math.max(flyoutIdx - 1, 0); updateFlyoutActive(); }
+        else { activeIdx = Math.max(activeIdx - 1, 0); updateActive(); syncFlyoutToHighlight(); }
+      } else if (e.key === 'ArrowRight') {
+        const row = list.querySelector<HTMLElement>('[data-turn-into="1"]');
+        if (!flyoutFocused && isTurnIntoHighlighted() && row) {
+          e.preventDefault(); openFlyout(row); flyoutFocused = true; flyoutIdx = 0; updateFlyoutActive();
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (flyoutFocused) { e.preventDefault(); flyoutFocused = false; closeFlyout(); input.focus(); updateActive(); }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (flyoutFocused) flyoutRows[flyoutIdx]?.();
+        else activeRows[activeIdx]?.();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (flyoutFocused) { flyoutFocused = false; closeFlyout(); input.focus(); updateActive(); }
+        else close();
+      }
+      return;
+    }
+    // ---- insert-menu (non-action) case: unchanged from today ----
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const max = actionMode ? activeRows.length - 1 : filtered.length - 1;
-      activeIdx = Math.min(activeIdx + 1, max);
-      updateActive();
+      activeIdx = Math.min(activeIdx + 1, filtered.length - 1); updateActive();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      activeIdx = Math.max(activeIdx - 1, 0);
-      updateActive();
+      activeIdx = Math.max(activeIdx - 1, 0); updateActive();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (actionMode) {
-        activeRows[activeIdx]?.();
-      } else if (filtered[activeIdx]) {
-        select(filtered[activeIdx]);
-      }
+      if (filtered[activeIdx]) select(filtered[activeIdx]);
     } else if (e.key === 'Escape') {
       if (drillParent) {
-        drillParent = null;
-        input.placeholder = 'Filter blocks…';
-        input.value = '';
-        filtered = BLOCK_DEFS;
-        renderList(filtered);
-        input.focus();
-      } else {
-        close();
-      }
+        e.preventDefault();
+        drillParent = null; input.placeholder = 'Filter blocks…'; input.value = '';
+        filtered = BLOCK_DEFS; renderList(filtered); input.focus();
+      } else { close(); }
     }
   });
 
@@ -1059,6 +1090,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     el.classList.remove('open');
     drillParent = null;
     actionMode = false;
+    flyoutFocused = false;
     closeFlyout();
     context = {};
     input.value = '';
