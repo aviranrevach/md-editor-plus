@@ -43,7 +43,7 @@
 | on table board allow clicking on the dragger for row actions | Todo | c36 | Medium |  |  |
 | Bug! Saving says "Saved" but the file is wiped to empty (0 bytes) on disk — the whole board can vanish | Done | c37 | Urgent!! | Boards / Save |  |
 | On the image bubble menu, add another items with 2 options- 1. find file on finder. 2. copy path. it pops these options to choose- make it make sense | Done | c38 | High |  | Gilad |
-| Redesign column menu for the same look and feel, icons, and grouping as the other menus. allow filtering shortcut (that opens the regular filter) | Todo | c39 | Medium | Board table |  |
+| Redesign column menu for the same look and feel, icons, and grouping as the other menus. allow filtering shortcut (that opens the regular filter) | Done | c39 | Medium | Board table |  |
 | Change icons of these areas | Todo | c40 | Low |  |  |
 | the save callout saying something was saved someplace else, where its not. both was me- i was changing something in the description | Todo | c41 | High |  |  |
 | Block dragger, plus, and empty state - make it more like notion, right now the dragger icon and the plus are too small in its space, and relation to the hover background space. also missing the empty state placeholder sentense that explain what you can do | Review | c42 | Medium |  |  |
