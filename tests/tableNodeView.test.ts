@@ -102,10 +102,9 @@ describe('TableWithRail edge handles (c46)', () => {
   });
 });
 
-describe('TableWithRail active cell (c46)', () => {
-  it('marks the cell holding the cursor as active', () => {
+describe('TableWithRail selection box (c46)', () => {
+  it('draws the outline box when the cursor is inside a cell', () => {
     const { editor, host } = makeEditor();
-    // Find a position inside the first body cell's paragraph and put the caret there.
     let pos = -1;
     editor.state.doc.descendants((node, p) => {
       if (pos >= 0) return false;
@@ -113,9 +112,22 @@ describe('TableWithRail active cell (c46)', () => {
       return true;
     });
     editor.commands.setTextSelection(pos);
-    const active = host.querySelector('td.mp-cell-active');
-    expect(active).toBeTruthy();
-    expect(active!.textContent).toBe('a1');
+    const box = host.querySelector('.mp-table-sel-box') as HTMLElement;
+    expect(box).toBeTruthy();
+    expect(box.style.display).toBe('block');
+    editor.destroy(); host.remove();
+  });
+
+  it('selected cells carry no background fill (the box is the only indicator)', () => {
+    const { editor, host } = makeEditor();
+    hoverCell(host, 1, 0);
+    clickGrip(host, '.mp-table-row-grip'); // selects the row (CellSelection)
+    const selected = host.querySelectorAll('table .selectedCell');
+    expect(selected.length).toBeGreaterThan(0);
+    selected.forEach((c) => {
+      // no inline fill applied by us; CSS sets it transparent
+      expect((c as HTMLElement).style.background).toBe('');
+    });
     editor.destroy(); host.remove();
   });
 });

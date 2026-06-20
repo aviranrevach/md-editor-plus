@@ -2044,20 +2044,23 @@ html.source-full-width #source-view {
    .board-block guard) and highlight only the hovered ROW instead. */
 .ProseMirror .mp-table,
 .ProseMirror .mp-table:hover { background: transparent !important; }
-.ProseMirror .mp-table tbody tr:hover > td:not(.selectedCell):not(.mp-cell-active),
-.ProseMirror .mp-table tbody tr:hover > th:not(.selectedCell):not(.mp-cell-active) {
+.ProseMirror .mp-table tbody tr:hover > td,
+.ProseMirror .mp-table tbody tr:hover > th {
   background: var(--block-hover);
 }
 
-/* Cell selection — the cell holding the cursor (mp-cell-active, set via a
-   decoration since ProseMirror is a single editable) and native CellSelection
-   ranges (.selectedCell). Selection wins over the row-hover tint. */
-.ProseMirror .mp-table td.mp-cell-active,
-.ProseMirror .mp-table th.mp-cell-active,
-.ProseMirror .mp-table td.selectedCell,
-.ProseMirror .mp-table th.selectedCell {
-  background: color-mix(in srgb, var(--link) 14%, transparent);
+/* Selection = a blue outline box over the cell / row / column (strokes on the
+   edges, like the board's .bd-cell-editing — never a fill). Drawn by the
+   NodeView from the current selection. The native .selectedCell gets no fill. */
+.ProseMirror .mp-table-sel-box {
+  position: absolute;
+  border: 2px solid var(--link);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 3;
 }
+.ProseMirror .mp-table td.selectedCell,
+.ProseMirror .mp-table th.selectedCell { background: transparent; }
 
 /* Block picker — matches the bubble-menu "Turn into" submenu */
 .block-picker {

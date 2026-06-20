@@ -13,8 +13,6 @@
 import Table from '@tiptap/extension-table';
 import { mergeAttributes } from '@tiptap/core';
 import { CellSelection } from '@tiptap/pm/tables';
-import { Plugin } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { createGripIcon } from './handleIcons';
 import { createMenu, type MenuSection } from './menu';
@@ -63,36 +61,6 @@ function rowCellRange(table: PMNode, tablePos: number, idx: number): { anchorPos
 }
 
 export const TableWithRail = Table.extend({
-  // Mark the cell that holds the cursor as "active" (clicking a cell selects
-  // it visually). ProseMirror is a single editable, so a CSS :focus per cell is
-  // impossible — a decoration is the correct mechanism. CellSelection ranges
-  // are already styled by prosemirror-tables' `.selectedCell`, so skip those.
-  addProseMirrorPlugins() {
-    const parent = this.parent?.() ?? [];
-    return [
-      ...parent,
-      new Plugin({
-        props: {
-          decorations(state) {
-            const sel = state.selection;
-            if (sel instanceof CellSelection) return null;
-            const $f = sel.$from;
-            for (let d = $f.depth; d > 0; d--) {
-              const node = $f.node(d);
-              const name = node.type.name;
-              if (name === 'tableCell' || name === 'tableHeader') {
-                const pos = $f.before(d);
-                return DecorationSet.create(state.doc, [
-                  Decoration.node(pos, pos + node.nodeSize, { class: 'mp-cell-active' }),
-                ]);
-              }
-            }
-            return null;
-          },
-        },
-      }),
-    ];
-  },
   addNodeView() {
     return ({ editor, getPos, HTMLAttributes }) => {
       const wrapper = document.createElement('div');
@@ -105,6 +73,10 @@ export const TableWithRail = Table.extend({
       rowGrip.appendChild(createGripIcon());
       colGrip.appendChild(createGripIcon());
 
+      // One outline box drawn over the selected cell / row / column (blue
+      // strokes on the edges, like the board — never a fill).
+      const selBox = mkEl('mp-table-sel-box');
+
       const table = document.createElement('table');
       const attrs = mergeAttributes(HTMLAttributes);
       for (const [k, v] of Object.entries(attrs)) {
@@ -113,7 +85,7 @@ export const TableWithRail = Table.extend({
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
 
-      wrapper.append(rowStroke, colStroke, rowGrip, colGrip, table);
+      wrapper.append(rowStroke, colStroke, rowGrip, colGrip, selBox, table);
 
       function mkEl(cls: string): HTMLDivElement {
         const el = document.createElement('div');
@@ -145,6 +117,50 @@ export const TableWithRail = Table.extend({
         rowStroke.style.display = colStroke.style.display = 'none';
         rowGrip.style.display = colGrip.style.display = 'none';
       }
+
+      // ---- selection outline box (cell / row / column) ---------------------
+      function hideSelBox(): void { selBox.style.display = 'none'; }
+      function showSelBoxOver(cells: HTMLElement[]): void {
+        if (!cells.length) { hideSelBox(); return; }
+        const w = wrapper.getBoundingClientRect();
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        for (const c of cells) {
+          const x = c.getBoundingClientRect();
+          l = Math.min(l, x.left); t = Math.min(t, x.top);
+          r = Math.max(r, x.right); b = Math.max(b, x.bottom);
+        }
+        selBox.style.left = `${l - w.left - 1}px`;
+        selBox.style.top = `${t - w.top - 1}px`;
+        selBox.style.width = `${r - l + 2}px`;
+        selBox.style.height = `${b - t + 2}px`;
+        selBox.style.display = 'block';
+      }
+      function onSelUpdate(): void {
+        if (editor.isDestroyed) return;
+        const l = loc(); if (!l) { hideSelBox(); return; }
+        const sel = editor.state.selection;
+        const within = sel.$from.pos >= l.tablePos && sel.$to.pos <= l.tablePos + l.node.nodeSize;
+        if (!within) { hideSelBox(); return; }
+        const cells: HTMLElement[] = [];
+        if (sel instanceof CellSelection) {
+          sel.forEachCell((_node, pos) => {
+            const dom = editor.view.nodeDOM(pos);
+            if (dom instanceof HTMLElement) cells.push(dom);
+          });
+        } else {
+          const $f = sel.$from;
+          for (let d = $f.depth; d > 0; d--) {
+            const node = $f.node(d);
+            if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+              const dom = editor.view.nodeDOM($f.before(d));
+              if (dom instanceof HTMLElement) cells.push(dom);
+              break;
+            }
+          }
+        }
+        showSelBoxOver(cells);
+      }
+      editor.on('selectionUpdate', onSelUpdate);
 
       // ---- hover (document-level, for the forgiving edge band) --------------
       function rowAt(y: number): { tr: HTMLElement; idx: number } | null {
@@ -412,6 +428,7 @@ export const TableWithRail = Table.extend({
           return false;
         },
         destroy() {
+          editor.off('selectionUpdate', onSelUpdate);
           document.removeEventListener('mousemove', onDocMove);
           document.removeEventListener('mousemove', onGripMove, true);
           document.removeEventListener('mouseup', onGripUp, true);
