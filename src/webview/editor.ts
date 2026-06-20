@@ -118,6 +118,7 @@ function buildRichEditor(
   initialMarkdown: string,
   onChange: OnChangeCallback,
   onDirty?: () => void,
+  options?: { suppressEmptyPlaceholder?: boolean },
 ): BuiltEditor {
   const split = splitFrontmatter(initialMarkdown);
   const frontmatter = split.frontmatter;
@@ -161,7 +162,9 @@ function buildRichEditor(
       ImagePasteDrop,
       ClickBelowContent,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
-      EmptyPlaceholder,
+      // The board card panel supplies its own "Add a description…" placeholder,
+      // so suppress this generic hint there to avoid two overlapping placeholders (c50).
+      ...(options?.suppressEmptyPlaceholder ? [] : [EmptyPlaceholder]),
     ],
     editorProps: {
       attributes: { spellcheck: 'true' },
@@ -225,7 +228,11 @@ export function createDetachedEditor(
   onChange: OnChangeCallback,
   onDirty?: () => void,
 ): DetachedEditorHandle {
-  const built = buildRichEditor(element, initialMarkdown, onChange, onDirty);
+  // Suppress the generic empty-state hint: the board card panel renders its own
+  // "Add a description to this card…" placeholder over this editor (c50).
+  const built = buildRichEditor(element, initialMarkdown, onChange, onDirty, {
+    suppressEmptyPlaceholder: true,
+  });
   return {
     editor: built.editor,
     flush: () => built.debounce.flush(),
