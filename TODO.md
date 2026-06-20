@@ -56,6 +56,7 @@
 | clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Todo | c49 | Urgent!! |  |  |
 | two empty states one upon each other in description (is it happening in other places?) | Todo | c50 | High |  |  |
 | Clicking below EVERYTHING in a doc wont suggest adding a new block, it should be selectable and if I click it, its added | Done | c51 | Urgent!! |  |  |
+| Unify the board table's draggers with the regular table's new c46 handles — give the board table the same look & behaviour: Notion-style edge strokes that promote to an emerging ⠿ grip on hover, drag-to-reorder, and the blue outline-box selection (cell / row / column). Today the board table still uses the older dots-in-the-gutter grips. | Todo | c52 | Medium | Board table / Tables |  |
 
 <!-- board:body id="c8" -->
 
