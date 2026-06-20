@@ -1989,41 +1989,33 @@ html.source-full-width #source-view {
   font-size: 10px;
 }
 
-/* c46 — regular-table NodeView: a rail hugs the table's left edge with a
-   reachable row grip; plus a visible cell-selection state. The rail is part of
-   the table wrapper (no gap), so you can slide from a row onto the grip. */
-.mp-table { position: relative; display: flex; align-items: flex-start; }
-.mp-table-rail {
-  position: relative;
-  flex: 0 0 18px;
-  align-self: stretch;        /* full table height — continuous hover zone */
-  border-radius: 4px;
+/* c46 — regular-table NodeView, Notion-style. Hovering a cell reveals that
+   cell's row handle (a thin stroke on the left outer edge) and column handle
+   (a thin stroke on the top outer edge). Small gutters hold the strokes so they
+   sit flush to the table without indenting the content much; the gutters are
+   part of the wrapper so you can slide from a cell onto a stroke. */
+.mp-table { position: relative; padding: 12px 0 0 12px; }
+.mp-table-row-handle,
+.mp-table-col-handle {
+  position: absolute;
+  display: none;              /* shown on cell hover by the NodeView */
+  background: rgba(55, 53, 47, 0.16);
+  border-radius: 3px;
+  cursor: grab;
+  z-index: 2;
   transition: background 0.1s;
 }
-.mp-table:hover > .mp-table-rail { background: rgba(55, 53, 47, 0.035); }
-.mp-table-rail-grip {
-  position: absolute;
-  left: 1px;
-  display: none;              /* set to flex on row hover by the NodeView */
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 22px;
-  color: #b3b2af;
-  border-radius: 4px;
-  cursor: grab;
-  transition: background 0.1s, color 0.1s;
-  user-select: none;
-}
-.mp-table-rail-grip svg { width: 11px; height: 17px; display: block; }
-.mp-table-rail-grip:hover { background: rgba(55, 53, 47, 0.09); color: #5f5e5b; }
-.mp-table-rail-grip.mp-table-rail-grip-dragging { cursor: grabbing; color: #5f5e5b; background: rgba(55, 53, 47, 0.12); }
+.mp-table-row-handle { left: 4px; width: 5px; }   /* vertical stroke, left edge */
+.mp-table-col-handle { top: 4px; height: 5px; }    /* horizontal stroke, top edge */
+.mp-table-row-handle:hover,
+.mp-table-col-handle:hover { background: rgba(55, 53, 47, 0.34); }
+.mp-table-row-handle.mp-table-handle-dragging,
+.mp-table-col-handle.mp-table-handle-dragging { background: var(--link); cursor: grabbing; }
 
-/* Drop indicator — a separate blue line between rows, never a row outline
-   (twin of .cb-drop-line). */
+/* Drop indicator — a separate blue line between rows (horizontal) or columns
+   (vertical), never a cell outline (twin of .cb-drop-line). */
 .mp-table-drop-line {
   position: fixed;
-  height: 2px;
   background: var(--link);
   border-radius: 2px;
   pointer-events: none;
@@ -2679,7 +2671,8 @@ html.source-full-width #source-view {
 .is-printing .bubble-menu,
 .is-printing .drag-handle,
 .is-printing .block-handle-tooltip,
-.is-printing .mp-table-rail,
+.is-printing .mp-table-row-handle,
+.is-printing .mp-table-col-handle,
 .is-printing .mp-table-drop-line,
 .is-printing #source-view {
   display: none !important;
