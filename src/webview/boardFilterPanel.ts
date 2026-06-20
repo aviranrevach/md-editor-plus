@@ -20,7 +20,7 @@ export function filterableFields(board: Board): FilterableField[] {
   return out;
 }
 
-export interface FilterPill { el: HTMLElement; refresh: () => void; }
+export interface FilterPill { el: HTMLElement; refresh: () => void; open: () => void; }
 
 // One field's filter row (label + value chips). Shared by the global funnel
 // panel and the per-column mini-filter. `onChange` fires after a toggle so the
@@ -175,5 +175,9 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
   }
 
   refresh();
-  return { el: wrap, refresh };
+  return {
+    el: wrap,
+    refresh,
+    open: () => { if (!popover?.isOpen()) openPanel(); },
+  };
 }

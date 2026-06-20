@@ -57,6 +57,8 @@ export function renderChrome(
   // its own refresh() when the board has no status/tag fields.
   const filterPill: FilterPill = createFilterPill(ctx);
   chrome.appendChild(filterPill.el);
+  // Let per-column mini-filters ("All filters…") open this board's funnel.
+  ctx.openFilterPanel = () => filterPill.open();
 
   let refreshViewSeg: (() => void) | null = null;
   let refreshPropsIfOpen: (() => void) | null = null;
