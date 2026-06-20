@@ -13,6 +13,8 @@
 import Table from '@tiptap/extension-table';
 import { mergeAttributes } from '@tiptap/core';
 import { CellSelection } from '@tiptap/pm/tables';
+import { Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { createGripIcon } from './handleIcons';
 import { createMenu, type MenuSection } from './menu';
@@ -61,6 +63,36 @@ function rowCellRange(table: PMNode, tablePos: number, idx: number): { anchorPos
 }
 
 export const TableWithRail = Table.extend({
+  // Mark the cell that holds the cursor as "active" (clicking a cell selects
+  // it visually). ProseMirror is a single editable, so a CSS :focus per cell is
+  // impossible — a decoration is the correct mechanism. CellSelection ranges
+  // are already styled by prosemirror-tables' `.selectedCell`, so skip those.
+  addProseMirrorPlugins() {
+    const parent = this.parent?.() ?? [];
+    return [
+      ...parent,
+      new Plugin({
+        props: {
+          decorations(state) {
+            const sel = state.selection;
+            if (sel instanceof CellSelection) return null;
+            const $f = sel.$from;
+            for (let d = $f.depth; d > 0; d--) {
+              const node = $f.node(d);
+              const name = node.type.name;
+              if (name === 'tableCell' || name === 'tableHeader') {
+                const pos = $f.before(d);
+                return DecorationSet.create(state.doc, [
+                  Decoration.node(pos, pos + node.nodeSize, { class: 'mp-cell-active' }),
+                ]);
+              }
+            }
+            return null;
+          },
+        },
+      }),
+    ];
+  },
   addNodeView() {
     return ({ editor, getPos, HTMLAttributes }) => {
       const wrapper = document.createElement('div');

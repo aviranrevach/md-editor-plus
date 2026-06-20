@@ -2039,15 +2039,24 @@ html.source-full-width #source-view {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 28%, transparent);
 }
 
-/* Cell selection — native ProseMirror CellSelection range + active cell. */
+/* Defensive: the editor fills a hovered block with --block-hover; on a table
+   that would grey the WHOLE table. Kill it on the wrapper (mirrors the board's
+   .board-block guard) and highlight only the hovered ROW instead. */
+.ProseMirror .mp-table,
+.ProseMirror .mp-table:hover { background: transparent !important; }
+.ProseMirror .mp-table tbody tr:hover > td:not(.selectedCell):not(.mp-cell-active),
+.ProseMirror .mp-table tbody tr:hover > th:not(.selectedCell):not(.mp-cell-active) {
+  background: var(--block-hover);
+}
+
+/* Cell selection — the cell holding the cursor (mp-cell-active, set via a
+   decoration since ProseMirror is a single editable) and native CellSelection
+   ranges (.selectedCell). Selection wins over the row-hover tint. */
+.ProseMirror .mp-table td.mp-cell-active,
+.ProseMirror .mp-table th.mp-cell-active,
 .ProseMirror .mp-table td.selectedCell,
 .ProseMirror .mp-table th.selectedCell {
   background: color-mix(in srgb, var(--link) 14%, transparent);
-}
-.ProseMirror .mp-table td:focus-within,
-.ProseMirror .mp-table th:focus-within {
-  outline: 2px solid color-mix(in srgb, var(--link) 55%, transparent);
-  outline-offset: -2px;
 }
 
 /* Block picker — matches the bubble-menu "Turn into" submenu */

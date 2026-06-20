@@ -102,6 +102,24 @@ describe('TableWithRail edge handles (c46)', () => {
   });
 });
 
+describe('TableWithRail active cell (c46)', () => {
+  it('marks the cell holding the cursor as active', () => {
+    const { editor, host } = makeEditor();
+    // Find a position inside the first body cell's paragraph and put the caret there.
+    let pos = -1;
+    editor.state.doc.descendants((node, p) => {
+      if (pos >= 0) return false;
+      if (node.type.name === 'tableCell') { pos = p + 2; return false; }
+      return true;
+    });
+    editor.commands.setTextSelection(pos);
+    const active = host.querySelector('td.mp-cell-active');
+    expect(active).toBeTruthy();
+    expect(active!.textContent).toBe('a1');
+    editor.destroy(); host.remove();
+  });
+});
+
 describe('TableWithRail row menu (c46)', () => {
   it('opens the full row menu on a body row', () => {
     const { editor, host } = makeEditor();
