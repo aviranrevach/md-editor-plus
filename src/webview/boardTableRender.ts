@@ -23,6 +23,7 @@ import { attachSmartTypography } from './extensions/smartTypography';
 import { openStatusOptionsEditor } from './boardStatusOptions';
 import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
+import { renderInlineMarkdown } from './boardInlineRender';
 import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
@@ -32,27 +33,6 @@ import type { Menu, MenuSection } from './menu';
 import { createPopover } from './popover';
 
 interface Group { key: string; cards: Card[]; }
-
-// Render a string into `host`, turning ![alt](src) links into small inline
-// thumbnails and leaving the rest as text. Returns true if any image rendered.
-function renderInlineWithImages(host: HTMLElement, value: string): boolean {
-  const re = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/g;
-  let last = 0;
-  let found = false;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(value)) !== null) {
-    if (m.index > last) host.appendChild(document.createTextNode(value.slice(last, m.index)));
-    const img = document.createElement('img');
-    img.className = 'bd-inline-thumb';
-    img.src = resolveImageSrc(m[2].trim());
-    img.alt = m[1];
-    host.appendChild(img);
-    found = true;
-    last = m.index + m[0].length;
-  }
-  if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
-  return found;
-}
 
 // Fill an editable cell with `value`, wrapping each ![](…) link in a colored
 // token so image references stay visually distinct WHILE editing (not just right
@@ -1163,11 +1143,7 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
     const body = (card.body || '').trim();
     const preview = body.replace(/[\r\n]+/g, ' • ').slice(0, 200);
     if (preview) {
-      if (preview.includes('![')) {
-        renderInlineWithImages(td, preview);
-      } else {
-        td.textContent = preview;
-      }
+      renderInlineMarkdown(td, preview);
     } else {
       const placeholder = document.createElement('span');
       placeholder.className = 'bd-cell-empty';
@@ -1199,11 +1175,7 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
   switch (field.type) {
     case 'text':
     case 'person':
-      if (value.includes('![')) {
-        renderInlineWithImages(td, value);
-      } else {
-        td.textContent = value;
-      }
+      renderInlineMarkdown(td, value);
       if (!ctx.readonly) {
         td.addEventListener('click', () => beginInlineText(td, card, field, ctx));
       }
@@ -1435,8 +1407,7 @@ function beginInlineText(
       // No change → mutate (and its re-render) won't fire, so restore the
       // rendered display ourselves; otherwise the cell is stuck showing the
       // raw `![](…)` markdown instead of the thumbnail.
-      td.textContent = '';
-      if (next.includes('![')) renderInlineWithImages(td, next); else td.textContent = next;
+      renderInlineMarkdown(td, next);
     }
   };
   const cancel = () => {
@@ -1447,8 +1418,7 @@ function beginInlineText(
     // Restore the rendered display (thumbnails) rather than leaving raw markdown
     // text — commit triggers ctx.mutate which re-renders, but cancel does not.
     const v = card.values[field.name] ?? '';
-    td.textContent = '';
-    if (v.includes('![')) renderInlineWithImages(td, v); else td.textContent = v;
+    renderInlineMarkdown(td, v);
     cleanup();
   };
   const onKey = (e: KeyboardEvent) => {

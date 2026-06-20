@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly across the board: **table cells**, the **Description** column, and **kanban cards** (title, body preview, and field chips). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
+
 ### Added
 
 - **Per-column Filter shortcut + tidier column menu (c39)** — a board column's **⋯ menu** now leads with **Filter** (on status / tag columns), which opens a small **mini-filter** for just that column: the field's value chips, a **Clear** that resets only that field, and an **All filters…** link down to the full filter panel. Toggling a chip hides cards live and keeps the toolbar filter's count badge in sync — it edits the same session filter. The menu was also reorganized so the "shape what you see" actions sit together up top — **Filter · Group by this · Sort** (the three sort options now tuck into a single **Sort ▸** flyout) — with **Rename · Edit options · Reset column width · Hide column** below a divider. (c39)
