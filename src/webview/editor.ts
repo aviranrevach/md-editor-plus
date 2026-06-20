@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import Table from '@tiptap/extension-table';
+import { TableWithRail } from './tableNodeView';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
@@ -28,7 +28,6 @@ import SmartTypography from './extensions/smartTypography';
 import { createBubbleMenu } from './bubbleMenu';
 import { createImageBubbleMenu } from './imageBubbleMenu';
 import { createBlockHandle } from './blockHandle';
-import { createTableRowHandle } from './tableRowHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
 import ImagePasteDrop from './extensions/imagePasteDrop';
@@ -44,9 +43,6 @@ const lowlight = createLowlight(common);
 let _editor: Editor | null = null;
 let _editDebounce: FlushableDebounce | null = null;
 let _frontmatter = '';
-// Teardown for the regular-table row handle (c46). Attached only to the PRIMARY
-// editor (not detached side-panel editors) so there's a single floating grip.
-let _tableRowHandleDispose: (() => void) | null = null;
 let _onFrontmatterChange: ((info: { lines: number; kind: 'yaml' | 'toml' | 'none' }) => void) | null = null;
 
 const ResolvedImage = Image.extend({
@@ -143,7 +139,7 @@ function buildRichEditor(
       MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Table.configure({ resizable: false }),
+      TableWithRail.configure({ resizable: false }),
       TableRow,
       TableHeader,
       TableCell,
@@ -205,8 +201,6 @@ export function createEditor(
   _editor = built.editor;
   _editDebounce = built.debounce;
   _frontmatter = built.frontmatter;
-  _tableRowHandleDispose?.();
-  _tableRowHandleDispose = createTableRowHandle(built.editor);
   notifyFrontmatterChange();
   return built.editor;
 }
@@ -289,8 +283,6 @@ export function destroyEditor(): void {
   // to the host instead of being silently discarded.
   _editDebounce?.flush();
   _editDebounce = null;
-  _tableRowHandleDispose?.();
-  _tableRowHandleDispose = null;
   _editor?.destroy();
   _editor = null;
 }
