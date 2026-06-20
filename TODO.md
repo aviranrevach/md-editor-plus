@@ -14,7 +14,7 @@
 | Add "Delete property" option to the table column three-dot menu | Todo | c3 | Medium | Board Table -> Three dot menu |  |
 | In the column three-dot menu, give Sort a dropdown: None / Ascending / Descending | Todo | c4 | Medium | Board Table -> Three dot menu |  |
 | Board table view bug when moving title  column (Bug) | Todo | c6 | Medium | Board Table |  |
-| board table sometimes clicking on a cell doesnt add in the curser and allow you to change its location in cell (Bug) | Todo | c7 | Medium | Board table -> cell |  |
+| board table sometimes clicking on a cell doesnt add in the curser and allow you to change its location in cell (Bug) | Done | c7 | Medium | Board table -> cell |  |
 | When typing -> <- Should actually put arrow character (like in notion), and check which combinations should also allow this | Done | c5 | Low | General |  |
 | Board table grouping visual bugs- the color doesnt fill the whole cell | Done | c12 | High | Board table grouping |  |
 | Board table grouping - allow dragging whole group and reorder groups, or organize by sorting order | Todo | c13 | Medium | Board table grouping |  |
@@ -53,7 +53,7 @@
 | Add a Notion-style row handle to regular markdown tables (hover gutter + grip), with drag-to-reorder and a row-actions menu — the affordance c36 adds to board tables, but for plain tables (which today have no dragger at all). | Todo | c46 | Medium | Tables |  |
 | Board table cells stay editable even when read-only is ON — they re-enable contenteditable on click and commit through a path that bypasses the editor's read-only state. This masked c44 (you could still edit cells while the whole doc was "locked", hiding that read-only was on). Make board cell editing respect read-only so a locked doc is truly locked everywhere. | Todo | c47 | High | Read-only / Board table |  |
 | DATA-LOSS incident (2026-06-20): opening/saving the board silently reverted the WHOLE of TODO.md back to the last git commit — rows c40–c47 and the Done statuses on c34/c37 were wiped, recoverable only from the chat transcript. Same family as c37. Proposed fix: (1) treat any board save that DROPS rows or shrinks the doc as suspect — refuse it / require an explicit delete; (2) auto-snapshot the file before every board write; (3) on load, never let a stale in-memory model silently overwrite newer content on disk. Bump c37 to the top — this is the highest-impact open bug. | Todo | c48 | Urgent!! | Boards / Save |  |
-| clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Todo | c48 | Urgent!! |  |  |
+| clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Todo | c49 | Urgent!! |  |  |
 
 <!-- board:body id="c8" -->
 
