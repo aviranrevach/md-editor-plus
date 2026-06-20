@@ -15,11 +15,14 @@ export function shouldShowPlaceholder(flags: {
   isFocused: boolean;
   isFirstBlock: boolean;
   docIsEmpty: boolean;
+  editable: boolean;
 }): boolean {
+  // A read-only doc can't be written into, so don't invite it (c51).
+  if (!flags.editable) return false;
   return flags.isEmpty && (flags.isFocused || (flags.isFirstBlock && flags.docIsEmpty));
 }
 
-function buildDecorations(state: EditorState): DecorationSet {
+function buildDecorations(state: EditorState, editable: boolean): DecorationSet {
   const { doc, selection } = state;
   const decos: Decoration[] = [];
   const docIsEmpty = doc.textContent === '';
@@ -32,7 +35,7 @@ function buildDecorations(state: EditorState): DecorationSet {
     const isEmpty = node.content.size === 0;
     const isFocused = selection.empty && selection.$from.parent === node;
     const isFirstBlock = topIndex === 0;
-    if (shouldShowPlaceholder({ isEmpty, isFocused, isFirstBlock, docIsEmpty })) {
+    if (shouldShowPlaceholder({ isEmpty, isFocused, isFirstBlock, docIsEmpty, editable })) {
       decos.push(Decoration.node(pos, pos + node.nodeSize, {
         'data-placeholder': PLACEHOLDER_TEXT,
         class: 'is-empty-block',
@@ -48,14 +51,15 @@ export const EmptyPlaceholder = Extension.create({
   name: 'emptyPlaceholder',
 
   addProseMirrorPlugins() {
+    const editor = this.editor;
     return [
       new Plugin<DecorationSet>({
         key: emptyPlaceholderKey,
         props: {
-          // Recompute every render: placeholder visibility depends on selection,
-          // not just doc content.
+          // Recompute every render: placeholder visibility depends on selection
+          // and editability, not just doc content.
           decorations(state) {
-            return buildDecorations(state);
+            return buildDecorations(state, editor.isEditable);
           },
         },
       }),

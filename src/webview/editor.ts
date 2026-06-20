@@ -31,6 +31,7 @@ import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
 import ImagePasteDrop from './extensions/imagePasteDrop';
+import ClickBelowContent from './extensions/clickBelowContent';
 import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 import { setMediaBaseUri, resolveImageSrc } from './mediaResolve';
 import { imageNodeToMarkdown, normalizeWidth } from './imageMarkdown';
@@ -157,6 +158,7 @@ function buildRichEditor(
       SmartTypography,
       SearchExtension,
       ImagePasteDrop,
+      ClickBelowContent,
       GlobalDragHandle.configure({ dragHandleWidth: 48 }),
       EmptyPlaceholder,
     ],

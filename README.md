@@ -29,6 +29,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 - **Slash / block picker** — `⌘/` (`Ctrl+/`) opens an inline picker; type to filter
 - **Bubble menu** — select text for inline formatting, links, color, highlight, emoji, a "Turn into" converter, and a ✨ **AI** button ([see below](#turn-selection-into-ai))
 - **Click-to-edit** — every block is editable in place; no mode switching
+- **Click below to keep typing** — hover the empty space under the last block and a faint "Start writing…" hint previews where a new block will land; click to drop your cursor into a fresh paragraph, even when the doc ends in a board, table, code block, or image (hidden in read-only)
 - **Delete any block** — from the `⠿` dragger menu, a block's own `⋯` menu (boards, diagrams), or select it and press Delete / Backspace
 
 ### Block types
