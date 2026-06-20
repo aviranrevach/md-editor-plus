@@ -14,6 +14,7 @@
 import type { Board, Card, ViewDef, FieldDef, ColorToken } from './boardModel';
 import { getStatusOptions, autoColorPublic, mintCardId } from './boardModel';
 import { applyFilter } from './boardFilter';
+import { openColumnFilter } from './boardFilterPanel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
 import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard, moveCardToGroup, deleteCard, duplicateCard, insertCardAt } from './boardOps';
@@ -980,6 +981,8 @@ const COL_MENU_ICONS = {
   resetWidth: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,56V200a8,8,0,0,1-16,0V56a8,8,0,0,1,16,0ZM32,200V56a8,8,0,0,0-16,0V200a8,8,0,0,0,16,0Zm164.69-71.85L168.85,156a4,4,0,0,1-6.85-2.83V136H94v17.17a4,4,0,0,1-6.85,2.83l-27.84-27.85a4,4,0,0,1,0-5.66l27.84-27.85a4,4,0,0,1,6.85,2.83V114h68V102.83a4,4,0,0,1,6.85-2.83l27.84,27.85A4,4,0,0,1,196.69,128.15Z"/></svg>`,
   hide: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l21.92,24.11a8,8,0,1,0,11.84-10.76Zm46.34,79.42a36,36,0,0,1,49.4,49.4Zm-3.18,90A102.45,102.45,0,0,1,46.71,143C39.62,134.21,32.31,123.5,29,116.74c8.45-17.59,30.93-46.74,72.17-60.18l21.93,24.12a52,52,0,0,0,75.79,71.18l24,26.4A111.55,111.55,0,0,1,128,192a112.46,112.46,0,0,1-30.92-12.27Zm130-31.46a8,8,0,0,1-1.31-11.21c2.66-3.51,17.51-23.81,17.51-32.74,0-8.62-13.79-26.39-21.33-36.06l-.55-.71a112.46,112.46,0,0,0-37.45-32.78,8,8,0,1,1,7.55-14.12,128.39,128.39,0,0,1,42.86,37.43c5.31,6.83,29.92,39.5,29.92,46.24,0,7.5-22.16,40.59-20.94,42.13A8,8,0,0,1,227.08,172.55Z"/></svg>`,
   editOptions: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
+  filter: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M230.6,49.53A15.81,15.81,0,0,0,216,40H40A16,16,0,0,0,28.19,66.76l.08.09L96,139.17V216a16,16,0,0,0,24.87,13.3l32-21.34A16,16,0,0,0,160,194.66V139.17l67.74-72.32.08-.09A15.8,15.8,0,0,0,230.6,49.53ZM40,56h0Zm106.18,74.58A8,8,0,0,0,144,136v58.66L112,216V136a8,8,0,0,0-2.16-5.47L40,56H216Z"/></svg>`,
+  sort: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,181.66l-32,32a8,8,0,0,1-11.32,0l-32-32A8,8,0,0,1,144,168h24V96a8,8,0,0,1,16,0v72h24a8,8,0,0,1,5.66,13.66ZM82.34,42.34a8,8,0,0,0-11.32,0l-32,32A8,8,0,0,0,44,88H68v72a8,8,0,0,0,16,0V88h24a8,8,0,0,0,5.66-13.66Z"/></svg>`,
 };
 
 function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx, collapsedGroups: Set<string>): void {
@@ -989,53 +992,13 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
   const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
   const tableGroupBy = ctx.getBoard().views.find(x => x.name === 'table')?.groupBy;
 
-  const items = [
-    {
-      icon: COL_MENU_ICONS.rename,
-      label: 'Rename',
-      disabled: isLockedName,
-      onSelect: () => {
-        requestHeaderRename(f.name);
-        ctx.mutate({ ...ctx.getBoard() });
-      },
-    },
+  // Section 1 — "shape what you see": Filter (status/tags only), Group, Sort flyout.
+  const viewItems = [
     ...(f.type === 'status' || f.type === 'tags' ? [{
-      icon: COL_MENU_ICONS.editOptions,
-      label: 'Edit options',
-      onSelect: () => {
-        openStatusOptionsEditor(anchor, ctx.getBoard, f.name, ctx.mutate);
-      },
+      icon: COL_MENU_ICONS.filter,
+      label: 'Filter',
+      onSelect: () => { openColumnFilter(anchor, ctx, f.name); },
     }] : []),
-    {
-      icon: COL_MENU_ICONS.sortAsc,
-      label: 'Sort ascending',
-      onSelect: () => {
-        const cur = ctx.getBoard();
-        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-        setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
-        ctx.mutate(b2);
-      },
-    },
-    {
-      icon: COL_MENU_ICONS.sortDesc,
-      label: 'Sort descending',
-      onSelect: () => {
-        const cur = ctx.getBoard();
-        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-        setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
-        ctx.mutate(b2);
-      },
-    },
-    {
-      icon: COL_MENU_ICONS.sortClear,
-      label: 'Clear sort',
-      onSelect: () => {
-        const cur = ctx.getBoard();
-        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-        setViewSort(b2, 'table', null);
-        ctx.mutate(b2);
-      },
-    },
     tableGroupBy === f.name
       ? {
           icon: COL_MENU_ICONS.group,
@@ -1060,6 +1023,62 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
           },
         },
     {
+      icon: COL_MENU_ICONS.sort,
+      label: 'Sort',
+      submenu: () => [{ items: [
+        {
+          icon: COL_MENU_ICONS.sortAsc,
+          label: 'Ascending',
+          onSelect: () => {
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
+            ctx.mutate(b2);
+          },
+        },
+        {
+          icon: COL_MENU_ICONS.sortDesc,
+          label: 'Descending',
+          onSelect: () => {
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
+            ctx.mutate(b2);
+          },
+        },
+        {
+          icon: COL_MENU_ICONS.sortClear,
+          label: 'Clear sort',
+          onSelect: () => {
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewSort(b2, 'table', null);
+            ctx.mutate(b2);
+          },
+        },
+      ] }],
+    },
+  ];
+
+  // Section 2 — field / column management.
+  const fieldItems = [
+    {
+      icon: COL_MENU_ICONS.rename,
+      label: 'Rename',
+      disabled: isLockedName,
+      onSelect: () => {
+        requestHeaderRename(f.name);
+        ctx.mutate({ ...ctx.getBoard() });
+      },
+    },
+    ...(f.type === 'status' || f.type === 'tags' ? [{
+      icon: COL_MENU_ICONS.editOptions,
+      label: 'Edit options',
+      onSelect: () => {
+        openStatusOptionsEditor(anchor, ctx.getBoard, f.name, ctx.mutate);
+      },
+    }] : []),
+    {
       icon: COL_MENU_ICONS.resetWidth,
       label: 'Reset column width',
       onSelect: () => {
@@ -1081,7 +1100,10 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     },
   ];
 
-  createMenu({ className: 'bd-col-menu' }).open(anchor, [{ items }]);
+  createMenu({ className: 'bd-col-menu' }).open(anchor, [
+    { items: viewItems },
+    { items: fieldItems },
+  ]);
 }
 
 function applySort(cards: Card[], v: ViewDef, b: Board): Card[] {
