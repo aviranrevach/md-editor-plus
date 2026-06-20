@@ -70,3 +70,55 @@ describe('applyFilter', () => {
     expect(ids(applyFilter(reordered, { Status: ['Todo', 'Doing'] }, b))).toEqual(['c3', 'c1', 'c2']);
   });
 });
+
+import {
+  NONE_ON, allFieldValues, onValues, toggleFilterValue, clearFilterField,
+} from '../src/webview/boardFilter';
+
+describe('filter on/off helpers', () => {
+  const opts = ['Todo', 'Doing', 'Done'];
+  const all = [...opts, EMPTY_VALUE];
+
+  it('allFieldValues appends EMPTY_VALUE', () => {
+    expect(allFieldValues(opts)).toEqual(['Todo', 'Doing', 'Done', EMPTY_VALUE]);
+  });
+
+  it('onValues defaults to all-on when the field has no entry', () => {
+    expect([...onValues({}, 'Status', opts)].sort()).toEqual([...all].sort());
+  });
+
+  it('onValues reads the stored set and drops NONE_ON', () => {
+    expect([...onValues({ Status: ['Todo'] }, 'Status', opts)]).toEqual(['Todo']);
+    expect([...onValues({ Status: [NONE_ON] }, 'Status', opts)]).toEqual([]);
+  });
+
+  it('toggling one value off an all-on field stores the remaining on-set', () => {
+    expect(toggleFilterValue({}, 'Status', opts, 'Done').Status!.sort())
+      .toEqual(['Doing', EMPTY_VALUE, 'Todo'].sort());
+  });
+
+  it('toggling the last value on clears the field (back to all-on)', () => {
+    const partial: FilterState = { Status: ['Todo'] };
+    // turn every remaining value on → field becomes inactive (deleted)
+    let next = toggleFilterValue(partial, 'Status', opts, 'Doing');
+    next = toggleFilterValue(next, 'Status', opts, 'Done');
+    next = toggleFilterValue(next, 'Status', opts, EMPTY_VALUE);
+    expect(next.Status).toBeUndefined();
+  });
+
+  it('toggling the only remaining value off stores [NONE_ON]', () => {
+    expect(toggleFilterValue({ Status: ['Todo'] }, 'Status', opts, 'Todo').Status)
+      .toEqual([NONE_ON]);
+  });
+
+  it('toggleFilterValue does not mutate its input', () => {
+    const input: FilterState = { Status: ['Todo'] };
+    toggleFilterValue(input, 'Status', opts, 'Doing');
+    expect(input).toEqual({ Status: ['Todo'] });
+  });
+
+  it('clearFilterField removes only the named field', () => {
+    expect(clearFilterField({ Status: ['Todo'], Impact: ['High'] }, 'Status'))
+      .toEqual({ Impact: ['High'] });
+  });
+});

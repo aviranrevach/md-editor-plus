@@ -40,3 +40,47 @@ export function applyFilter(cards: Card[], filter: FilterState, board: Board): C
     }),
   );
 }
+
+// Sentinel stored when EVERY value of a field is toggled off: a value no card
+// has, so applyFilter hides every card. Distinct from EMPTY_VALUE.
+export const NONE_ON = '__none__';
+
+// All selectable values for a field = its option names + the (Empty) sentinel.
+export function allFieldValues(optionNames: string[]): string[] {
+  return [...optionNames, EMPTY_VALUE];
+}
+
+// The values currently ON for a field. No entry → all on (default). Otherwise
+// the stored set, minus the NONE_ON sentinel.
+export function onValues(
+  filter: FilterState, fieldName: string, optionNames: string[],
+): Set<string> {
+  const raw = filter[fieldName];
+  return raw === undefined
+    ? new Set(allFieldValues(optionNames))
+    : new Set(raw.filter((v) => v !== NONE_ON));
+}
+
+// Pure toggle of one value. Returns a new FilterState (never mutates input):
+// all on → field deleted (show everything); all off → [NONE_ON] (hide all);
+// otherwise the on-set is stored.
+export function toggleFilterValue(
+  filter: FilterState, fieldName: string, optionNames: string[], value: string,
+): FilterState {
+  const next: FilterState = { ...filter };
+  const on = onValues(filter, fieldName, optionNames);
+  if (on.has(value)) on.delete(value);
+  else on.add(value);
+  const all = allFieldValues(optionNames);
+  if (on.size === all.length) delete next[fieldName];
+  else if (on.size === 0) next[fieldName] = [NONE_ON];
+  else next[fieldName] = [...on];
+  return next;
+}
+
+// Pure: reset a single field (back to all-on). Never mutates input.
+export function clearFilterField(filter: FilterState, fieldName: string): FilterState {
+  const next: FilterState = { ...filter };
+  delete next[fieldName];
+  return next;
+}

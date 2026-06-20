@@ -41,6 +41,8 @@ export interface BoardRendererCtx {
   getFilter: () => FilterState;
   /** Replace the filter and re-render the body + chrome (no save/mutate). */
   setFilter: (next: FilterState) => void;
+  /** Open the global (multi-field) filter funnel for THIS board. Wired by chrome. */
+  openFilterPanel?: () => void;
 }
 
 /** Lifecycle handles returned by a board renderer. */
