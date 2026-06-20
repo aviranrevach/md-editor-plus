@@ -38,12 +38,22 @@
 | Convert table into board teable doesnt work | Done | c31 | High |  |  |
 | Regular table dissappeard from the + and tunr into menu | Done | c32 | Urgent!! |  |  |
 | Turn into with AI is not in the Turn into menu | Done | c33 | Urgent!! |  |  |
-| fix all the menus drill downs that get cropped because they are out of the screen, and make sure this doesnt happen again in this project. if needed show me all instances of this to check them | Todo | c34 | Urgent!! |  |  |
+| fix all the menus drill downs  (and regular menus) that get cropped because they are out of the screen, and make sure this doesnt happen again in this project. it should be smart way to check it and position the menu in a comfortable way. if needed show me all instances of this to check them | Done | c34 | Urgent!! |  |  |
 | Search doesnt work. i tried searching "type" in this page- showed me nothing | Done | c35 | Urgent!! |  |  |
 | on table board allow clicking on the dragger for row actions | Todo | c36 | Medium |  |  |
-| Bug! Saving says "Saved" but the file is wiped to empty (0 bytes) on disk — the whole board can vanish | Todo | c37 | Urgent!! | Boards / Save |  |
+| Bug! Saving says "Saved" but the file is wiped to empty (0 bytes) on disk — the whole board can vanish | Done | c37 | Urgent!! | Boards / Save |  |
 | On the image bubble menu, add another items with 2 options- 1. find file on finder. 2. copy path. it pops these options to choose- make it make sense | Done | c38 | High |  | Gilad |
 | Redesign column menu for the same look and feel, icons, and grouping as the other menus. allow filtering shortcut (that opens the regular filter) | Todo | c39 | Medium | Board table |  |
+| Change icons of these areas | Todo | c40 | Low |  |  |
+| the save callout saying something was saved someplace else, where its not. both was me- i was changing something in the description | Todo | c41 | High |  |  |
+| Block dragger, plus, and empty state - make it more like notion, right now the dragger icon and the plus are too small in its space, and relation to the hover background space. also missing the empty state placeholder sentense that explain what you can do | Review | c42 | Medium |  |  |
+| Menu list just like in notion - more compact menu lines and with icons with no borders- less padding, and footer (the footer text should be with smaller text like caption and not like notion) | Done | c43 | Medium |  |  |
+| Read-only mode was silently ON without me ever turning it on, and it broke the whole app — no blinking cursor / can't click-to-type in card descriptions, kanban titles, and tables. Board cells still edited (they bypass read-only), which hid the fact I was locked. Find why read-only turns on by itself / make it impossible to get stuck, and show a clear, obvious indicator when read-only is active. | Done | c44 | Urgent!! | Read-only |  |
+| Read-only needs a REAL on/off toggle (a switch like elsewhere in the app), not the confusing blue "active highlight" on the button that no one understands. | Done | c45 | High | Read-only / Settings menu |  |
+| Add a Notion-style row handle to regular markdown tables (hover gutter + grip), with drag-to-reorder and a row-actions menu — the affordance c36 adds to board tables, but for plain tables (which today have no dragger at all). | Todo | c46 | Medium | Tables |  |
+| Board table cells stay editable even when read-only is ON — they re-enable contenteditable on click and commit through a path that bypasses the editor's read-only state. This masked c44 (you could still edit cells while the whole doc was "locked", hiding that read-only was on). Make board cell editing respect read-only so a locked doc is truly locked everywhere. | Todo | c47 | High | Read-only / Board table |  |
+| DATA-LOSS incident (2026-06-20): opening/saving the board silently reverted the WHOLE of TODO.md back to the last git commit — rows c40–c47 and the Done statuses on c34/c37 were wiped, recoverable only from the chat transcript. Same family as c37. Proposed fix: (1) treat any board save that DROPS rows or shrinks the doc as suspect — refuse it / require an explicit delete; (2) auto-snapshot the file before every board write; (3) on load, never let a stale in-memory model silently overwrite newer content on disk. Bump c37 to the top — this is the highest-impact open bug. | Todo | c48 | Urgent!! | Boards / Save |  |
+| clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Todo | c48 | Urgent!! |  |  |
 
 <!-- board:body id="c8" -->
 
@@ -132,6 +142,18 @@ Almost certainly the same save/sync family as c8, c26, c28, c30: the editor sign
 <!-- board:body id="c39" -->
 
 ![](./TODO.assets/image-8.webp)
+
+<!-- board:body id="c41" -->
+
+![](./TODO.assets/image-9.png)
+
+<!-- board:body id="c42" -->
+
+![](./TODO.assets/image-2.png)
+
+<!-- board:body id="c43" -->
+
+![](./TODO.assets/image-5.png)
 
 <!-- board:end -->
 

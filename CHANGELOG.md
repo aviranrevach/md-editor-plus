@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-20
+
 ### Added
 
 - **Empty-state hint and plain `/` trigger (c42)** — empty blocks now show a hint: "Start writing, or press / for commands". Typing `/` on an empty block opens the block picker; `⌘/` continues to work everywhere.
