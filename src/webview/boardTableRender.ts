@@ -971,7 +971,7 @@ function openRowMenu(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): vo
   getRowMenu().open(anchor, sections);
 }
 
-// Phosphor Bold 16px icons for the column header menu.
+// Phosphor Regular 16px icons for the column header menu.
 const COL_MENU_ICONS = {
   rename: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
   sortAsc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M152,72a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H160A8,8,0,0,1,152,72Zm8,48h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm-50.34-26.34L96,187.31V40a8,8,0,0,0-16,0V187.31L66.34,173.66a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l24-24A8,8,0,0,0,109.66,173.66Z"/></svg>`,
