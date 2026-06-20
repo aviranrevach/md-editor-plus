@@ -181,3 +181,51 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
     open: () => { if (!popover?.isOpen()) openPanel(); },
   };
 }
+
+// Scoped per-column mini-filter. Opened from a column's ⋯ menu. Edits the same
+// session FilterState the funnel uses; "All filters…" jumps to the full funnel.
+export function openColumnFilter(
+  anchor: HTMLElement, ctx: BoardRendererCtx, fieldName: string,
+): void {
+  const f = filterableFields(ctx.getBoard()).find((x) => x.name === fieldName);
+  if (!f) return;
+
+  const popover = createPopover({ className: 'bd-filter-panel bd-col-filter-panel' });
+  popover.el.setAttribute('role', 'dialog');
+
+  function build(): void {
+    popover.el.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'bd-filter-head';
+    const title = document.createElement('span');
+    title.className = 'bd-filter-title';
+    title.textContent = f!.name;
+    head.appendChild(title);
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'bd-filter-clear';
+    clear.textContent = 'Clear';
+    clear.addEventListener('click', () => {
+      ctx.setFilter(clearFilterField(ctx.getFilter(), f!.name));
+      build();
+    });
+    head.appendChild(clear);
+    popover.el.appendChild(head);
+
+    popover.el.appendChild(buildFieldFilterRow(ctx, f!, build));
+
+    const foot = document.createElement('button');
+    foot.type = 'button';
+    foot.className = 'bd-col-filter-foot';
+    foot.innerHTML = FUNNEL_SVG + '<span>All filters…</span>';
+    foot.addEventListener('click', () => {
+      popover.close();
+      ctx.openFilterPanel?.();
+    });
+    popover.el.appendChild(foot);
+  }
+
+  build();
+  popover.open(anchor);
+}

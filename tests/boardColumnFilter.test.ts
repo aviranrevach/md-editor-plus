@@ -58,3 +58,47 @@ describe('buildFieldFilterRow', () => {
     expect(ctx.getFilter().Status).toContain('Done');
   });
 });
+
+import { openColumnFilter } from '../src/webview/boardFilterPanel';
+
+describe('openColumnFilter', () => {
+  it('renders header (field name + Clear), the chip row, and an All filters… footer', () => {
+    const board = makeBoard();
+    const ctx = makeCtx(board);
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+
+    openColumnFilter(anchor, ctx, 'Status');
+
+    const panel = document.querySelector('.bd-col-filter-panel')!;
+    expect(panel).toBeTruthy();
+    expect(panel.querySelector('.bd-filter-title')!.textContent).toBe('Status');
+    expect(panel.querySelectorAll('.bd-filter-chip').length).toBe(3);
+    expect(panel.querySelector('.bd-col-filter-foot')!.textContent).toContain('All filters');
+  });
+
+  it('Clear resets only this field', () => {
+    const board = makeBoard();
+    const ctx = makeCtx(board);
+    ctx.setFilter({ Status: ['Todo'] });
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+
+    openColumnFilter(anchor, ctx, 'Status');
+    (document.querySelector('.bd-filter-clear') as HTMLButtonElement).click();
+    expect(ctx.getFilter().Status).toBeUndefined();
+  });
+
+  it('All filters… calls ctx.openFilterPanel', () => {
+    const board = makeBoard();
+    const ctx = makeCtx(board);
+    let opened = 0;
+    ctx.openFilterPanel = () => { opened++; };
+    const anchor = document.createElement('button');
+    document.body.appendChild(anchor);
+
+    openColumnFilter(anchor, ctx, 'Status');
+    (document.querySelector('.bd-col-filter-foot') as HTMLButtonElement).click();
+    expect(opened).toBe(1);
+  });
+});

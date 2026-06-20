@@ -1861,3 +1861,14 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 }
 .bd-filter-chip.bd-filter-empty .board-column-chip-dot { display: none; }
 .bd-filter-chip.bd-filter-empty.bd-filter-hollow { border-style: dashed; }
+
+.bd-col-filter-panel { min-width: 200px; max-width: 280px; }
+.bd-col-filter-foot {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  margin-top: 8px; padding: 8px 2px 0;
+  border: none; border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
+  background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--accent, #2383e2);
+}
+.bd-col-filter-foot:hover { text-decoration: underline; }
+.bd-col-filter-foot svg { width: 13px; height: 13px; flex: none; }
