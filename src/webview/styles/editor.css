@@ -1989,6 +1989,79 @@ html.source-full-width #source-view {
   font-size: 10px;
 }
 
+/* c46 — regular-table NodeView, Notion-style. No padding: the table aligns with
+   surrounding content. Hovering a cell shows a thin stroke hint on its row's
+   left edge and its column's top edge; drifting toward an edge (a forgiving
+   ~24px band, handled in JS) promotes the hint into a ⠿ grip that emerges
+   centred on the stroke. The top grip's dots are rotated since it drags
+   horizontally. */
+.mp-table { position: relative; }
+
+/* thin resting hint — never grabs the pointer (the grip does) */
+.mp-table-stroke {
+  position: absolute;
+  display: none;
+  background: rgba(55, 53, 47, 0.24);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 2;
+}
+.mp-table-row-stroke { width: 3px; }
+.mp-table-col-stroke { height: 3px; }
+
+/* the grip that emerges near an edge — white rounded box, like the block handle */
+.mp-table-grip {
+  position: absolute;
+  display: none;              /* set to grid on edge-hover by the NodeView */
+  place-items: center;
+  z-index: 4;
+  background: #fff;
+  border-radius: 5px;
+  box-shadow: 0 1px 5px rgba(0,0,0,.20), 0 0 0 1px rgba(0,0,0,.06);
+  color: #9b9a97;
+  cursor: grab;
+}
+.mp-table-row-grip { width: 16px; height: 24px; }
+.mp-table-col-grip { width: 24px; height: 16px; }
+.mp-table-grip:hover { color: #5f5e5b; }
+.mp-table-grip svg { display: block; width: 11px; height: 16px; }
+.mp-table-col-grip svg { transform: rotate(90deg); } /* dragged horizontally */
+.mp-table-grip.mp-table-grip-dragging { cursor: grabbing; color: var(--link); }
+
+/* Drop indicator — a separate blue line between rows (horizontal) or columns
+   (vertical), never a cell outline (twin of .cb-drop-line). */
+.mp-table-drop-line {
+  position: fixed;
+  background: var(--link);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1100;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--link) 28%, transparent);
+}
+
+/* Defensive: the editor fills a hovered block with --block-hover; on a table
+   that would grey the WHOLE table. Kill it on the wrapper (mirrors the board's
+   .board-block guard) and highlight only the hovered ROW instead. */
+.ProseMirror .mp-table,
+.ProseMirror .mp-table:hover { background: transparent !important; }
+.ProseMirror .mp-table tbody tr:hover > td,
+.ProseMirror .mp-table tbody tr:hover > th {
+  background: var(--block-hover);
+}
+
+/* Selection = a blue outline box over the cell / row / column (strokes on the
+   edges, like the board's .bd-cell-editing — never a fill). Drawn by the
+   NodeView from the current selection. The native .selectedCell gets no fill. */
+.ProseMirror .mp-table-sel-box {
+  position: absolute;
+  border: 2px solid var(--link);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 3;
+}
+.ProseMirror .mp-table td.selectedCell,
+.ProseMirror .mp-table th.selectedCell { background: transparent; }
+
 /* Block picker — matches the bubble-menu "Turn into" submenu */
 .block-picker {
   position: fixed;
@@ -2626,6 +2699,9 @@ html.source-full-width #source-view {
 .is-printing .bubble-menu,
 .is-printing .drag-handle,
 .is-printing .block-handle-tooltip,
+.is-printing .mp-table-stroke,
+.is-printing .mp-table-grip,
+.is-printing .mp-table-drop-line,
 .is-printing #source-view {
   display: none !important;
 }

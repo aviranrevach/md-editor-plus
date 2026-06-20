@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import Table from '@tiptap/extension-table';
+import { TableWithRail } from './tableNodeView';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
@@ -139,7 +139,7 @@ function buildRichEditor(
       MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      Table.configure({ resizable: false }),
+      TableWithRail.configure({ resizable: false }),
       TableRow,
       TableHeader,
       TableCell,
