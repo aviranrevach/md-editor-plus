@@ -10,6 +10,7 @@ import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { applyFilter } from './boardFilter';
 import { resolveImageSrc } from './mediaResolve';
 import { firstImageSrc } from './boardImageLinks';
+import { renderInlineMarkdown } from './boardInlineRender';
 import { attachSmartTypography } from './extensions/smartTypography';
 import { createPopover } from './popover';
 
@@ -470,7 +471,7 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
 
   const title = document.createElement('div');
   title.className = 'board-card-title';
-  title.textContent = card.values.Title || 'Untitled';
+  renderInlineMarkdown(title, card.values.Title || 'Untitled');
   el.appendChild(title);
 
   // Skip the body preview when the kanban view's Properties popover has hidden
@@ -481,7 +482,7 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
   if (preview) {
     const p = document.createElement('div');
     p.className = 'board-card-preview';
-    p.textContent = preview;
+    renderInlineMarkdown(p, preview);
     el.appendChild(p);
   }
 
@@ -590,7 +591,7 @@ function startInlineTitleEdit(
       // mutate would re-render anyway; fall back to a direct restore for no-op.
       const restored = document.createElement('div');
       restored.className = 'board-card-title';
-      restored.textContent = original || 'Untitled';
+      renderInlineMarkdown(restored, original || 'Untitled');
       input.replaceWith(restored);
       return;
     }
@@ -607,7 +608,7 @@ function startInlineTitleEdit(
     cardEl.classList.remove('is-editing-title');
     const restored = document.createElement('div');
     restored.className = 'board-card-title';
-    restored.textContent = original || 'Untitled';
+    renderInlineMarkdown(restored, original || 'Untitled');
     input.replaceWith(restored);
   };
 

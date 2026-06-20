@@ -1785,6 +1785,27 @@ body.is-dragging-property .board-properties-name { user-select: none; }
   border-radius: 3px; vertical-align: text-bottom; margin: 0 2px;
 }
 
+/* ===== c27: inline text styles rendered inside board views =====
+   Cell values + card titles/previews render bold/italic/strike/code/highlight/
+   links via renderInlineMarkdown. Keep marks sized to the surrounding text so
+   they never blow up row height. */
+.bd-table-cell strong, .board-card-title strong, .board-card-preview strong { font-weight: 600; }
+.bd-table-cell em, .board-card-title em, .board-card-preview em { font-style: italic; }
+.bd-table-cell s, .board-card-title s, .board-card-preview s { text-decoration: line-through; }
+.bd-table-cell u, .board-card-title u, .board-card-preview u { text-decoration: underline; }
+.bd-table-cell mark, .board-card-title mark, .board-card-preview mark {
+  background: var(--board-highlight, #fef3a8); color: inherit;
+  border-radius: 2px; padding: 0 1px;
+}
+.bd-table-cell code, .board-card-title code, .board-card-preview code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9em; background: var(--code-bg, rgba(135, 131, 120, 0.15));
+  border-radius: 3px; padding: 0.1em 0.35em;
+}
+.bd-table-cell a, .board-card-title a, .board-card-preview a {
+  color: var(--link, #2383e2); text-decoration: underline; cursor: pointer;
+}
+
 /* ===== Kanban card cover image ===== */
 /* Card padding is 9px (top/bottom) × 11px (left/right).
    Negative margin pulls the cover flush to the card edges on top and sides;

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly in board **table cells** and **kanban cards** (title + preview). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
+
 ### Added
 
 - **Click below the page to add a block (c51)** — clicking the empty space beneath the last block now lands your cursor in a new paragraph, so you can always keep typing at the bottom of a doc. Previously this was a no-op whenever the document ended in a block with no place for the caret (a board, code block, image, or table). **Hovering** that area first previews a faint "Start writing, or press / for commands" hint so it reads as clickable before you click. If the doc already ends in an empty paragraph, the click just focuses it instead of stacking another. In **read-only** docs nothing is shown and nothing is added — and the empty-state hint no longer appears there either, since you can't write. (c51)
