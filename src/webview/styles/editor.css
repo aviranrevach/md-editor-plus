@@ -1994,24 +1994,24 @@ html.source-full-width #source-view {
    (a thin stroke on the top outer edge). Small gutters hold the strokes so they
    sit flush to the table without indenting the content much; the gutters are
    part of the wrapper so you can slide from a cell onto a stroke. */
-/* Gutters via padding (so the strokes sit within the wrapper's hover zone and
-   stay reachable), cancelled by an equal negative margin so the TABLE itself
-   stays aligned with surrounding content — no visual indent. */
-.mp-table { position: relative; padding: 12px 0 0 12px; margin: -12px 0 0 -12px; }
+/* No padding — the table aligns with surrounding content. The handles are thin
+   strokes pinned ON the table's edges (left:0 / top:0), inside the box so they
+   stay reachable (sliding from a cell to a stroke never leaves the wrapper). */
+.mp-table { position: relative; }
 .mp-table-row-handle,
 .mp-table-col-handle {
   position: absolute;
   display: none;              /* shown on cell hover by the NodeView */
-  background: rgba(55, 53, 47, 0.16);
+  background: rgba(55, 53, 47, 0.28);
   border-radius: 3px;
   cursor: grab;
   z-index: 2;
   transition: background 0.1s;
 }
-.mp-table-row-handle { left: 4px; width: 5px; }   /* vertical stroke, left edge */
-.mp-table-col-handle { top: 4px; height: 5px; }    /* horizontal stroke, top edge */
+.mp-table-row-handle { left: 0; width: 3px; }     /* thin stroke on the left edge */
+.mp-table-col-handle { top: 0; height: 3px; }      /* thin stroke on the top edge */
 .mp-table-row-handle:hover,
-.mp-table-col-handle:hover { background: rgba(55, 53, 47, 0.34); }
+.mp-table-col-handle:hover { background: rgba(55, 53, 47, 0.5); }
 .mp-table-row-handle.mp-table-handle-dragging,
 .mp-table-col-handle.mp-table-handle-dragging { background: var(--link); cursor: grabbing; }
 

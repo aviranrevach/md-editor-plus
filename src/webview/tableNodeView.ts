@@ -112,11 +112,11 @@ export const TableWithRail = Table.extend({
         const wRect = wrapper.getBoundingClientRect();
         const rRect = tr.getBoundingClientRect();
         const cRect = cell.getBoundingClientRect();
-        rowHandle.style.top = `${rRect.top - wRect.top + 3}px`;
-        rowHandle.style.height = `${Math.max(8, rRect.height - 6)}px`;
+        rowHandle.style.top = `${rRect.top - wRect.top + 1}px`;
+        rowHandle.style.height = `${Math.max(8, rRect.height - 2)}px`;
         rowHandle.style.display = 'block';
-        colHandle.style.left = `${cRect.left - wRect.left + 3}px`;
-        colHandle.style.width = `${Math.max(8, cRect.width - 6)}px`;
+        colHandle.style.left = `${cRect.left - wRect.left + 1}px`;
+        colHandle.style.width = `${Math.max(8, cRect.width - 2)}px`;
         colHandle.style.display = 'block';
       }
 
