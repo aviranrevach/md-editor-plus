@@ -658,7 +658,8 @@ function renderChip(f: FieldDef, val: string): HTMLElement {
     const initial = val.replace(/^@/, '').charAt(0).toUpperCase();
     chip.innerHTML = `<span class="board-avatar">${escapeHtml(initial)}</span><span>${escapeHtml(val)}</span>`;
   } else {
-    chip.textContent = val;
+    // c27: text-field chips carry inline markdown too — render bold/italic/etc.
+    renderInlineMarkdown(chip, val);
   }
   return chip;
 }

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly in board **table cells** and **kanban cards** (title + preview). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
+- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly across the board: **table cells**, the **Description** column, and **kanban cards** (title, body preview, and field chips). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
 
 ### Added
 
