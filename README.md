@@ -36,7 +36,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 - **Text** — paragraph, H1, H2, H3
 - **Lists** — bullet, numbered, task lists with real checkboxes that round-trip to `- [ ]` / `- [x]`
-- **Tables** — GFM pipe syntax, inline cell editing, add rows/columns from the bubble menu, plus a `⠿` **row handle** to drag-reorder rows or open a row menu (insert / duplicate / delete)
+- **Tables** — GFM pipe syntax, inline cell editing, plus Notion-style `⠿` **row & column handles** on the edges to drag-reorder or open a menu (insert / duplicate / delete), with a blue outline selection on cells, rows, and columns
 - **Code blocks** — syntax highlighting for \~50 languages, line-number gutter, drag lines to reorder, copy button, optional auto-collapse for long snippets
 - **Callouts** — GFM `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]` with colored backgrounds and icons
 - **Toggles** — collapsible `<details>` sections
@@ -258,7 +258,7 @@ Type `->` and `<-` and they become `→` and `←` as you go — Notion-style. A
 
 Insert a plain Markdown table from the block picker (under **Lists**) — a 3×3 starter with a header row — then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table. It's a distinct block from **Board: Table**, so typing `table` in the picker surfaces both.
 
-**Row & column handles + selection** — Notion-style edge handles. **Hover a cell** → a thin stroke marks its **row** (left edge) and **column** (top edge); drift toward an edge and a **⠿ grip emerges**. **Click** the grip to select the whole row/column and open its menu (rows: **Insert above / below**, **Duplicate**, **Delete**; columns: **Insert left / right**, **Duplicate**, **Delete**), or **drag** it to reorder. The active cell is outlined, and you can **drag across cells / shift-click** to select a block. The header row stays first (menu: **Insert row below** only), and a table always keeps at least one column. The margin handle still moves the whole table.
+**Row & column handles + selection** — Notion-style edge handles. **Hover a cell** → a thin stroke marks its **row** (left edge) and **column** (top edge); drift toward an edge and a **⠿ grip emerges**. **Click** the grip to select the whole row/column and open its menu (rows: **Insert above / below**, **Duplicate**, **Delete**; columns: **Insert left / right**, **Duplicate**, **Delete**), or **drag** it to reorder. Selection shows as a **blue outline box** (never a fill) — on the clicked cell, a selected row/column, or a **drag across cells / shift-click** range. The header row stays first (menu: **Insert row below** only), and a table always keeps at least one column. The margin handle still moves the whole table.
 
 Outgrown a simple grid? Use the `⠿` handle → **Turn into → Board: Table** to convert it into a full board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the view toggle.
 
