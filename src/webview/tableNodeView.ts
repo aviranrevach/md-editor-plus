@@ -421,8 +421,12 @@ export const TableWithRail = Table.extend({
         dom: wrapper,
         contentDOM: tbody,
         ignoreMutation(mutation) {
+          // All of our chrome lives in the wrapper but outside contentDOM; its
+          // style/position mutations must NOT make ProseMirror redraw the node
+          // (a redraw would reset the selection box and the handles). The drop
+          // line lives on document.body, so it's never seen here.
           const t = mutation.target as Node;
-          for (const el of [rowStroke, colStroke, rowGrip, colGrip]) {
+          for (const el of [rowStroke, colStroke, rowGrip, colGrip, selBox]) {
             if (t === el || el.contains(t)) return true;
           }
           return false;
