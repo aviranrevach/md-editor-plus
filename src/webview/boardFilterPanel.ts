@@ -6,12 +6,12 @@
 import type { BoardRendererCtx } from './boardBlock';
 import type { Board, ColumnDef } from './boardModel';
 import { getStatusOptions } from './boardModel';
-import { applyFilter, EMPTY_VALUE } from './boardFilter';
+import { applyFilter, EMPTY_VALUE, onValues, toggleFilterValue, clearFilterField } from './boardFilter';
 import { createPopover, type Popover } from './popover';
 
-interface FilterableField { name: string; values: ColumnDef[]; }
+export interface FilterableField { name: string; values: ColumnDef[]; }
 
-function filterableFields(board: Board): FilterableField[] {
+export function filterableFields(board: Board): FilterableField[] {
   const out: FilterableField[] = [];
   for (const f of board.fields) {
     if (f.type === 'status') out.push({ name: f.name, values: getStatusOptions(board, f.name) });
@@ -20,24 +20,54 @@ function filterableFields(board: Board): FilterableField[] {
   return out;
 }
 
-// Model note: the UI shows every value ON by default and you click to turn one
-// OFF. applyFilter is an include-filter (allowed values), so we store the set of
-// values still ON. All ON → store nothing (field inactive → all cards shown).
-// All OFF → store this sentinel, a value no card has, so applyFilter matches
-// nothing and hides every card. (Session-only state — never serialized.)
-const NONE_ON = '__none__';
-
-function allValuesOf(f: FilterableField): string[] {
-  return [...f.values.map((v) => v.name), EMPTY_VALUE];
-}
-
-// The values currently ON for a field: default (no entry) = all on.
-function onSetOf(filter: Record<string, string[] | undefined>, f: FilterableField): Set<string> {
-  const raw = filter[f.name];
-  return raw === undefined ? new Set(allValuesOf(f)) : new Set(raw.filter((v) => v !== NONE_ON));
-}
-
 export interface FilterPill { el: HTMLElement; refresh: () => void; }
+
+// One field's filter row (label + value chips). Shared by the global funnel
+// panel and the per-column mini-filter. `onChange` fires after a toggle so the
+// caller can rebuild its own container to reflect the new selection.
+export function buildFieldFilterRow(
+  ctx: BoardRendererCtx, f: FilterableField, onChange: () => void,
+): HTMLElement {
+  const optionNames = f.values.map((v) => v.name);
+  const on = onValues(ctx.getFilter(), f.name, optionNames);
+
+  const row = document.createElement('div');
+  row.className = 'bd-filter-field';
+
+  const label = document.createElement('div');
+  label.className = 'bd-filter-field-label';
+  label.textContent = f.name;
+  row.appendChild(label);
+
+  const chips = document.createElement('div');
+  chips.className = 'bd-filter-chips';
+
+  const mkChip = (value: string, display: string, token: string, isEmpty: boolean): void => {
+    const isOn = on.has(value);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `board-column-chip color-${token} bd-filter-chip`
+      + (isOn ? ' is-selected' : ' bd-filter-hollow')
+      + (isEmpty ? ' bd-filter-empty' : '');
+    const dot = document.createElement('span');
+    dot.className = 'board-column-chip-dot';
+    chip.appendChild(dot);
+    const name = document.createElement('span');
+    name.textContent = display;
+    chip.appendChild(name);
+    chip.addEventListener('click', () => {
+      ctx.setFilter(toggleFilterValue(ctx.getFilter(), f.name, optionNames, value));
+      onChange();
+    });
+    chips.appendChild(chip);
+  };
+
+  for (const opt of f.values) mkChip(opt.name, opt.name, opt.color, false);
+  mkChip(EMPTY_VALUE, '(Empty)', 'gray', true);
+
+  row.appendChild(chips);
+  return row;
+}
 
 // Funnel icon — matches the stroke weight of the sibling "+" / "⋯" chrome buttons.
 const FUNNEL_SVG =
@@ -87,21 +117,6 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
     else openPanel();
   });
 
-  // Toggle one value on/off. Default is all-on, so we track the ON set: all on
-  // → clear the field (show everything); all off → NONE_ON (hide everything);
-  // otherwise store the values still on.
-  function toggleValue(f: FilterableField, value: string): void {
-    const cur: Record<string, string[]> = { ...ctx.getFilter() };
-    const on = onSetOf(cur, f);
-    if (on.has(value)) on.delete(value);
-    else on.add(value);
-    if (on.size === allValuesOf(f).length) delete cur[f.name];
-    else if (on.size === 0) cur[f.name] = [NONE_ON];
-    else cur[f.name] = [...on];
-    ctx.setFilter(cur); // re-renders body + calls refresh() (pill label)
-    buildPanel();       // rebuild chips to reflect the new selection
-  }
-
   function buildPanel(): void {
     if (!popover) return;
     const panel = popover.el;
@@ -133,42 +148,7 @@ export function createFilterPill(ctx: BoardRendererCtx): FilterPill {
     panel.appendChild(head);
 
     for (const f of filterableFields(board)) {
-      const on = onSetOf(filter, f);
-      const row = document.createElement('div');
-      row.className = 'bd-filter-field';
-
-      const label = document.createElement('div');
-      label.className = 'bd-filter-field-label';
-      label.textContent = f.name;
-      row.appendChild(label);
-
-      const chips = document.createElement('div');
-      chips.className = 'bd-filter-chips';
-
-      // Reuse the real status pill (.board-column-chip): selected = solid,
-      // unselected = hollow outline (no dimming). The `(Empty)` chip is neutral.
-      const mkChip = (value: string, display: string, token: string, isEmpty: boolean): void => {
-        const isOn = on.has(value);
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = `board-column-chip color-${token} bd-filter-chip`
-          + (isOn ? ' is-selected' : ' bd-filter-hollow')
-          + (isEmpty ? ' bd-filter-empty' : '');
-        const dot = document.createElement('span');
-        dot.className = 'board-column-chip-dot';
-        chip.appendChild(dot);
-        const name = document.createElement('span');
-        name.textContent = display;
-        chip.appendChild(name);
-        chip.addEventListener('click', () => toggleValue(f, value));
-        chips.appendChild(chip);
-      };
-
-      for (const opt of f.values) mkChip(opt.name, opt.name, opt.color, false);
-      mkChip(EMPTY_VALUE, '(Empty)', 'gray', true);
-
-      row.appendChild(chips);
-      panel.appendChild(row);
+      panel.appendChild(buildFieldFilterRow(ctx, f, buildPanel));
     }
   }
 
