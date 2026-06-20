@@ -1989,31 +1989,44 @@ html.source-full-width #source-view {
   font-size: 10px;
 }
 
-/* c46 — regular-table NodeView, Notion-style. Hovering a cell reveals that
-   cell's row handle (a thin stroke on the left outer edge) and column handle
-   (a thin stroke on the top outer edge). Small gutters hold the strokes so they
-   sit flush to the table without indenting the content much; the gutters are
-   part of the wrapper so you can slide from a cell onto a stroke. */
-/* No padding — the table aligns with surrounding content. The handles are thin
-   strokes pinned ON the table's edges (left:0 / top:0), inside the box so they
-   stay reachable (sliding from a cell to a stroke never leaves the wrapper). */
+/* c46 — regular-table NodeView, Notion-style. No padding: the table aligns with
+   surrounding content. Hovering a cell shows a thin stroke hint on its row's
+   left edge and its column's top edge; drifting toward an edge (a forgiving
+   ~24px band, handled in JS) promotes the hint into a ⠿ grip that emerges
+   centred on the stroke. The top grip's dots are rotated since it drags
+   horizontally. */
 .mp-table { position: relative; }
-.mp-table-row-handle,
-.mp-table-col-handle {
+
+/* thin resting hint — never grabs the pointer (the grip does) */
+.mp-table-stroke {
   position: absolute;
-  display: none;              /* shown on cell hover by the NodeView */
-  background: rgba(55, 53, 47, 0.28);
+  display: none;
+  background: rgba(55, 53, 47, 0.24);
   border-radius: 3px;
-  cursor: grab;
+  pointer-events: none;
   z-index: 2;
-  transition: background 0.1s;
 }
-.mp-table-row-handle { left: 0; width: 3px; }     /* thin stroke on the left edge */
-.mp-table-col-handle { top: 0; height: 3px; }      /* thin stroke on the top edge */
-.mp-table-row-handle:hover,
-.mp-table-col-handle:hover { background: rgba(55, 53, 47, 0.5); }
-.mp-table-row-handle.mp-table-handle-dragging,
-.mp-table-col-handle.mp-table-handle-dragging { background: var(--link); cursor: grabbing; }
+.mp-table-row-stroke { width: 3px; }
+.mp-table-col-stroke { height: 3px; }
+
+/* the grip that emerges near an edge — white rounded box, like the block handle */
+.mp-table-grip {
+  position: absolute;
+  display: none;              /* set to grid on edge-hover by the NodeView */
+  place-items: center;
+  z-index: 4;
+  background: #fff;
+  border-radius: 5px;
+  box-shadow: 0 1px 5px rgba(0,0,0,.20), 0 0 0 1px rgba(0,0,0,.06);
+  color: #9b9a97;
+  cursor: grab;
+}
+.mp-table-row-grip { width: 16px; height: 24px; }
+.mp-table-col-grip { width: 24px; height: 16px; }
+.mp-table-grip:hover { color: #5f5e5b; }
+.mp-table-grip svg { display: block; width: 11px; height: 16px; }
+.mp-table-col-grip svg { transform: rotate(90deg); } /* dragged horizontally */
+.mp-table-grip.mp-table-grip-dragging { cursor: grabbing; color: var(--link); }
 
 /* Drop indicator — a separate blue line between rows (horizontal) or columns
    (vertical), never a cell outline (twin of .cb-drop-line). */
@@ -2674,8 +2687,8 @@ html.source-full-width #source-view {
 .is-printing .bubble-menu,
 .is-printing .drag-handle,
 .is-printing .block-handle-tooltip,
-.is-printing .mp-table-row-handle,
-.is-printing .mp-table-col-handle,
+.is-printing .mp-table-stroke,
+.is-printing .mp-table-grip,
 .is-printing .mp-table-drop-line,
 .is-printing #source-view {
   display: none !important;

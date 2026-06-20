@@ -1,8 +1,14 @@
 /**
  * @jest-environment jsdom
  *
- * c46 — the regular-table NodeView: cell-driven row + column edge handles and a
- * cell-selection state. Mounts the real Table* + tiptap-markdown pipeline.
+ * c46 — the regular-table NodeView: cell-driven row + column edge handles
+ * (thin stroke hint → grip emerges near the edge) and a cell-selection state.
+ * Mounts the real Table* + tiptap-markdown pipeline.
+ *
+ * Note: jsdom has no layout (all rects are 0), so the forgiving-band geometry
+ * is verified on F5. These tests drive the wiring with small coordinates (which
+ * land "near the edge" against zero-sized rects) and identify the active
+ * row/column from the hovered cell (target-based), which is layout-independent.
  */
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -43,9 +49,9 @@ function hoverCell(host: HTMLElement, rowIdx: number, colIdx = 0): void {
   const cell = rows[rowIdx].querySelectorAll('th, td')[colIdx];
   cell.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 5, clientY: 5 }));
 }
-function clickHandle(host: HTMLElement, sel: string): void {
-  const handle = host.querySelector(sel)!;
-  handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 5, clientY: 5 }));
+function clickGrip(host: HTMLElement, sel: string): void {
+  const grip = host.querySelector(sel)!;
+  grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 5, clientY: 5 }));
   document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 5, clientY: 5 }));
 }
 function labels(): (string | null)[] {
@@ -55,13 +61,15 @@ function labels(): (string | null)[] {
 afterEach(() => { __closeAllForTest(); document.querySelectorAll('.mp-menu').forEach(e => e.remove()); });
 
 describe('TableWithRail NodeView (c46)', () => {
-  it('renders the table inside a .mp-table wrapper with row + column handles', () => {
+  it('renders the table in a .mp-table wrapper with stroke + grip elements for both axes', () => {
     const { editor, host } = makeEditor();
-    const wrap = host.querySelector('.mp-table');
+    const wrap = host.querySelector('.mp-table')!;
     expect(wrap).toBeTruthy();
-    expect(wrap!.querySelector('.mp-table-row-handle')).toBeTruthy();
-    expect(wrap!.querySelector('.mp-table-col-handle')).toBeTruthy();
-    expect(wrap!.querySelectorAll('table tbody tr').length).toBe(3); // header + 2 body
+    expect(wrap.querySelector('.mp-table-row-stroke')).toBeTruthy();
+    expect(wrap.querySelector('.mp-table-col-stroke')).toBeTruthy();
+    expect(wrap.querySelector('.mp-table-row-grip')).toBeTruthy();
+    expect(wrap.querySelector('.mp-table-col-grip')).toBeTruthy();
+    expect(wrap.querySelectorAll('table tbody tr').length).toBe(3); // header + 2 body
     editor.destroy(); host.remove();
   });
 
@@ -75,20 +83,21 @@ describe('TableWithRail NodeView (c46)', () => {
   });
 });
 
-describe('TableWithRail cell hover (c46)', () => {
-  it('reveals both the row and column handle when a cell is hovered', () => {
+describe('TableWithRail edge handles (c46)', () => {
+  it('summons the row and column grip near a cell edge', () => {
     const { editor, host } = makeEditor();
     hoverCell(host, 1, 0);
-    expect((host.querySelector('.mp-table-row-handle') as HTMLElement).style.display).toBe('block');
-    expect((host.querySelector('.mp-table-col-handle') as HTMLElement).style.display).toBe('block');
+    expect((host.querySelector('.mp-table-row-grip') as HTMLElement).style.display).toBe('grid');
+    expect((host.querySelector('.mp-table-col-grip') as HTMLElement).style.display).toBe('grid');
     editor.destroy(); host.remove();
   });
 
-  it('keeps the handles hidden in read-only documents', () => {
+  it('shows nothing in read-only documents', () => {
     const { editor, host } = makeEditor();
     editor.setEditable(false);
     hoverCell(host, 1, 0);
-    expect((host.querySelector('.mp-table-row-handle') as HTMLElement).style.display).toBe('none');
+    expect((host.querySelector('.mp-table-row-grip') as HTMLElement).style.display).toBe('none');
+    expect((host.querySelector('.mp-table-col-grip') as HTMLElement).style.display).toBe('none');
     editor.destroy(); host.remove();
   });
 });
@@ -97,7 +106,7 @@ describe('TableWithRail row menu (c46)', () => {
   it('opens the full row menu on a body row', () => {
     const { editor, host } = makeEditor();
     hoverCell(host, 1, 0);
-    clickHandle(host, '.mp-table-row-handle');
+    clickGrip(host, '.mp-table-row-grip');
     expect(labels()).toEqual([
       ROW_MENU_LABEL['insert-above'], ROW_MENU_LABEL['insert-below'],
       ROW_MENU_LABEL['duplicate'], ROW_MENU_LABEL['delete'],
@@ -108,7 +117,7 @@ describe('TableWithRail row menu (c46)', () => {
   it('restricts the header row menu to Insert row below', () => {
     const { editor, host } = makeEditor();
     hoverCell(host, 0, 0);
-    clickHandle(host, '.mp-table-row-handle');
+    clickGrip(host, '.mp-table-row-grip');
     expect(labels()).toEqual([ROW_MENU_LABEL['insert-below']]);
     editor.destroy(); host.remove();
   });
@@ -117,7 +126,7 @@ describe('TableWithRail row menu (c46)', () => {
     const { editor, host } = makeEditor();
     const before = host.querySelectorAll('table tbody tr').length;
     hoverCell(host, 1, 0);
-    clickHandle(host, '.mp-table-row-handle');
+    clickGrip(host, '.mp-table-row-grip');
     const del = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
       .find(el => el.textContent?.includes(ROW_MENU_LABEL['delete']))!;
     del.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -127,10 +136,10 @@ describe('TableWithRail row menu (c46)', () => {
 });
 
 describe('TableWithRail column menu (c46)', () => {
-  it('opens the full column menu on a column handle click', () => {
+  it('opens the full column menu on a column grip click', () => {
     const { editor, host } = makeEditor();
     hoverCell(host, 1, 0);
-    clickHandle(host, '.mp-table-col-handle');
+    clickGrip(host, '.mp-table-col-grip');
     expect(labels()).toEqual([
       COL_MENU_LABEL['insert-left'], COL_MENU_LABEL['insert-right'],
       COL_MENU_LABEL['duplicate'], COL_MENU_LABEL['delete'],
@@ -142,7 +151,7 @@ describe('TableWithRail column menu (c46)', () => {
     const { editor, host } = makeEditor();
     const before = host.querySelectorAll('table tbody tr')[0].children.length;
     hoverCell(host, 1, 1); // second column
-    clickHandle(host, '.mp-table-col-handle');
+    clickGrip(host, '.mp-table-col-grip');
     const del = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
       .find(el => el.textContent?.includes(COL_MENU_LABEL['delete']))!;
     del.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));

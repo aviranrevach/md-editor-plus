@@ -2,18 +2,19 @@
 // edge handles can hug the table without changing the content model. contentDOM
 // is the real <tbody>, so markdown round-trip is unchanged.
 //
-// Cell-driven, like Notion: hovering a cell reveals that cell's ROW handle (a
-// thin stroke on the table's left outer edge, aligned to the row) and COLUMN
-// handle (a thin stroke on the top outer edge, aligned to the column). Each
-// stroke darkens on direct hover. Click a stroke → select that row/column +
-// open its menu; drag → reorder. Manual mouse drag (PM intercepts HTML5
-// dragstart); drop lines live on document.body. Row/column mutations reuse the
-// tested tableRowTx / tableColTx modules. The margin block handle still moves
-// the whole table.
+// Cell-driven, like Notion. Hovering a cell shows a thin stroke hint on the
+// table's left edge (that row) and top edge (that column). Drifting toward an
+// edge — a forgiving ~24px band, no precision needed — promotes the hint into a
+// ⠿ grip that emerges centered on the stroke (top grip's dots rotated, since it
+// drags horizontally). Click a grip → select that row/column + open its menu;
+// drag → reorder. Manual mouse drag (PM intercepts HTML5 dragstart); drop lines
+// live on document.body. Row/column mutations reuse the tested tableRowTx /
+// tableColTx modules. The margin block handle still moves the whole table.
 import Table from '@tiptap/extension-table';
 import { mergeAttributes } from '@tiptap/core';
 import { CellSelection } from '@tiptap/pm/tables';
 import type { Node as PMNode } from '@tiptap/pm/model';
+import { createGripIcon } from './handleIcons';
 import { createMenu, type MenuSection } from './menu';
 import { rowMenuModel, canDragRow, ROW_MENU_LABEL, type RowMenuItemKind } from './tableRowOps';
 import { colMenuModel, COL_MENU_LABEL, type ColMenuItemKind } from './tableColOps';
@@ -25,6 +26,13 @@ import {
 } from './tableColTx';
 
 const DRAG_THRESHOLD_PX = 4;
+const BAND = 24;     // forgiving distance from an edge that summons the grip
+const EDGE_IN = 8;   // how far the band reaches into the table
+const PAD = 9;       // stroke padding (so a stroke never spans the full row/col)
+const ROW_MAX = 28;  // cap on the row stroke length
+const COL_MAX = 96;  // cap on the column stroke length
+const RGRIP_W = 16, RGRIP_H = 24;
+const CGRIP_W = 24, CGRIP_H = 16;
 
 const RM_ICON: Record<RowMenuItemKind, string> = {
   'insert-above': '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
@@ -58,13 +66,12 @@ export const TableWithRail = Table.extend({
       const wrapper = document.createElement('div');
       wrapper.className = 'mp-table';
 
-      const rowHandle = document.createElement('div');
-      rowHandle.className = 'mp-table-row-handle';
-      rowHandle.style.display = 'none';
-
-      const colHandle = document.createElement('div');
-      colHandle.className = 'mp-table-col-handle';
-      colHandle.style.display = 'none';
+      const rowStroke = mkEl('mp-table-row-stroke mp-table-stroke');
+      const colStroke = mkEl('mp-table-col-stroke mp-table-stroke');
+      const rowGrip = mkEl('mp-table-row-grip mp-table-grip');
+      const colGrip = mkEl('mp-table-col-grip mp-table-grip');
+      rowGrip.appendChild(createGripIcon());
+      colGrip.appendChild(createGripIcon());
 
       const table = document.createElement('table');
       const attrs = mergeAttributes(HTMLAttributes);
@@ -74,12 +81,19 @@ export const TableWithRail = Table.extend({
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
 
-      wrapper.appendChild(rowHandle);
-      wrapper.appendChild(colHandle);
-      wrapper.appendChild(table);
+      wrapper.append(rowStroke, colStroke, rowGrip, colGrip, table);
+
+      function mkEl(cls: string): HTMLDivElement {
+        const el = document.createElement('div');
+        el.className = cls;
+        el.style.display = 'none';
+        el.contentEditable = 'false';
+        return el;
+      }
 
       const menu = createMenu({ className: 'mp-table-menu' });
-      let activeCell: HTMLTableCellElement | null = null;
+      let activeRow: { idx: number; isHeader: boolean } | null = null;
+      let activeCol: { idx: number } | null = null;
       let dragSrc:
         | { axis: 'row'; idx: number; isHeader: boolean; startX: number; startY: number }
         | { axis: 'col'; idx: number; startX: number; startY: number }
@@ -95,43 +109,94 @@ export const TableWithRail = Table.extend({
         if (!node || node.type.name !== 'table') return null;
         return { tablePos, node };
       }
-      function rowOf(cell: HTMLTableCellElement): HTMLTableRowElement | null {
-        const tr = cell.closest('tr') as HTMLTableRowElement | null;
-        return tr && tbody.contains(tr) ? tr : null;
-      }
-      function hideBars(): void {
-        rowHandle.style.display = 'none';
-        colHandle.style.display = 'none';
-        activeCell = null;
+      function hideAll(): void {
+        rowStroke.style.display = colStroke.style.display = 'none';
+        rowGrip.style.display = colGrip.style.display = 'none';
       }
 
-      // ---- hover → position both handles for the active cell ----------------
-      function positionHandles(cell: HTMLTableCellElement): void {
-        const tr = rowOf(cell);
-        if (!tr) return;
-        const wRect = wrapper.getBoundingClientRect();
-        const rRect = tr.getBoundingClientRect();
-        const cRect = cell.getBoundingClientRect();
-        rowHandle.style.top = `${rRect.top - wRect.top + 1}px`;
-        rowHandle.style.height = `${Math.max(8, rRect.height - 2)}px`;
-        rowHandle.style.display = 'block';
-        colHandle.style.left = `${cRect.left - wRect.left + 1}px`;
-        colHandle.style.width = `${Math.max(8, cRect.width - 2)}px`;
-        colHandle.style.display = 'block';
+      // ---- hover (document-level, for the forgiving edge band) --------------
+      function rowAt(y: number): { tr: HTMLElement; idx: number } | null {
+        const trs = Array.from(tbody.children) as HTMLElement[];
+        for (let i = 0; i < trs.length; i++) {
+          const r = trs[i].getBoundingClientRect();
+          if (y >= r.top && y <= r.bottom) return { tr: trs[i], idx: i };
+        }
+        return null;
+      }
+      function headerCellAt(x: number): { idx: number; rect: DOMRect } | null {
+        const first = tbody.children[0] as HTMLElement | undefined;
+        if (!first) return null;
+        const cells = Array.from(first.children) as HTMLElement[];
+        for (let i = 0; i < cells.length; i++) {
+          const r = cells[i].getBoundingClientRect();
+          if (x >= r.left && x <= r.right) return { idx: i, rect: r };
+        }
+        return null;
       }
 
-      function onWrapperMove(e: MouseEvent): void {
+      function onDocMove(e: MouseEvent): void {
         if (dragSrc) return;
-        if (editor.isDestroyed || !editor.isEditable) { hideBars(); return; }
-        const t = e.target as Element | null;
-        if (t && (rowHandle.contains(t) || colHandle.contains(t))) return; // stay on the handle
-        const cell = t?.closest('td, th') as HTMLTableCellElement | null;
-        if (cell && tbody.contains(cell)) { activeCell = cell; positionHandles(cell); return; }
-        // Over the gutter padding (not a cell): keep the current handles visible
-        // so they stay reachable; only a real mouseleave clears them.
+        if (editor.isDestroyed || !editor.isEditable) { hideAll(); return; }
+        const x = e.clientX, y = e.clientY;
+        const t = table.getBoundingClientRect();
+        const w = wrapper.getBoundingClientRect();
+        const near = x >= t.left - BAND && x <= t.right + 6 && y >= t.top - BAND && y <= t.bottom + 6;
+        // Identify the cell precisely when the pointer is over one; otherwise
+        // (in the gutter band) locate the row/column by geometry.
+        const cell = (e.target as Element | null)?.closest?.('td, th') as HTMLTableCellElement | null;
+        const overCell = !!cell && tbody.contains(cell);
+        if (!overCell && !near) { hideAll(); return; }
+
+        // ----- row (left edge) -----
+        let rowTr: HTMLElement | null = null;
+        let rowIdx = -1;
+        if (overCell) {
+          rowTr = cell!.closest('tr') as HTMLElement | null;
+          rowIdx = rowTr ? Array.from(tbody.children).indexOf(rowTr) : -1;
+        } else {
+          const r = rowAt(y);
+          if (r) { rowTr = r.tr; rowIdx = r.idx; }
+        }
+        if (rowTr && rowIdx >= 0) {
+          placeRow(rowTr, w);
+          const nearLeft = x <= t.left + EDGE_IN;
+          rowGrip.style.display = nearLeft ? 'grid' : 'none';
+          rowStroke.style.display = nearLeft ? 'none' : 'block';
+          activeRow = { idx: rowIdx, isHeader: !!rowTr.querySelector('th') || (cell?.tagName === 'TH') };
+        } else { rowStroke.style.display = 'none'; rowGrip.style.display = 'none'; }
+
+        // ----- column (top edge) -----
+        let colRect: DOMRect | null = null;
+        let colIdx = -1;
+        if (overCell) { colRect = cell!.getBoundingClientRect(); colIdx = cell!.cellIndex; }
+        else { const c = headerCellAt(x); if (c) { colRect = c.rect; colIdx = c.idx; } }
+        if (colRect && colIdx >= 0) {
+          placeCol(colRect, w, t);
+          const nearTop = y <= t.top + EDGE_IN;
+          colGrip.style.display = nearTop ? 'grid' : 'none';
+          colStroke.style.display = nearTop ? 'none' : 'block';
+          activeCol = { idx: colIdx };
+        } else { colStroke.style.display = 'none'; colGrip.style.display = 'none'; }
       }
-      wrapper.addEventListener('mousemove', onWrapperMove);
-      wrapper.addEventListener('mouseleave', () => { if (!dragSrc) hideBars(); });
+
+      function placeRow(tr: HTMLElement, w: DOMRect): void {
+        const r = tr.getBoundingClientRect();
+        const len = Math.min(r.height - 2 * PAD, ROW_MAX);
+        rowStroke.style.left = `${r.left - w.left}px`;
+        rowStroke.style.top = `${r.top - w.top + (r.height - Math.max(8, len)) / 2}px`;
+        rowStroke.style.height = `${Math.max(8, len)}px`;
+        rowGrip.style.left = `${r.left - w.left - 9}px`;                 // -1 to centre on the stroke
+        rowGrip.style.top = `${r.top - w.top + r.height / 2 - RGRIP_H / 2 - 1}px`;
+      }
+      function placeCol(c: DOMRect, w: DOMRect, t: DOMRect): void {
+        const len = Math.min(c.width - 2 * PAD, COL_MAX);
+        colStroke.style.top = `${t.top - w.top}px`;
+        colStroke.style.left = `${c.left - w.left + (c.width - Math.max(8, len)) / 2}px`;
+        colStroke.style.width = `${Math.max(8, len)}px`;
+        colGrip.style.top = `${t.top - w.top - 9}px`;                   // -1 to centre on the stroke
+        colGrip.style.left = `${c.left - w.left + c.width / 2 - CGRIP_W / 2 - 1}px`;
+      }
+      document.addEventListener('mousemove', onDocMove);
 
       // ---- menus -----------------------------------------------------------
       function selectRow(rowIdx: number): void {
@@ -164,7 +229,7 @@ export const TableWithRail = Table.extend({
         if (inserts.length) sections.push({ items: inserts });
         if (kinds.includes('duplicate')) sections.push({ items: [make('duplicate')] });
         if (kinds.includes('delete')) sections.push({ items: [make('delete')] });
-        menu.open(rowHandle, sections);
+        menu.open(rowGrip, sections);
       }
 
       function openColMenu(colIdx: number): void {
@@ -188,12 +253,16 @@ export const TableWithRail = Table.extend({
         if (inserts.length) sections.push({ items: inserts });
         if (kinds.includes('duplicate')) sections.push({ items: [make('duplicate')] });
         if (kinds.includes('delete')) sections.push({ items: [make('delete')] });
-        menu.open(colHandle, sections);
+        menu.open(colGrip, sections);
       }
 
       // ---- drag (rows + columns) -------------------------------------------
       function hideDropLine(): void { if (dropLine) { dropLine.remove(); dropLine = null; } }
-
+      function ensureDropLine(cls: string): HTMLDivElement {
+        if (!dropLine) { dropLine = document.createElement('div'); document.body.appendChild(dropLine); }
+        dropLine.className = cls;
+        return dropLine;
+      }
       function rowDropIndexAt(clientY: number): number | null {
         const rows = Array.from(tbody.children) as HTMLElement[];
         for (let i = 0; i < rows.length; i++) {
@@ -214,18 +283,14 @@ export const TableWithRail = Table.extend({
         if (cells.length) return clientX < cells[0].getBoundingClientRect().left ? 0 : cells.length;
         return null;
       }
-
       function showRowDropLine(insertIdx: number): void {
         const rows = Array.from(tbody.children) as HTMLElement[];
         const idx = Math.max(1, Math.min(insertIdx, rows.length)); // never above the header row
         const ref = rows[idx] ?? rows[rows.length - 1];
         const r = ref.getBoundingClientRect();
         const y = idx >= rows.length ? r.bottom : r.top;
-        dropLine = ensureDropLine('mp-table-drop-line');
-        dropLine.style.top = `${y - 1}px`;
-        dropLine.style.left = `${r.left}px`;
-        dropLine.style.width = `${r.width}px`;
-        dropLine.style.height = '2px';
+        const el = ensureDropLine('mp-table-drop-line');
+        el.style.top = `${y - 1}px`; el.style.left = `${r.left}px`; el.style.width = `${r.width}px`; el.style.height = '2px';
       }
       function showColDropLine(insertIdx: number): void {
         const first = tbody.children[0] as HTMLElement | undefined;
@@ -236,16 +301,8 @@ export const TableWithRail = Table.extend({
         const r = ref.getBoundingClientRect();
         const x = idx >= cells.length ? r.right : r.left;
         const tRect = table.getBoundingClientRect();
-        dropLine = ensureDropLine('mp-table-drop-line mp-table-drop-line-v');
-        dropLine.style.left = `${x - 1}px`;
-        dropLine.style.top = `${tRect.top}px`;
-        dropLine.style.height = `${tRect.height}px`;
-        dropLine.style.width = '2px';
-      }
-      function ensureDropLine(cls: string): HTMLDivElement {
-        if (!dropLine) { dropLine = document.createElement('div'); document.body.appendChild(dropLine); }
-        dropLine.className = cls;
-        return dropLine;
+        const el = ensureDropLine('mp-table-drop-line mp-table-drop-line-v');
+        el.style.left = `${x - 1}px`; el.style.top = `${tRect.top}px`; el.style.height = `${tRect.height}px`; el.style.width = '2px';
       }
 
       function onGripMove(e: MouseEvent): void {
@@ -254,29 +311,28 @@ export const TableWithRail = Table.extend({
           if (Math.hypot(e.clientX - dragSrc.startX, e.clientY - dragSrc.startY) < DRAG_THRESHOLD_PX) return;
           moved = true;
           const draggable = dragSrc.axis === 'col' || canDragRow(dragSrc.isHeader);
-          if (draggable) { document.body.style.cursor = 'grabbing'; }
-          (dragSrc.axis === 'row' ? rowHandle : colHandle).classList.add('mp-table-handle-dragging');
+          if (draggable) document.body.style.cursor = 'grabbing';
+          (dragSrc.axis === 'row' ? rowGrip : colGrip).classList.add('mp-table-grip-dragging');
         }
         if (dragSrc.axis === 'row') {
           if (!canDragRow(dragSrc.isHeader)) return;
           e.preventDefault();
-          const insertIdx = rowDropIndexAt(e.clientY);
-          if (insertIdx == null || insertIdx === dragSrc.idx || insertIdx === dragSrc.idx + 1) { hideDropLine(); return; }
-          showRowDropLine(insertIdx);
+          const i = rowDropIndexAt(e.clientY);
+          if (i == null || i === dragSrc.idx || i === dragSrc.idx + 1) { hideDropLine(); return; }
+          showRowDropLine(i);
         } else {
           e.preventDefault();
-          const insertIdx = colDropIndexAt(e.clientX);
-          if (insertIdx == null || insertIdx === dragSrc.idx || insertIdx === dragSrc.idx + 1) { hideDropLine(); return; }
-          showColDropLine(insertIdx);
+          const i = colDropIndexAt(e.clientX);
+          if (i == null || i === dragSrc.idx || i === dragSrc.idx + 1) { hideDropLine(); return; }
+          showColDropLine(i);
         }
       }
-
       function onGripUp(e: MouseEvent): void {
         document.removeEventListener('mousemove', onGripMove, true);
         document.removeEventListener('mouseup', onGripUp, true);
         const src = dragSrc; dragSrc = null;
-        rowHandle.classList.remove('mp-table-handle-dragging');
-        colHandle.classList.remove('mp-table-handle-dragging');
+        rowGrip.classList.remove('mp-table-grip-dragging');
+        colGrip.classList.remove('mp-table-grip-dragging');
         document.body.style.cursor = '';
         hideDropLine();
         if (!src) return;
@@ -288,41 +344,43 @@ export const TableWithRail = Table.extend({
         const l = loc(); if (!l) return;
         if (src.axis === 'row') {
           if (!canDragRow(src.isHeader)) return;
-          const insertIdx = rowDropIndexAt(e.clientY);
-          if (insertIdx != null) moveRow(editor, l, src.idx, insertIdx);
+          const i = rowDropIndexAt(e.clientY);
+          if (i != null) moveRow(editor, l, src.idx, i);
         } else {
-          const insertIdx = colDropIndexAt(e.clientX);
-          if (insertIdx != null) moveColumn(editor, l, src.idx, insertIdx);
+          const i = colDropIndexAt(e.clientX);
+          if (i != null) moveColumn(editor, l, src.idx, i);
         }
       }
 
-      function startDrag(axis: 'row' | 'col', e: MouseEvent): void {
-        if (e.button !== 0 || !activeCell) return;
-        const tr = rowOf(activeCell); if (!tr) return;
+      function beginDrag(axis: 'row' | 'col', e: MouseEvent): void {
+        if (e.button !== 0) return;
         e.preventDefault(); e.stopPropagation();
         moved = false;
         if (axis === 'row') {
-          const idx = Array.from(tbody.children).indexOf(tr);
-          if (idx < 0) return;
-          dragSrc = { axis: 'row', idx, isHeader: !!activeCell.querySelector('th') || activeCell.tagName === 'TH', startX: e.clientX, startY: e.clientY };
+          if (!activeRow) return;
+          dragSrc = { axis: 'row', idx: activeRow.idx, isHeader: activeRow.isHeader, startX: e.clientX, startY: e.clientY };
         } else {
-          dragSrc = { axis: 'col', idx: activeCell.cellIndex, startX: e.clientX, startY: e.clientY };
+          if (!activeCol) return;
+          dragSrc = { axis: 'col', idx: activeCol.idx, startX: e.clientX, startY: e.clientY };
         }
         document.addEventListener('mousemove', onGripMove, true);
         document.addEventListener('mouseup', onGripUp, true);
       }
-      rowHandle.addEventListener('mousedown', (e) => startDrag('row', e));
-      colHandle.addEventListener('mousedown', (e) => startDrag('col', e));
+      rowGrip.addEventListener('mousedown', (e) => beginDrag('row', e));
+      colGrip.addEventListener('mousedown', (e) => beginDrag('col', e));
 
       return {
         dom: wrapper,
         contentDOM: tbody,
         ignoreMutation(mutation) {
           const t = mutation.target as Node;
-          return rowHandle.contains(t) || colHandle.contains(t) || t === rowHandle || t === colHandle;
+          for (const el of [rowStroke, colStroke, rowGrip, colGrip]) {
+            if (t === el || el.contains(t)) return true;
+          }
+          return false;
         },
         destroy() {
-          wrapper.removeEventListener('mousemove', onWrapperMove);
+          document.removeEventListener('mousemove', onDocMove);
           document.removeEventListener('mousemove', onGripMove, true);
           document.removeEventListener('mouseup', onGripUp, true);
           hideDropLine();
