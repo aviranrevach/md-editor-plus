@@ -54,6 +54,8 @@
 | Board table cells stay editable even when read-only is ON — they re-enable contenteditable on click and commit through a path that bypasses the editor's read-only state. This masked c44 (you could still edit cells while the whole doc was "locked", hiding that read-only was on). Make board cell editing respect read-only so a locked doc is truly locked everywhere. | Todo | c47 | High | Read-only / Board table |  |
 | DATA-LOSS incident (2026-06-20): opening/saving the board silently reverted the WHOLE of TODO.md back to the last git commit — rows c40–c47 and the Done statuses on c34/c37 were wiped, recoverable only from the chat transcript. Same family as c37. Proposed fix: (1) treat any board save that DROPS rows or shrinks the doc as suspect — refuse it / require an explicit delete; (2) auto-snapshot the file before every board write; (3) on load, never let a stale in-memory model silently overwrite newer content on disk. Bump c37 to the top — this is the highest-impact open bug. | Todo | c48 | Urgent!! | Boards / Save |  |
 | clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Todo | c49 | Urgent!! |  |  |
+| two empty states one upon each other in description (is it happening in other places?) | Todo | c50 | High |  |  |
+| Clicking below EVERYTHING in a doc wont suggest adding a new block, it should be selectable and if I click it, its added | Done | c51 | Urgent!! |  |  |
 
 <!-- board:body id="c8" -->
 
@@ -65,7 +67,7 @@ The dragger menu actions are missing for certain block types — fix so "Turn in
 
 <!-- board:body id="c9" -->
 
-when i pasted into desctiption i got some code in the table view (in the panel view its was fine)
+when i pasted into desctiption i got some code in the table view (in the panel view itself its was fine)
 
 <!-- board:body id="c3" -->
 
@@ -154,6 +156,10 @@ Almost certainly the same save/sync family as c8, c26, c28, c30: the editor sign
 <!-- board:body id="c43" -->
 
 ![](./TODO.assets/image-5.png)
+
+<!-- board:body id="c50" -->
+
+![](./TODO.assets/image-6.png)
 
 <!-- board:end -->
 

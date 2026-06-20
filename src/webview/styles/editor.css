@@ -5210,3 +5210,13 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   pointer-events: none;
   color: #c4c3c0;
 }
+
+/* c51: ghost hint shown while hovering the empty area below the last block, so
+   that zone reads as clickable. pointer-events:none lets the click fall through
+   to the editor's mousedown handler, which adds the block. */
+.ProseMirror .pm-below-hint {
+  margin-top: 0.3rem;
+  color: #c4c3c0;
+  pointer-events: none;
+  user-select: none;
+}
