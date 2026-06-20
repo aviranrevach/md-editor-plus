@@ -258,7 +258,7 @@ Type `->` and `<-` and they become `→` and `←` as you go — Notion-style. A
 
 Insert a plain Markdown table from the block picker (under **Lists**) — a 3×3 starter with a header row — then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table. It's a distinct block from **Board: Table**, so typing `table` in the picker surfaces both.
 
-**Row handle** — hover any row and a `⠿` grip appears in the left margin. **Drag** it to reorder the row, or **click** it for a row menu: **Insert row above / below**, **Duplicate row**, **Delete row**. The header row stays first and present — its menu only offers **Insert row below**.
+**Row handle & selection** — a rail hugs the table's left edge. **Hover a row** → a `⠿` grip appears; **click** it to select the whole row and open a menu (**Insert row above / below**, **Duplicate row**, **Delete row**), or **drag** it to reorder. The active cell is outlined, and you can **drag across cells / shift-click** to select a block. The header row stays first and present — its menu only offers **Insert row below**. The margin handle still moves the whole table.
 
 Outgrown a simple grid? Use the `⠿` handle → **Turn into → Board: Table** to convert it into a full board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the view toggle.
 
