@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Formatting toolbar inside board cells (c52)** — selecting a word while editing a board **text cell** (or a text property in the **side panel**) now pops a small formatting toolbar, the board's counterpart to the document bubble menu. It offers **Bold · Italic · Strikethrough · Inline code · Highlight · Link · Text color** — each wraps your selection in the matching markdown, which renders as styled text the moment you click away (building on the c27 inline-style rendering). **Link** drops a `[text](url)` with the `url` ready to type over, right in the cell — no popup. Every action keeps your cursor in the cell, so the edit is never interrupted. Structural labels (column / board / field names) and the plain-input kanban card title are intentionally left out, so styling can never corrupt a column's identity. (c52)
+
 ## [0.7.1] - 2026-06-20
 
 ### Fixed

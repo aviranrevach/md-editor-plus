@@ -26,6 +26,7 @@ import BlockDirection from './extensions/blockDirection';
 import BlockOutline from './extensions/outline';
 import SmartTypography from './extensions/smartTypography';
 import { createBubbleMenu } from './bubbleMenu';
+import { initBoardFormatToolbar } from './boardFormatToolbar';
 import { createImageBubbleMenu } from './imageBubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
@@ -185,6 +186,8 @@ function buildRichEditor(
   createBubbleMenu(editor);
   createImageBubbleMenu(editor);
   createBlockHandle(editor);
+  // Selection toolbar for board free-text cells (idempotent document-level singleton).
+  initBoardFormatToolbar();
 
   return { editor, debounce, frontmatter };
 }

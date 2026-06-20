@@ -135,6 +135,29 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
   return { reposition, destroy };
 }
 
+/**
+ * One-shot placement of `el` against an arbitrary screen-space rect (e.g. a text
+ * selection's getBoundingClientRect()), rather than a DOM anchor element. Used by
+ * selection-anchored floaters like the board format toolbar, which have no anchor
+ * node to observe. Coordinate writes stay here (c34 guardrail home), so callers
+ * never hand-roll `.style.left/.top`. No live reposition — callers re-call (or
+ * hide) on scroll / selection change.
+ */
+export function placeFloatingAtRect(el: HTMLElement, rect: Rect, opts: PlaceOpts = {}): void {
+  el.style.position = 'fixed';
+  const natH = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+  const p = computePlacement({
+    anchor: rect,
+    size: { width: el.offsetWidth, height: natH },
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    margin: opts.margin, gap: opts.gap, preferX: opts.preferX, maxHeight: opts.maxHeight,
+  });
+  el.style.left = `${p.left}px`;
+  el.style.top = `${p.top}px`;
+  if (p.scroll) { el.classList.add('is-scroll'); el.style.maxHeight = `${p.maxHeight ?? 0}px`; }
+  else { el.classList.remove('is-scroll'); el.style.maxHeight = ''; }
+}
+
 export interface FlyoutInput {
   panel: Rect;                                  // the action panel's bounding rect
   row: Rect;                                    // the Turn-into row's rect (vertical anchor)

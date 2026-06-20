@@ -1398,6 +1398,26 @@ html.source-full-width #source-view {
   z-index: 999;
 }
 
+/* Board format toolbar — the bubble menu's sibling for board free-text cells.
+   Positioned by placeFloatingAtRect() (no CSS-anchored offsets), reuses the
+   .bm-btn / .bm-div / .bm-swatch-panel visual language. The swatch sub-panel is
+   position:absolute, so this container is the positioned containing block. */
+.board-format-toolbar {
+  position: fixed;
+  display: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10);
+  z-index: 999;
+}
+.theme-dark .board-format-toolbar {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
+}
+.board-format-toolbar .bft-row { display: flex; align-items: center; gap: 2px; }
+.board-format-toolbar .bft-color-bar { transition: fill 0.1s; }
+
 /* Inline URL input that swaps in for the bubble menu's button row when
    the user clicks Link. Compact pill that fits the bubble's existing chrome. */
 .bm-link-row {
