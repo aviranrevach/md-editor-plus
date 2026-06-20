@@ -700,6 +700,9 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   const onFlyoutResize = () => positionFlyout();
 
   function openFlyout(rowEl: HTMLElement): void {
+    // Already open against this same row: no-op so a stray re-hover doesn't
+    // rebuild the list and reset the highlight (keyboard nav relies on it).
+    if (isFlyoutOpen() && flyoutAnchorRow === rowEl) return;
     flyoutAnchorRow = rowEl;
     flyoutEl.style.display = '';
     renderFlyout();
