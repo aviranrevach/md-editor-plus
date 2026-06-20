@@ -332,7 +332,7 @@ Type `/board kanban` or `/board table` to drop a project board. Two views over t
 
 Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. **Drag** it to move the block anywhere; **click** it to open the **block action menu** — the same for every block type. Empty blocks show a hint — "Start writing, or press / for commands" — and pressing `/` on an empty block opens the block picker (⌘/ works everywhere).
 
-- **Turn into** — convert to paragraph, heading, list, quote, code block, **table**, **Board: Table**, or any callout type (the current type is checkmarked). At the bottom, a **✨ Using AI** section offers AI-powered conversions for targets without a direct converter (Ask AI…, Board: Kanban, Mermaid, Summary, Action items, Outline, Timeline) — it reuses the same clipboard-prompt flow as the bubble menu, scoped to the active block
+- **Turn into** — hover it (or press `→`) to open a **side panel** of convert targets: paragraph, heading, list, quote, code block, **table**, **Board: Table**, or any callout type (the current type is checkmarked), plus a **✨ Using AI** section for targets without a direct converter (Ask AI…, Board: Kanban, Mermaid, Summary, Action items, Outline, Timeline) — it reuses the same clipboard-prompt flow as the bubble menu, scoped to the active block. (Typing in the search box collapses the panels into one flat list, so `h1` still jumps straight to Heading 1.)
 - **Duplicate** — drop an identical copy right below (duplicating a board mints a fresh id, so the copy stays independent and saves cleanly)
 - **Delete** — remove the block
 
