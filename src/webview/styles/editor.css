@@ -5316,3 +5316,53 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
   pointer-events: none;
   user-select: none;
 }
+
+/* ── Structure map (c54): right-edge navigation rail ───────────────────────
+   Hidden by default; shown when documentElement has .structure-map-visible.
+   Hidden in Code (source) view. Hide/expand-on-hover — never an OS scrollbar. */
+.structure-map {
+  position: fixed;
+  top: 56px;            /* clears the toolbar */
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 90;          /* below toolbar/popovers (100/200), above content */
+  display: none;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: width 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+html.structure-map-visible .structure-map { display: block; }
+html.source-mode-active .structure-map { display: none; }
+
+.structure-map:hover {
+  width: 22px;
+  opacity: 1;
+  background: color-mix(in srgb, var(--fg, #444) 4%, transparent);
+}
+
+.structure-map-ticks { position: absolute; inset: 0; }
+
+.structure-map-tick {
+  position: absolute;
+  right: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--fg, #444);
+  transform: translateY(-50%);
+}
+.structure-map-tick.level-1 { width: 9px;  opacity: 0.85; }
+.structure-map-tick.level-2 { width: 6px;  opacity: 0.6;  }
+.structure-map-tick.level-3 { width: 4px;  opacity: 0.4;  }
+
+.structure-map-viewport {
+  position: absolute;
+  right: 0;
+  left: 0;
+  min-height: 18px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent, #4c8bf5) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #4c8bf5) 45%, transparent);
+  cursor: grab;
+}
+.structure-map-viewport:active { cursor: grabbing; }
