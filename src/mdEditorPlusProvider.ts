@@ -7,6 +7,7 @@ import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from 
 import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 import { ApplyingTracker } from './applyingTracker';
 import { openFullDiff } from './diffViewer';
+import { applyEditThenDiff } from './diffPrepare';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -257,8 +258,12 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         return;
       }
       if (msg.type === 'openFullDiff') {
-        const m = msg as unknown as { baseContent?: string; baseLabel?: string };
-        await openFullDiff(document, { baseContent: m.baseContent, baseLabel: m.baseLabel }, openSnapshot);
+        const m = msg as unknown as { baseContent?: string; baseLabel?: string; markdown?: string };
+        await applyEditThenDiff(
+          m.markdown,
+          (md) => this._applyEdit(document, md),
+          () => openFullDiff(document, { baseContent: m.baseContent, baseLabel: m.baseLabel }, openSnapshot),
+        );
         return;
       }
       if (msg.type === 'edit' && msg.markdown !== undefined) {

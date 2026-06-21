@@ -302,7 +302,7 @@ function init(): void {
   });
 
   document.getElementById('diff-btn')?.addEventListener('click', () => {
-    vscode.postMessage({ type: 'openFullDiff' });
+    vscode.postMessage({ type: 'openFullDiff', markdown: getCurrentMarkdown() });
   });
 
   // External-edit conflict banner. Rendered once and toggled via 'visible'.
@@ -357,7 +357,7 @@ function init(): void {
     const diff = computeConflictDiff(yours, disk);
     conflictCount = diff.rows.length + diff.truncated;
     conflictPanel.replaceChildren(buildConflictDiffPanel(diff, {
-      onOpenFullDiff: () => vscode.postMessage({ type: 'openFullDiff', baseContent: disk, baseLabel: 'On disk' }),
+      onOpenFullDiff: () => vscode.postMessage({ type: 'openFullDiff', baseContent: disk, baseLabel: 'On disk', markdown: getCurrentMarkdown() }),
     }));
     setRevealOpen(false); // collapsed by default
   }
