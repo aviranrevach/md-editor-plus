@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Structure map — navigation rail (c54)** — a slim rail down the right edge of the editor showing a **tick for every heading** (wider/bolder for H1, fainter for H3) plus a **translucent box** marking your current viewport. **Click a tick** to jump to that heading, **drag the box** to scroll, **hover a tick** for its text. Toggle it from the new toolbar button (next to Outline); your on/off choice persists like the other view settings. It reuses the document outline (so it never re-scans the page), recolors to match every theme, and tucks away automatically in Code view. (c54)
 - **Formatting toolbar inside board cells (c52)** — selecting a word while editing a board **text cell** (or a text property in the **side panel**) now pops a small formatting toolbar, the board's counterpart to the document bubble menu. It offers **Bold · Italic · Strikethrough · Inline code · Highlight · Link · Text color** — each wraps your selection in the matching markdown, which renders as styled text the moment you click away (building on the c27 inline-style rendering). **Link** drops a `[text](url)` with the `url` ready to type over, right in the cell — no popup. Every action keeps your cursor in the cell, so the edit is never interrupted. Structural labels (column / board / field names) and the plain-input kanban card title are intentionally left out, so styling can never corrupt a column's identity. (c52)
 
 ### Fixed
 
+- **Full diff now catches unsaved edits and renders as a real diff (c54)** — two fixes to **Show Diff**. First, edits you just typed are flushed into the document before the diff opens, so a brand-new section is no longer invisible in the comparison. Second, both sides of the diff now open in VS Code's **native text-diff editor** (red/green line markers) instead of two rendered MD Editor Plus webviews — the panes used to claim the `*.md` custom editor, which showed no diff highlighting and broke the base-side image (a text diff shows the raw markdown instead). (c54)
 - **Single description placeholder in the card panel (c50)** — opening a board card with an empty description no longer shows two overlapping placeholder hints. The panel now displays only its own "Add a description to this card…" prompt; the generic editor hint is suppressed inside the card panel. (c50)
 
 ## [0.7.1] - 2026-06-20

@@ -82,6 +82,7 @@ From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Cla
 
 - **Auto-save + save status** — a condensed indicator by the filename always shows where you stand: `• Unsaved` the instant you type, `⟳ Saving…` while it writes, `✓ Saved` at rest. Edits auto-save to disk ~1 s after you stop typing; **⌘S / Ctrl+S** saves immediately with a confirming pulse. If the file changes on disk while you have unsaved edits, auto-save pauses and the conflict banner lets you choose — nothing is silently overwritten.
 - **Find in page** — ⌘F / Ctrl+F (or **Find in page** in the `⋯` menu) opens a Notion-style find bar: every match highlights with a live `3 / 12` count, Enter / Shift+Enter (or ↑ ↓) jumps between them, Esc closes. Works in both Preview and Code views. A match hidden inside a collapsed toggle auto-expands and scrolls into view, and search reaches **inside boards** too — card titles, body previews, field/tag values, column names — scrolling the matching card into view.
+- **Structure map** — a slim navigation rail down the right edge: a **tick per heading** (bolder for H1, fainter for H3) and a box marking your current viewport. **Click a tick** to jump, **drag the box** to scroll, **hover** for the heading text. Toggle it from the toolbar — it recolors to match your theme and hides in Code view.
 - **Code / Preview toggle** — switch between rendered blocks and raw Markdown without leaving the editor
 - **Auto-fading toolbar** — drops to 50% opacity when your cursor is away, lights up when you approach
 - **Actions menu** — the `⋯` menu carries Find in page, Read only, Reload from disk, Copy page content, Copy file path, Duplicate, Open in Finder, Export, and Create blocks skill
@@ -128,6 +129,8 @@ The toolbar fades to 50% opacity when your cursor isn't near it, so it stays out
 | --- | --- |
 | **Logo** | Icon for the extension. |
 | **Preview / Code** | Switch between the rendered block view and the raw Markdown view. The active button shows its label (`Preview` or `Code`). |
+| **Outline** | **Click** to toggle the heading outline tree (also ⌘⇧O). |
+| **Structure map** | **Click** to toggle the right-edge navigation rail — heading ticks plus a draggable viewport box. |
 | **Filename** | Centered. **Hover** to open the actions menu (Copy, Duplicate, etc.). The full name shows in a native tooltip when truncated. |
 | **Aa** | **Click** to open the display-settings panel (theme, page width, font, code-block options). |
 | **⋯** | **Click** to open the actions menu, anchored to the top-right. |
