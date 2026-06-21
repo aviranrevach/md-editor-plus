@@ -1,4 +1,4 @@
-import { resolveDiffBase } from '../src/diffBase';
+import { resolveDiffBase, diffSidePaths } from '../src/diffBase';
 
 const opts = (over: Record<string, unknown> = {}) =>
   ({ fsPath: '/w/TODO.md', uri: {}, gitApi: null, snapshot: 'SNAP', ...over }) as Parameters<typeof resolveDiffBase>[0];
@@ -30,5 +30,29 @@ describe('resolveDiffBase', () => {
     const r = await resolveDiffBase(opts({ gitApi }));
     expect(r.content).toBe('SNAP');
     expect(r.label).toBe('when you opened it');
+  });
+});
+
+describe('diffSidePaths', () => {
+  // The custom editor claims these globs; both diff sides MUST avoid them so VS
+  // Code renders a text diff instead of two MD Editor Plus webviews (c54).
+  const MD_EXT = /\.(md|markdown|mdown|mkd|mdx)$/i;
+
+  it('produces side paths whose basenames do not match any markdown extension', () => {
+    const { leftPath, rightPath } = diffSidePaths('demo-tester.md', 'HEAD (last commit)');
+    expect(MD_EXT.test(leftPath)).toBe(false);
+    expect(MD_EXT.test(rightPath)).toBe(false);
+  });
+
+  it('keeps the original filename and label visible for readability', () => {
+    const { leftPath, rightPath } = diffSidePaths('notes.markdown', 'when you opened it');
+    expect(leftPath).toBe('/notes.markdown (when you opened it)');
+    expect(rightPath).toBe('/notes.markdown (current)');
+  });
+
+  it('dodges the extension even for awkward filenames', () => {
+    const { leftPath, rightPath } = diffSidePaths('a.mdx', 'HEAD (last commit)');
+    expect(MD_EXT.test(leftPath)).toBe(false);
+    expect(MD_EXT.test(rightPath)).toBe(false);
   });
 });

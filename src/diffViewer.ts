@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { resolveDiffBase, type GitApiLike, type DiffBase } from './diffBase';
+import { resolveDiffBase, diffSidePaths, type GitApiLike, type DiffBase } from './diffBase';
 
 const SCHEME = 'md-editor-plus-diff';
 // token -> base (left) content. Read-only docs served to vscode.diff's left pane.
@@ -48,14 +48,37 @@ export async function openFullDiff(
     snapshot,
   });
 
-  const token = String(++seq);
-  bases.set(token, base.content);
+  // Serve BOTH sides from the read-only scheme. The right side is a point-in-time
+  // snapshot of the live document (already flushed by the caller), NOT document.uri
+  // itself — feeding document.uri would let the *.md custom editor claim the pane
+  // and render a webview instead of a text diff (c54).
+  const baseToken = String(++seq);
+  bases.set(baseToken, base.content);
+  const curToken = String(++seq);
+  bases.set(curToken, document.getText());
+
   const fileName = document.uri.path.split('/').pop() ?? 'document.md';
-  const leftUri = vscode.Uri.from({ scheme: SCHEME, path: '/' + fileName, query: token });
+  const { leftPath, rightPath } = diffSidePaths(fileName, base.label);
+  const leftUri = vscode.Uri.from({ scheme: SCHEME, path: leftPath, query: baseToken });
+  const rightUri = vscode.Uri.from({ scheme: SCHEME, path: rightPath, query: curToken });
+
+  // The synthetic paths have no .md extension (so the custom editor skips them),
+  // which also drops markdown syntax highlighting — restore it explicitly.
+  try {
+    const [l, r] = await Promise.all([
+      vscode.workspace.openTextDocument(leftUri),
+      vscode.workspace.openTextDocument(rightUri),
+    ]);
+    await vscode.languages.setTextDocumentLanguage(l, 'markdown');
+    await vscode.languages.setTextDocumentLanguage(r, 'markdown');
+  } catch {
+    // highlighting is best-effort; the diff still works as plain text
+  }
+
   await vscode.commands.executeCommand(
     'vscode.diff',
     leftUri,
-    document.uri,
+    rightUri,
     `${fileName} — changes since ${base.label}`,
   );
 }
