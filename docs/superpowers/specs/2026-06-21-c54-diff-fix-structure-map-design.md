@@ -143,8 +143,10 @@ Reused primitives (do not reinvent):
 - A toolbar toggle button turns the map on/off. Phosphor icon, regular weight,
   matching the existing toolbar icons. The on/off choice persists like other
   view settings (e.g. word-wrap, width).
-- Hidden automatically in Code/source view and when a board view is active —
-  those have their own navigation affordances.
+- Hidden automatically in Code (source) view, driven by the existing
+  `.source-mode-active` class on `documentElement` (pure CSS, no JS). There is no
+  document-level "board mode" (boards are embedded blocks), so no board
+  special-casing.
 
 ### Testing
 
