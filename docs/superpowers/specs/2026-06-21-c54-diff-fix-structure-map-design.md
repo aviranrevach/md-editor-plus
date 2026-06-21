@@ -73,6 +73,29 @@ minimap is expensive and not useful. Instead: a **structure map** — a slim rai
 of heading ticks with a draggable viewport box. It reflects document structure
 and works regardless of block type.
 
+**Relationship to the existing outline panel.** The editor already ships an
+outline *tree* panel (`src/webview/outlinePanel.ts`, toggled ⌘⇧O) backed by a
+`blockOutline` ProseMirror extension (`src/webview/extensions/outline.ts`). VS
+Code has both an Outline view and a minimap; this adds the minimap-style **rail**
+to complement the existing tree. The structure map is a new *rendering* of the
+**same heading data** the outline panel already computes — it does NOT re-query
+the DOM and does NOT duplicate heading collection.
+
+Reused primitives (do not reinvent):
+- `getOutline(editor.view): OutlineEntry[]` — heading list. `OutlineEntry` is
+  `{ pos: number; level: 1 | 2 | 3; text: string }`. **Only heading levels 1–3**
+  are tracked (h4–h6 are ignored), matching the outline panel.
+- `OUTLINE_EVENT` (`'outline:changed'`) dispatched on `editor.view.dom` with
+  `detail: OutlineEntry[]` — the rebuild signal.
+- `editor.view.coordsAtPos(pos)` — converts a heading's doc position to viewport
+  coords; the editor renders the whole document (no virtualization) so this is
+  valid for every entry. Document Y = `coords.top + window.scrollY`.
+- Jump pattern from `outlinePanel.jumpTo`: `window.scrollTo({ top: coords.top +
+  window.scrollY - 80, behavior: 'smooth' })`.
+- Persistence pattern: an `onVisibilityChange` callback that posts a
+  `save…Visible` message; the provider writes a config key and feeds it back via
+  `init.defaults`.
+
 ### Placement
 
 - A fixed rail pinned to the right edge of the window
@@ -85,18 +108,18 @@ and works regardless of block type.
 
 ### What it draws
 
-- **Heading ticks** — enumerate `#editor .ProseMirror :is(h1,h2,h3,h4,h5,h6)`.
-  Each heading becomes a horizontal tick at vertical position
-  `heading.offsetTop / docHeight`. Heading level drives the tick's **width and
-  opacity**: H1 widest/boldest → H6 shortest/faintest, so the rail reads as the
-  document's shape.
+- **Heading ticks** — from `getOutline(editor.view)`. For each entry, document Y
+  is `coordsAtPos(pos).top + window.scrollY`; the tick sits at `docY / docHeight`.
+  Heading level (1–3) drives the tick's **width and opacity**: H1 widest/boldest
+  → H3 shortest/faintest, so the rail reads as the document's shape.
 - **Viewport box** — a translucent rectangle:
   `top = scrollY / docHeight`, `height = innerHeight / docHeight`. Shows the
   current view at a glance.
 
 ### Interactions
 
-- Click a tick → smooth `scrollIntoView` to that heading.
+- Click a tick → smooth jump to that heading via the `jumpTo(pos)` pattern
+  (`coordsAtPos` + `window.scrollTo`).
 - Click empty rail → jump to that proportion of the document.
 - Drag the viewport box → scroll proportionally. Use manual mouse
   (mousedown/mousemove/mouseup) drag — consistent with custom-chrome dragging
@@ -106,8 +129,9 @@ and works regardless of block type.
 
 ### Lifecycle & performance
 
-- Rebuild ticks on document change (debounced, piggy-backing the existing edit
-  signal) and on `window` `resize`.
+- Rebuild ticks on the `OUTLINE_EVENT` (fires only when the heading list
+  actually changes — already debounced/diffed inside the extension) and on
+  `window` `resize`.
 - On `scroll`, update **only** the viewport box, throttled with
   `requestAnimationFrame`. No tick rebuild on scroll.
 
@@ -124,16 +148,27 @@ and works regardless of block type.
 
 ### Testing
 
-Extract the math into a pure, testable core:
+Extract the math into a pure, testable core (no DOM, no editor):
 
 ```
-computeMap(headings, docHeight, scrollY, viewportHeight)
-  → { ticks: [{ top, level }], viewport: { top, height } }
+interface MapInput {
+  headings: { pos: number; level: 1 | 2 | 3; docY: number }[];
+  docHeight: number;     // total scrollable content height
+  scrollY: number;       // window.scrollY
+  viewportHeight: number;// window.innerHeight
+}
+computeMap(input: MapInput): {
+  ticks: { pos: number; level: 1 | 2 | 3; topFrac: number }[]; // topFrac in [0,1]
+  viewport: { topFrac: number; heightFrac: number };           // both in [0,1]
+}
 ```
 
-Unit-test that function directly (positions, clamping, empty-document and
-single-heading edge cases). The DOM wiring (querying headings, building
-elements, event listeners) stays a thin shell around it.
+`docY` is supplied by the shell (`coordsAtPos(pos).top + window.scrollY`) so the
+core stays pure. Unit-test it directly: tick fractions, viewport clamping at top
+and bottom, `docHeight <= viewportHeight` (whole doc visible → viewport box fills
+the rail), empty-document, and single-heading edge cases. The DOM wiring
+(`getOutline`, `coordsAtPos`, building elements, event listeners) stays a thin
+shell around it.
 
 ---
 
