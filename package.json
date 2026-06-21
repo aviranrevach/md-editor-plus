@@ -169,6 +169,11 @@
           "default": false,
           "description": "Show the outline panel (left gutter) by default"
         },
+        "mdEditorPlus.structureMapVisible": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the structure map (right-edge navigation rail) by default"
+        },
         "mdEditorPlus.sourceWordWrap": {
           "type": "boolean",
           "default": false,
