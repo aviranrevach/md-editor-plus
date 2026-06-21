@@ -14,6 +14,7 @@ import { setSmartTypographyEnabled } from './extensions/smartTypography';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
+import { createStructureMap } from './structureMap';
 import { initBoardSidePanel } from './boardSidePanel';
 import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
@@ -85,6 +86,7 @@ interface SavedDefaults {
   shortenCodeSnippets?: boolean;
   smartTypography?: boolean;
   outlineVisible?: boolean;
+  structureMapVisible?: boolean;
   sourceWordWrap?: boolean;
 }
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
@@ -1114,6 +1116,25 @@ function init(): void {
         }
       } catch (err) {
         console.error('[md-editor-plus] outline init failed', err);
+      }
+
+      try {
+        const mapBtn  = document.getElementById('structure-map-btn') as HTMLElement | null;
+        const mapRail = document.getElementById('structure-map') as HTMLElement | null;
+        if (mapBtn && mapRail) {
+          const map = createStructureMap({
+            editor: editorInstance,
+            railEl: mapRail,
+            toggleBtn: mapBtn,
+            initialVisible: Boolean(msg.defaults?.structureMapVisible),
+            onVisibilityChange: (visible) => {
+              vscode.postMessage({ type: 'saveStructureMapVisible', value: visible });
+            },
+          });
+          mapBtn.addEventListener('click', () => map.setVisible(!map.isVisible()));
+        }
+      } catch (err) {
+        console.error('[md-editor-plus] structure map init failed', err);
       }
       } catch (err) {
         console.error('[md-editor-plus] INIT FAILED', err);
