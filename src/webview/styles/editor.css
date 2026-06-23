@@ -5366,3 +5366,24 @@ html.source-mode-active .structure-map { display: none; }
   cursor: grab;
 }
 .structure-map-viewport:active { cursor: grabbing; }
+
+/* ── Diff map (c55): change marks on the structure-map rail ────────────────
+   Left edge of the rail (heading ticks live on the right). Shown only when the
+   rail is visible and there are marks; inherits the rail's hide-in-source-mode. */
+.diff-map-marks { position: absolute; inset: 0; pointer-events: none; }
+
+.diff-mark {
+  position: absolute;
+  left: 2px;
+  width: 3px;
+  height: 16px;            /* add/change span; del overrides shorter below */
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.diff-mark.add    { background: var(--callout-tip-accent, #1a7f37); }
+.diff-mark.change { background: #F5A623; }
+.diff-mark.del    { background: var(--callout-caution-accent, #cf222e); height: 6px; }
+
+.structure-map:hover .diff-mark { width: 5px; }
