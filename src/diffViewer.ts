@@ -29,6 +29,20 @@ async function getGitApi(): Promise<GitApiLike | null> {
   }
 }
 
+/** Resolve the diff base (HEAD → on-disk → snapshot) for a document, for the diff map (c55). */
+export async function resolveBaseForDocument(
+  document: vscode.TextDocument,
+  snapshot: string,
+): Promise<DiffBase> {
+  const gitApi = await getGitApi();
+  return resolveDiffBase({
+    fsPath: document.uri.fsPath,
+    uri: document.uri,
+    gitApi,
+    snapshot,
+  });
+}
+
 /** Open VS Code's native diff editor: base (left) vs the live document (right). */
 export async function openFullDiff(
   document: vscode.TextDocument,

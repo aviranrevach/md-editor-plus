@@ -6,7 +6,7 @@ import { spawn } from 'child_process';
 import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
 import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 import { ApplyingTracker } from './applyingTracker';
-import { openFullDiff } from './diffViewer';
+import { openFullDiff, resolveBaseForDocument } from './diffViewer';
 import { applyEditThenDiff } from './diffPrepare';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
@@ -151,7 +151,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       pendingFlash = flash;
       try {
         const ok = await document.save();
-        if (!ok) { pendingFlash = false; postSaveState('failed'); }
+        if (!ok) { pendingFlash = false; postSaveState('failed'); return; }
+        void sendDiffBase();
       } catch (err) {
         pendingFlash = false;
         console.error('[md-editor-plus] save failed', err);
@@ -189,6 +190,16 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           sourceWordWrap:      cfg.get<boolean>('sourceWordWrap', false),
         },
       });
+      void sendDiffBase();
+    };
+
+    const sendDiffBase = async (): Promise<void> => {
+      try {
+        const base = await resolveBaseForDocument(document, openSnapshot);
+        void webviewPanel.webview.postMessage({ type: 'diffBase', content: base.content, label: base.label });
+      } catch {
+        // base unavailable (no git, etc.) — the diff map simply shows nothing
+      }
     };
 
     const openMarkdownInEditor = async (uri: vscode.Uri): Promise<void> => {
