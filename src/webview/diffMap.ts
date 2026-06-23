@@ -65,6 +65,7 @@ export function createDiffMap(opts: { editor: Editor; railEl: HTMLElement }): Di
       el.className = `diff-mark ${m.kind}`;
       el.style.top = `${(m.docY / docHeight) * 100}%`;
       el.dataset.tip = LABEL[m.kind];
+      el.dataset.docy = String(m.docY);
       if (m.pos !== undefined) el.dataset.pos = String(m.pos);
       return el;
     }));
@@ -82,12 +83,19 @@ export function createDiffMap(opts: { editor: Editor; railEl: HTMLElement }): Di
 
   function onMarkClick(e: MouseEvent): void {
     const el = (e.target as HTMLElement).closest<HTMLElement>('.diff-mark');
-    if (!el || el.dataset.pos === undefined) return;
+    if (!el) return;
     e.stopPropagation(); // don't also trigger the rail's click-to-fraction
-    try {
-      const top = editor.view.coordsAtPos(Number(el.dataset.pos)).top + window.scrollY - SCROLL_OFFSET;
-      window.scrollTo({ top, behavior: 'smooth' });
-    } catch { /* stale pos */ }
+
+    if (el.dataset.pos !== undefined) {
+      // jump to a real block position
+      try {
+        const top = editor.view.coordsAtPos(Number(el.dataset.pos)).top + window.scrollY - SCROLL_OFFSET;
+        window.scrollTo({ top, behavior: 'smooth' });
+      } catch { /* stale pos */ }
+    } else if (el.dataset.docy !== undefined) {
+      // jump to a deletion seam (no real pos, scroll to docY directly)
+      window.scrollTo({ top: Math.max(0, Number(el.dataset.docy) - SCROLL_OFFSET), behavior: 'smooth' });
+    }
   }
   marksLayer.addEventListener('click', onMarkClick);
 
