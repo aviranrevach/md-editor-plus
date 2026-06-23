@@ -15,6 +15,7 @@ import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { createStructureMap } from './structureMap';
+import { createDiffMap, type DiffMap } from './diffMap';
 import { initBoardSidePanel } from './boardSidePanel';
 import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
@@ -92,7 +93,8 @@ interface SavedDefaults {
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
 interface SaveStateMessage { type: 'saveState'; state: 'saving' | 'saved' | 'failed'; flash?: boolean }
-type HostMessage = InitMessage | UpdateMessage | SaveStateMessage;
+interface DiffBaseMessage { type: 'diffBase'; content: string; label?: string; }
+type HostMessage = InitMessage | UpdateMessage | SaveStateMessage | DiffBaseMessage;
 
 type WidthMode  = 'normal' | 'full';
 type TextSize   = 's' | 'm' | 'l' | 'xl';
@@ -1044,6 +1046,8 @@ function init(): void {
     refreshDefaultsButtons();
   });
 
+  let diffMap: DiffMap | null = null;
+
   window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     const msg = event.data;
 
@@ -1061,6 +1065,7 @@ function init(): void {
         lastSentMarkdown = normalizeMd(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);
         vscode.postMessage({ type: 'edit', markdown });
+        diffMap?.recompute();
       }, () => applySaveEvent('localEdit'));
       editorReady = true;
       initBoardSidePanel();
@@ -1136,6 +1141,15 @@ function init(): void {
       } catch (err) {
         console.error('[md-editor-plus] structure map init failed', err);
       }
+
+      try {
+        const mapRail = document.getElementById('structure-map') as HTMLElement | null;
+        if (mapRail) {
+          diffMap = createDiffMap({ editor: editorInstance, railEl: mapRail });
+        }
+      } catch (err) {
+        console.error('[md-editor-plus] diff map init failed', err);
+      }
       } catch (err) {
         console.error('[md-editor-plus] INIT FAILED', err);
         document.body.innerHTML = '<pre style="padding:20px;color:#c44">md-editor-plus init failed:\n\n' + String(err && (err as Error).stack || err) + '</pre>';
@@ -1148,6 +1162,11 @@ function init(): void {
         msg.state === 'saved'  ? 'saveSucceeded' :
                                  'saveFailed';
       applySaveEvent(event, Boolean(msg.flash));
+      return;
+    }
+
+    if (msg.type === 'diffBase') {
+      diffMap?.setBase(typeof msg.content === 'string' ? msg.content : '');
       return;
     }
 
