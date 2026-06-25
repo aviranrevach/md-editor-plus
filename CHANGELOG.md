@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-25
+
 ### Added
 
 - **Diff map — change marks on the structure rail (c55)** — the structure-map rail now paints a VS Code-minimap-style overview of what's changed since your last commit: **green** for added blocks, **amber** (`#F5A623`) for modified, **red** for removed (a short stub at the seam). Each mark sits at its block's real rendered position — **click one to jump** there (a removed-block mark jumps to where it was), **hover** for "Added / Modified / Removed". Marks recompute as you type and after each save, recolor per theme, show only when there are changes vs your last commit, and hide in Code view with the rest of the rail. For files not in git, they fall back to comparing against the on-disk / session version. (c55)
