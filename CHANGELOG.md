@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Catastrophic saves are now refused, not written (c48)** — a last line of defense for the save data-loss family. A save that would replace your real content with **nothing**, or make an entire **board vanish** (the c37 fragment signature), is now **refused at the write path** instead of being silently written to disk while the editor claims "Saved" — the untouched content snaps straight back into the editor so nothing diverges. Only these never-legitimate writes are blocked; ordinary edits, row deletions, and shrinking a doc are untouched. The rarer "reverted on open" path stays instrumented (it needs a live repro before a root-cause fix). (c48)
+- **"Turn into" (and Delete / Duplicate) on the dragger for every block type (c49)** — clicking a block's **⠿ dragger** now opens the full action menu — **Turn into · Duplicate · Delete** — for *all* block types, including boards, images, diagrams, dividers, and toggles. The menu used to silently fall back to "insert a new block" over those (atomic) blocks because it couldn't locate the block under the handle; it now finds the block reliably. (c49)
+- **Board cells respect read-only (c47)** — turning **read-only** on now truly locks the whole board. Previously a board's text cells and column headers stayed editable after the toggle (their edit listeners went stale), which let you keep editing a "locked" doc and masked c44. Cell and header editing now check read-only **live** and refuse to enter edit mode, and the board re-renders the instant you flip the switch — both ways — so its add-row / edit affordances always match the lock state. (c47)
+
 ## [0.8.0] - 2026-06-25
 
 ### Added
