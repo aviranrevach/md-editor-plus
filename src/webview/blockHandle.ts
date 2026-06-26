@@ -27,17 +27,48 @@ interface BlockUnderHandle {
   blockEnd: number;
 }
 
+// Map the handle's vertical position to the doc position of the top-level block
+// it sits beside. posAtCoords (used first) returns null over many atomic
+// NodeViews — board, whiteboard, image, mermaid, divider, toggle — because the
+// sampled point lands on a non-text element. That null silently dropped the
+// dragger into insert mode, which is why "Turn into" (and Delete/Duplicate) went
+// missing for "a lot of" block types (c49). This DOM hit-test is the fallback:
+// it finds the top-level ProseMirror child whose box vertically contains the
+// handle's midpoint and resolves it to a block position — independent of
+// whether the node renders editable text.
+function topLevelBlockPosFromY(editor: Editor, midY: number): number | null {
+  const children = Array.from(editor.view.dom.children) as HTMLElement[];
+  for (const child of children) {
+    const r = child.getBoundingClientRect();
+    if (midY >= r.top && midY <= r.bottom) {
+      try {
+        const pos = editor.view.posAtDOM(child, 0);
+        const $pos = editor.view.state.doc.resolve(pos);
+        return $pos.depth >= 1 ? $pos.before(1) : pos;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 function getBlockAtHandle(editor: Editor, handleEl: HTMLElement): BlockUnderHandle | null {
   try {
     const rect = handleEl.getBoundingClientRect();
-    const result = editor.view.posAtCoords({
-      left: rect.right + 24,
-      top:  rect.top + rect.height / 2,
-    });
-    if (!result) return null;
-    const $pos = editor.view.state.doc.resolve(result.pos);
-    if ($pos.depth < 1) return null;
-    const blockPos = $pos.before(1);
+    const midY = rect.top + rect.height / 2;
+
+    // Primary: coordinate hit-test just right of the handle (works for text-y
+    // blocks). Atomic NodeViews return null here → fall back to DOM hit-testing.
+    let blockPos: number | null = null;
+    const result = editor.view.posAtCoords({ left: rect.right + 24, top: midY });
+    if (result) {
+      const $pos = editor.view.state.doc.resolve(result.pos);
+      if ($pos.depth >= 1) blockPos = $pos.before(1);
+    }
+    if (blockPos == null) blockPos = topLevelBlockPosFromY(editor, midY);
+    if (blockPos == null) return null;
+
     const node = editor.state.doc.nodeAt(blockPos);
     if (!node) return null;
     return {
