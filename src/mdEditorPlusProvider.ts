@@ -8,6 +8,7 @@ import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetP
 import { ApplyingTracker } from './applyingTracker';
 import { openFullDiff, resolveBaseForDocument } from './diffViewer';
 import { applyEditThenDiff } from './diffPrepare';
+import { assessWrite } from './saveGuard';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -124,6 +125,18 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
 
     const cancelAutoSave = (): void => {
       if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    };
+
+    // Re-assert the (untouched) document content into the webview after the save
+    // guard refuses a catastrophic write, so the webview, host, and disk all
+    // reconverge on the good content instead of silently diverging. Tagged as a
+    // 'refresh' so the webview's sync guard re-renders it unconditionally.
+    const resyncWebview = (): void => {
+      void webviewPanel.webview.postMessage({
+        type: 'update',
+        markdown: document.getText(),
+        source: 'refresh',
+      });
     };
 
     // Writes the (already-applied, in-memory) document to disk. Gated on conflict:
@@ -273,18 +286,22 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         const m = msg as unknown as { baseContent?: string; baseLabel?: string; markdown?: string };
         await applyEditThenDiff(
           m.markdown,
-          (md) => this._applyEdit(document, md),
+          async (md) => { await this._applyEdit(document, md); },
           () => openFullDiff(document, { baseContent: m.baseContent, baseLabel: m.baseLabel }, openSnapshot),
         );
         return;
       }
       if (msg.type === 'edit' && msg.markdown !== undefined) {
-        await this._applyEdit(document, msg.markdown);
+        const applied = await this._applyEdit(document, msg.markdown);
+        if (!applied) { resyncWebview(); return; }
         scheduleAutoSave();
         return;
       }
       if (msg.type === 'save') {
-        if (msg.markdown !== undefined) await this._applyEdit(document, msg.markdown);
+        if (msg.markdown !== undefined) {
+          const applied = await this._applyEdit(document, msg.markdown);
+          if (!applied) { resyncWebview(); cancelAutoSave(); postSaveState('saved', true); return; }
+        }
         cancelAutoSave();
         await saveToDisk(true);
         return;
@@ -792,16 +809,24 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     // not here — so it can't arrive before the webview is listening.
   }
 
-  private async _applyEdit(document: vscode.TextDocument, markdown: string): Promise<void> {
-    // Diagnostic for the empty-on-open data-loss bug: a webview 'edit'/'save'
-    // that would replace existing content with nothing is the prime suspect for
-    // the on-disk wipe. Log it (with a stack) so we can trace which path sent it.
-    if (markdown.trim() === '' && document.getText().trim() !== '') {
-      console.warn('[md-editor-plus] _applyEdit replacing NON-EMPTY document with EMPTY', {
+  // Returns true if the edit was applied, false if it was REFUSED by the
+  // save guard (a catastrophic, never-legitimate wipe — see saveGuard.ts).
+  // Callers must re-sync the webview from the untouched document when refused.
+  private async _applyEdit(document: vscode.TextDocument, markdown: string): Promise<boolean> {
+    const prev = document.getText();
+    const assessment = assessWrite(prev, markdown);
+    if (assessment.verdict === 'wipe') {
+      // c37/c48 last line of defense: do NOT write this to disk. The on-disk
+      // file (and the in-memory document) stay as they are; the caller re-asserts
+      // the good content back into the webview so nothing diverges.
+      console.error('[md-editor-plus] save guard REFUSED a catastrophic write', {
         uri: document.uri.toString(),
-        prevChars: document.getText().length,
+        reason: assessment.reason,
+        prevChars: prev.length,
+        nextChars: markdown.length,
         stack: new Error().stack,
       });
+      return false;
     }
     const edit = new vscode.WorkspaceEdit();
     edit.replace(
@@ -818,6 +843,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     } finally {
       this._applying.end(key);
     }
+    return true;
   }
 
   private _getHtml(webview: vscode.Webview, document: vscode.TextDocument): string {
