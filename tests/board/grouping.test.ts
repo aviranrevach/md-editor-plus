@@ -35,6 +35,7 @@ function makeCtx(board: Board): { ctx: BoardRendererCtx; boardRef: { current: Bo
     openSidePanel: (_id: string) => { /* no-op */ },
     requestDelete: () => { /* no-op */ },
     readonly: false,
+    isReadonly: () => ctx.readonly,
   };
   return { ctx, boardRef };
 }
