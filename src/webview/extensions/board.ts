@@ -122,6 +122,14 @@ const Board = Node.create({
         editor.view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)));
         editor.view.focus();
       });
+      // setEditable() (the read-only toggle) emits the editor 'update' event but
+      // does NOT change the board node's source, so the NodeView.update below
+      // never fires for it. Subscribe so the board re-syncs its read-only state
+      // (and tears down live edit listeners) the moment the doc is locked (c47).
+      // refreshReadOnly() is a no-op unless editability actually flipped.
+      const onEditorUpdate = () => view.refreshReadOnly();
+      editor.on('update', onEditorUpdate);
+
       return {
         dom: view.dom,
         update(updatedNode) {
@@ -131,6 +139,9 @@ const Board = Node.create({
           lastSource = next;
           view.update(next);
           return true;
+        },
+        destroy() {
+          editor.off('update', onEditorUpdate);
         },
         ignoreMutation() { return true; },
         // Tell ProseMirror to stay out of the way for events that hit our

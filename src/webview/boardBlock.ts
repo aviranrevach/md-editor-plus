@@ -9,6 +9,8 @@ import type { FilterState } from './boardFilter';
 export interface BoardView {
   dom: HTMLElement;
   update(source: string): void;
+  /** Re-sample editability and re-render if read-only flipped (c47). */
+  refreshReadOnly(): void;
 }
 
 /**
@@ -37,6 +39,10 @@ export interface BoardRendererCtx {
   /** Delete the entire board block from the document. */
   requestDelete:  () => void;
   readonly:       boolean;
+  /** Live read-only check (reads editor.isEditable now), for user-action entry
+   *  guards — the cached `readonly` above is only refreshed on re-render, so a
+   *  read-only toggle would otherwise leave stale edit listeners live (c47). */
+  isReadonly:     () => boolean;
   /** Session-only display filter (never serialized). */
   getFilter: () => FilterState;
   /** Replace the filter and re-render the body + chrome (no save/mutate). */
@@ -155,6 +161,7 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     },
     requestDelete: () => opts.onDelete?.(),
     readonly: opts.isReadOnly(),
+    isReadonly: opts.isReadOnly,
     getFilter: () => filter,
     setFilter: (next: FilterState) => {
       filter = next;
@@ -195,6 +202,16 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
       } else {
         renderer!.update(board);
       }
+    },
+    refreshReadOnly(): void {
+      const ro = opts.isReadOnly();
+      if (ro === ctx.readonly) return; // editability unchanged — nothing to do
+      ctx.readonly = ro;
+      // Re-render chrome + body so read-only affordances (add-row, inline-edit
+      // listeners, ⋯ menus) match the new state — otherwise a board that was
+      // rendered editable keeps its live edit listeners after locking (c47).
+      chromeHandle.update(board);
+      renderer!.update(board);
     },
   };
 }
