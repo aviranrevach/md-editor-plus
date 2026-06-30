@@ -89,15 +89,13 @@ function alignPanes(): void {
     } else if (lEl && !rEl) {
       // base-only (del): full-height filler on the right at the same flow point.
       const next = nextRightEl(rows, row, rightEls);
-      const body = document.getElementById('diff-right')!;
       const f = filler(lEl.offsetHeight);
-      if (next) next.parentElement!.insertBefore(f, next); else body.appendChild(f);
+      if (next) next.parentElement!.insertBefore(f, next); else rightEditor!.view.dom.appendChild(f);
     } else if (rEl && !lEl) {
       // current-only (add): full-height filler on the left at the same flow point.
       const next = nextLeftEl(rows, row, leftEls);
-      const body = document.getElementById('diff-left')!;
       const f = filler(rEl.offsetHeight);
-      if (next) next.parentElement!.insertBefore(f, next); else body.appendChild(f);
+      if (next) next.parentElement!.insertBefore(f, next); else leftEditor!.view.dom.appendChild(f);
     }
   }
 }
@@ -157,6 +155,7 @@ function mount(msg: InitMsg): void {
     // avoid an infinite loop from our own filler inserts.
     const mo = new MutationObserver((records) => {
       const onlyFillers = records.every((r) =>
+        (r.addedNodes.length > 0 || r.removedNodes.length > 0) &&
         [...r.addedNodes, ...r.removedNodes].every((n) => n instanceof HTMLElement && n.classList.contains('diff-filler')));
       if (!onlyFillers) reAlign();
     });
