@@ -1710,7 +1710,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
    (matches .bd-row-grip: base 0.35, row-hover 0.75, grip-hover 1). */
 .bd-opt-grip {
   border: 0; background: transparent; color: var(--board-text-muted);
-  cursor: grab; padding: 0 2px; font-size: 12px; line-height: 1;
+  cursor: grab; padding: 0 4px; font-size: 17px; line-height: 1;
   opacity: 0.35; transition: opacity 0.15s;
 }
 .bd-opt-row:hover .bd-opt-grip { opacity: 0.75; }
