@@ -9,7 +9,7 @@ import type { Node as PMNode } from '@tiptap/pm/model';
 import { splitFrontmatter } from './frontmatter';
 import { preprocessMarkdownBoards } from './extensions/board';
 import { preprocessMarkdownCallouts } from './extensions/callout';
-import { computeAlignment } from './diffAlign';
+import { computeAlignment, AlignRow } from './diffAlign';
 
 interface InitMsg { type: 'init'; base: string; baseLabel: string; current: string; }
 
@@ -19,6 +19,7 @@ const vscode = acquireVsCodeApi();
 let leftEditor: Editor | null = null;
 let rightEditor: Editor | null = null;
 let lastInit: InitMsg | null = null;
+let alignWired = false;
 
 // Split markdown into normalized top-level block strings using an editor's own
 // parser+serializer, so base and current compare identically (c55).
@@ -42,6 +43,66 @@ function blockElements(editor: Editor): HTMLElement[] {
   const root = editor.view.dom as HTMLElement;
   return Array.from(root.children) as HTMLElement[];
 }
+
+// --- Filler alignment ---
+
+function clearFillers(): void {
+  document.querySelectorAll('.diff-filler').forEach((f) => f.remove());
+}
+
+function filler(height: number): HTMLElement {
+  const f = document.createElement('div');
+  f.className = 'diff-filler';
+  f.style.height = `${Math.max(0, height)}px`;
+  return f;
+}
+
+function nextRightEl(rows: AlignRow[], row: AlignRow, rightEls: HTMLElement[]): HTMLElement | null {
+  const idx = rows.indexOf(row);
+  for (let i = idx + 1; i < rows.length; i++) if (rows[i].right !== null) return rightEls[rows[i].right!] ?? null;
+  return null;
+}
+
+function nextLeftEl(rows: AlignRow[], row: AlignRow, leftEls: HTMLElement[]): HTMLElement | null {
+  const idx = rows.indexOf(row);
+  for (let i = idx + 1; i < rows.length; i++) if (rows[i].left !== null) return leftEls[rows[i].left!] ?? null;
+  return null;
+}
+
+function alignPanes(): void {
+  if (!leftEditor || !rightEditor || !lastInit) return;
+  clearFillers();
+  const baseBlocks = blocksOf(leftEditor, lastInit.base);
+  const curBlocks = blocksOf(rightEditor, lastInit.current);
+  const rows = computeAlignment(baseBlocks, curBlocks);
+  const leftEls = blockElements(leftEditor).filter((el) => !el.classList.contains('diff-filler'));
+  const rightEls = blockElements(rightEditor).filter((el) => !el.classList.contains('diff-filler'));
+
+  for (const row of rows) {
+    const lEl = row.left !== null ? leftEls[row.left] : null;
+    const rEl = row.right !== null ? rightEls[row.right] : null;
+    if (lEl && rEl) {
+      // paired (eq or change): pad the shorter so tops line up
+      const lh = lEl.offsetHeight, rh = rEl.offsetHeight;
+      if (lh < rh) lEl.parentElement!.insertBefore(filler(rh - lh), lEl);
+      else if (rh < lh) rEl.parentElement!.insertBefore(filler(lh - rh), rEl);
+    } else if (lEl && !rEl) {
+      // base-only (del): full-height filler on the right at the same flow point.
+      const next = nextRightEl(rows, row, rightEls);
+      const body = document.getElementById('diff-right')!;
+      const f = filler(lEl.offsetHeight);
+      if (next) next.parentElement!.insertBefore(f, next); else body.appendChild(f);
+    } else if (rEl && !lEl) {
+      // current-only (add): full-height filler on the left at the same flow point.
+      const next = nextLeftEl(rows, row, leftEls);
+      const body = document.getElementById('diff-left')!;
+      const f = filler(rEl.offsetHeight);
+      if (next) next.parentElement!.insertBefore(f, next); else body.appendChild(f);
+    }
+  }
+}
+
+// --------------------------
 
 function applyTint(): void {
   if (!leftEditor || !rightEditor) return;
@@ -80,7 +141,27 @@ function mount(msg: InitMsg): void {
   if (leftLabel) leftLabel.textContent = msg.baseLabel;
   // Editors render synchronously enough that the top-level children exist now;
   // requestAnimationFrame ensures layout has flushed before we touch DOM.
-  requestAnimationFrame(applyTint);
+  requestAnimationFrame(() => { applyTint(); alignPanes(); });
+
+  // Rendered heights settle asynchronously (images, mermaid, fonts). Re-align
+  // when content loads or the panel resizes. Debounce to avoid thrashing.
+  if (!alignWired) {
+    alignWired = true;
+    let raf = 0;
+    const reAlign = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(alignPanes); };
+    window.addEventListener('resize', reAlign);
+    window.addEventListener('load', reAlign);
+    document.addEventListener('load', reAlign, true); // capture <img> load events
+    // Mermaid renders asynchronously; observe DOM mutations within the panes.
+    // Guard: skip mutations whose added/removed nodes are ALL .diff-filler to
+    // avoid an infinite loop from our own filler inserts.
+    const mo = new MutationObserver((records) => {
+      const onlyFillers = records.every((r) =>
+        [...r.addedNodes, ...r.removedNodes].every((n) => n instanceof HTMLElement && n.classList.contains('diff-filler')));
+      if (!onlyFillers) reAlign();
+    });
+    mo.observe(document.getElementById('diff-panes')!, { subtree: true, childList: true, attributes: true });
+  }
 }
 
 window.addEventListener('message', (e: MessageEvent) => {
