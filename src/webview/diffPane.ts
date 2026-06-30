@@ -5,11 +5,7 @@ import boardCss from './styles/board.css';
 import diffCss from './styles/diff.css';
 import { createDiffEditor } from './editor';
 import type { Editor } from '@tiptap/core';
-import type { Node as PMNode } from '@tiptap/pm/model';
-import { splitFrontmatter } from './frontmatter';
-import { preprocessMarkdownBoards } from './extensions/board';
-import { preprocessMarkdownCallouts } from './extensions/callout';
-import { computeAlignment, AlignRow } from './diffAlign';
+import { computeAlignment } from './diffAlign';
 
 interface InitMsg { type: 'init'; base: string; baseLabel: string; current: string; }
 
@@ -21,20 +17,19 @@ let rightEditor: Editor | null = null;
 let lastInit: InitMsg | null = null;
 let alignWired = false;
 
-// Split markdown into normalized top-level block strings using an editor's own
-// parser+serializer, so base and current compare identically (c55).
-function blocksOf(editor: Editor, markdown: string): string[] {
-  const body = splitFrontmatter(markdown).body;
-  const pre = preprocessMarkdownBoards(preprocessMarkdownCallouts(body));
-  try {
-    const doc = editor.storage.markdown.parser.parse(pre) as PMNode;
-    const out: string[] = [];
-    doc.forEach((node) => {
-      try { out.push((editor.storage.markdown.serializer.serialize(node) as string).trim()); }
-      catch { out.push(node.textContent.trim()); }
-    });
-    return out;
-  } catch { return []; }
+// Serialize each top-level block of an editor's ALREADY-PARSED document back to
+// markdown via its own serializer. Both diff panes are built by createDiffEditor
+// from the same extension set, so base and current normalize identically (c55).
+// (We use the live doc rather than re-parsing the markdown string: tiptap-markdown's
+// parser.parse() returns an HTML string, not a ProseMirror node — re-parsing here
+// silently produced zero blocks, so nothing was tinted/aligned.)
+function blocksOf(editor: Editor): string[] {
+  const out: string[] = [];
+  editor.state.doc.forEach((node) => {
+    try { out.push((editor.storage.markdown.serializer.serialize(node) as string).trim()); }
+    catch { out.push(node.textContent.trim()); }
+  });
+  return out;
 }
 
 // Map a top-level block index → its DOM element in a rendered pane. ProseMirror
@@ -57,46 +52,33 @@ function filler(height: number): HTMLElement {
   return f;
 }
 
-function nextRightEl(rows: AlignRow[], row: AlignRow, rightEls: HTMLElement[]): HTMLElement | null {
-  const idx = rows.indexOf(row);
-  for (let i = idx + 1; i < rows.length; i++) if (rows[i].right !== null) return rightEls[rows[i].right!] ?? null;
-  return null;
-}
-
-function nextLeftEl(rows: AlignRow[], row: AlignRow, leftEls: HTMLElement[]): HTMLElement | null {
-  const idx = rows.indexOf(row);
-  for (let i = idx + 1; i < rows.length; i++) if (rows[i].left !== null) return leftEls[rows[i].left!] ?? null;
-  return null;
-}
-
 function alignPanes(): void {
   if (!leftEditor || !rightEditor || !lastInit) return;
   clearFillers();
-  const baseBlocks = blocksOf(leftEditor, lastInit.base);
-  const curBlocks = blocksOf(rightEditor, lastInit.current);
-  const rows = computeAlignment(baseBlocks, curBlocks);
+  const rows = computeAlignment(blocksOf(leftEditor), blocksOf(rightEditor));
   const leftEls = blockElements(leftEditor).filter((el) => !el.classList.contains('diff-filler'));
   const rightEls = blockElements(rightEditor).filter((el) => !el.classList.contains('diff-filler'));
+  const pairs = rows.filter((r) => r.left !== null && r.right !== null);
 
-  for (const row of rows) {
-    const lEl = row.left !== null ? leftEls[row.left] : null;
-    const rEl = row.right !== null ? rightEls[row.right] : null;
-    if (lEl && rEl) {
-      // paired (eq or change): pad the shorter so tops line up
-      const lh = lEl.offsetHeight, rh = rEl.offsetHeight;
-      if (lh < rh) lEl.parentElement!.insertBefore(filler(rh - lh), lEl);
-      else if (rh < lh) rEl.parentElement!.insertBefore(filler(lh - rh), rEl);
-    } else if (lEl && !rEl) {
-      // base-only (del): full-height filler on the right at the same flow point.
-      const next = nextRightEl(rows, row, rightEls);
-      const f = filler(lEl.offsetHeight);
-      if (next) next.parentElement!.insertBefore(f, next); else rightEditor!.view.dom.appendChild(f);
-    } else if (rEl && !lEl) {
-      // current-only (add): full-height filler on the left at the same flow point.
-      const next = nextLeftEl(rows, row, leftEls);
-      const f = filler(rEl.offsetHeight);
-      if (next) next.parentElement!.insertBefore(f, next); else leftEditor!.view.dom.appendChild(f);
+  // Align by measured TOPS, not heights: for each paired (eq/change) block, push
+  // whichever side sits higher down by the exact pixel gap so the pair's tops
+  // match. Measuring live accounts for margins/margin-collapse a height-delta
+  // approach can't. A filler inserted between two blocks breaks their collapsed
+  // margin, so one pass slightly overshoots; we iterate, correcting the residual
+  // each pass (it shrinks to 0 within a couple of passes). del/add rows need no
+  // explicit filler — the next paired row re-aligns, opening a gap opposite them.
+  for (let pass = 0; pass < 4; pass++) {
+    let maxResidual = 0;
+    for (const row of pairs) {
+      const lEl = leftEls[row.left!];
+      const rEl = rightEls[row.right!];
+      if (!lEl || !rEl) continue;
+      const d = Math.round(rEl.getBoundingClientRect().top - lEl.getBoundingClientRect().top);
+      if (Math.abs(d) > Math.abs(maxResidual)) maxResidual = d;
+      if (d > 0) lEl.parentElement!.insertBefore(filler(d), lEl);
+      else if (d < 0) rEl.parentElement!.insertBefore(filler(-d), rEl);
     }
+    if (Math.abs(maxResidual) <= 1) break; // converged
   }
   buildRail();
 }
@@ -105,8 +87,8 @@ function buildRail(): void {
   const rail = document.getElementById('diff-rail')!;
   rail.replaceChildren();
   if (!lastInit || !leftEditor || !rightEditor) return;
-  const baseBlocks = blocksOf(leftEditor, lastInit.base);
-  const curBlocks = blocksOf(rightEditor, lastInit.current);
+  const baseBlocks = blocksOf(leftEditor);
+  const curBlocks = blocksOf(rightEditor);
   const rows = computeAlignment(baseBlocks, curBlocks);
   const leftEls = blockElements(leftEditor).filter((el) => !el.classList.contains('diff-filler'));
   const rightEls = blockElements(rightEditor).filter((el) => !el.classList.contains('diff-filler'));
@@ -132,8 +114,8 @@ function buildRail(): void {
 
 function applyTint(): void {
   if (!leftEditor || !rightEditor) return;
-  const baseBlocks = blocksOf(leftEditor, lastInit!.base);
-  const curBlocks = blocksOf(rightEditor, lastInit!.current);
+  const baseBlocks = blocksOf(leftEditor);
+  const curBlocks = blocksOf(rightEditor);
   const rows = computeAlignment(baseBlocks, curBlocks);
   const leftEls = blockElements(leftEditor);
   const rightEls = blockElements(rightEditor);
