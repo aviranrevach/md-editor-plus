@@ -62,7 +62,6 @@
 | Diff map: paint the structure-map rail with red/green change markers vs the last commit (like VS Code's minimap diff overview), click a change to jump to it | Done | c55 | Medium | Structure map / Diff |  |
 | Clicking the diff toggle marks the file as "modified" (unclear what actually changed). Happens only when clicking it in the RIGHT pane — clicking in the left pane does NOT make the file modified. | Review | c56 | High | Diff |  |
 | Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Todo | c57 | High | Diff |  |
-| Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Todo | c57 | High | Diff |  |
 
 <!-- board:body id="c8" -->
 
