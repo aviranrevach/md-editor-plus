@@ -1,4 +1,4 @@
-import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption, isStatusNameAvailable } from '../../src/webview/boardModel';
+import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption, isStatusNameAvailable, reorderStatusOption } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 
 describe('10-color palette', () => {
@@ -138,5 +138,39 @@ describe('field-options round-trip', () => {
     const plain = `<!-- board:start id="b1" columns="Todo" column-colors="blue" field-types="Title=text,Status=status" -->\n\n| Title | Status |\n|---|---|\n\n<!-- board:end -->`;
     const out = serializeBoard(parseBoardSource(plain));
     expect(out).not.toContain('field-options');
+  });
+});
+
+describe('reorderStatusOption', () => {
+  it('moves a Status option and rewrites board.columns (drives kanban order)', () => {
+    const next = reorderStatusOption(makeBoard(), 'Status', 1, 0); // Done before Todo
+    expect(next.columns.map(c => c.name)).toEqual(['Done', 'Todo']);
+  });
+
+  it('moves an option on an additional status field', () => {
+    const b = makeBoard();
+    b.fields.find(f => f.name === 'Impact')!.options =
+      [{ name: 'Low', color: 'gray' }, { name: 'High', color: 'red' }, { name: 'Mid', color: 'blue' }];
+    const next = reorderStatusOption(b, 'Impact', 2, 0); // Mid to front
+    expect(next.fields.find(f => f.name === 'Impact')!.options!.map(o => o.name))
+      .toEqual(['Mid', 'Low', 'High']);
+  });
+
+  it('returns the board unchanged for a no-op or out-of-range move', () => {
+    const b = makeBoard();
+    expect(reorderStatusOption(b, 'Status', 0, 0)).toBe(b);
+    expect(reorderStatusOption(b, 'Status', 5, 0)).toBe(b);
+  });
+
+  it('reordered options survive a serialize -> parse round-trip', () => {
+    const src = [
+      `<!-- board:start id="b1" columns="Todo|Done" column-colors="blue|emerald" field-types="Title=text,Status=status,Impact=status" field-options="Impact=Low:gray|High:red" -->`,
+      ``, `| Title | Status | Impact |`, `|---|---|---|`, `| A | Todo | Low |`, ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const b = reorderStatusOption(parseBoardSource(src), 'Impact', 1, 0); // High, Low
+    const round = parseBoardSource(serializeBoard(b));
+    expect(round.fields.find(f => f.name === 'Impact')!.options!.map(o => o.name))
+      .toEqual(['High', 'Low']);
   });
 });

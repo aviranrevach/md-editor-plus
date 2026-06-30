@@ -125,6 +125,19 @@ export function recolorStatusOption(
   return setStatusOptions(board, fieldName, opts);
 }
 
+/** Move the status option at index `from` to index `to`. Pure array reorder. */
+export function reorderStatusOption(
+  board: Board, fieldName: string, from: number, to: number,
+): Board {
+  const opts = [...getStatusOptions(board, fieldName)];
+  if (from < 0 || from >= opts.length || to < 0 || to >= opts.length || from === to) {
+    return board;
+  }
+  const [moved] = opts.splice(from, 1);
+  opts.splice(to, 0, moved);
+  return setStatusOptions(board, fieldName, opts);
+}
+
 // ---------------------------------------------------------------------------
 // Tag-list helpers
 // A "tags" field stores its option palette in field.options (same as status),
