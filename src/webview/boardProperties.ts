@@ -635,12 +635,21 @@ export function promptNewField(
       onAdd: () => {
         const used = working.map((o) => o.color);
         const color = COLOR_TOKENS_PUBLIC.find((c) => !used.includes(c)) ?? 'gray';
-        working.push({ name: 'New', color });
+        const norm = (s: string) => s.trim().toLowerCase();
+        let label = 'New';
+        let counter = 2;
+        while (working.some((w) => norm(w.name) === norm(label))) { label = `New ${counter}`; counter++; }
+        working.push({ name: label, color });
         rerender();
       },
-      onRename: (o, n) => { const t2 = working.find((w) => w.name === o); if (t2) t2.name = n; rerender(); },
+      onRename: (o, n) => {
+        const norm = (s: string) => s.trim().toLowerCase();
+        if (working.some((w) => w.name !== o && norm(w.name) === norm(n))) return false;
+        const t2 = working.find((w) => w.name === o); if (t2) t2.name = n; rerender(); return true;
+      },
       onRecolor: (n, c) => { const t2 = working.find((w) => w.name === n); if (t2) t2.color = c; rerender(); },
       onDelete: (n) => { const i = working.findIndex((w) => w.name === n); if (i >= 0) working.splice(i, 1); rerender(); },
+      onReorder: (from, to) => { const [m] = working.splice(from, 1); working.splice(to, 0, m); rerender(); },
     });
     rerender();
 
