@@ -1,6 +1,6 @@
 import {
   COLOR_TOKENS_PUBLIC as PALETTE,
-  getStatusOptions,
+  getStatusOptions, isStatusNameAvailable,
   addStatusOption, renameStatusOption, recolorStatusOption, deleteStatusOption,
   addTagOption, renameTagOption, deleteTagOption,
 } from './boardModel';
@@ -11,7 +11,7 @@ import type { Popover } from './popover';
 export interface OptionsEditorConfig {
   getOptions: () => ColumnDef[];
   onAdd: () => void;
-  onRename: (oldName: string, newName: string) => void;
+  onRename: (oldName: string, newName: string) => boolean;
   onRecolor: (name: string, color: ColorToken) => void;
   onDelete: (name: string) => void;
 }
@@ -55,8 +55,16 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig, 
     name.value = opt.name;
     const commit = () => {
       const v = name.value.trim();
-      if (v && v !== opt.name) cfg.onRename(opt.name, v);
+      if (!v || v === opt.name) return;
+      const applied = cfg.onRename(opt.name, v);
+      if (!applied) {
+        name.value = opt.name;
+        name.classList.remove('bd-opt-name--reject');
+        void name.offsetWidth;                  // restart the CSS animation
+        name.classList.add('bd-opt-name--reject');
+      }
     };
+    name.addEventListener('animationend', () => name.classList.remove('bd-opt-name--reject'));
     name.addEventListener('blur', commit);
     name.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); name.blur(); }
@@ -130,7 +138,13 @@ export function openStatusOptionsEditor(
       onChange(isTags() ? addTagOption(getBoard(), fieldName, label) : addStatusOption(getBoard(), fieldName, label));
       rerender();
     },
-    onRename:  (o, n) => { onChange(isTags() ? renameTagOption(getBoard(), fieldName, o, n) : renameStatusOption(getBoard(), fieldName, o, n)); rerender(); },
+    onRename: (o, n) => {
+      if (isTags()) { onChange(renameTagOption(getBoard(), fieldName, o, n)); rerender(); return true; }
+      if (!isStatusNameAvailable(getBoard(), fieldName, n, o)) return false;
+      onChange(renameStatusOption(getBoard(), fieldName, o, n));
+      rerender();
+      return true;
+    },
     onRecolor: (n, c) => { onChange(recolorStatusOption(getBoard(), fieldName, n, c)); rerender(); },
     onDelete:  (n) => { onChange(isTags() ? deleteTagOption(getBoard(), fieldName, n) : deleteStatusOption(getBoard(), fieldName, n)); rerender(); },
   }, popover);

@@ -638,7 +638,7 @@ export function promptNewField(
         working.push({ name: 'New', color });
         rerender();
       },
-      onRename: (o, n) => { const t2 = working.find((w) => w.name === o); if (t2) t2.name = n; rerender(); },
+      onRename: (o, n) => { const t2 = working.find((w) => w.name === o); if (t2) t2.name = n; rerender(); return true; },
       onRecolor: (n, c) => { const t2 = working.find((w) => w.name === n); if (t2) t2.color = c; rerender(); },
       onDelete: (n) => { const i = working.findIndex((w) => w.name === n); if (i >= 0) working.splice(i, 1); rerender(); },
     });

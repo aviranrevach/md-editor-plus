@@ -79,6 +79,22 @@ describe('buildOptionsEditor — rename', () => {
     expect(calls).toEqual([]);
   });
 
+  it('reverts the input and flashes when onRename returns false (rejected)', () => {
+    const host = render(opts(), { onRename: () => false });
+    const input = host.querySelectorAll('.bd-opt-name')[0] as HTMLInputElement;
+    input.focus(); input.value = 'High'; input.dispatchEvent(new Event('blur'));
+    expect(input.value).toBe('Low');                       // reverted to original
+    expect(input.classList.contains('bd-opt-name--reject')).toBe(true);
+  });
+
+  it('keeps the typed value when onRename returns true (accepted)', () => {
+    const host = render(opts(), { onRename: () => true });
+    const input = host.querySelectorAll('.bd-opt-name')[0] as HTMLInputElement;
+    input.focus(); input.value = 'Minor'; input.dispatchEvent(new Event('blur'));
+    expect(input.value).toBe('Minor');
+    expect(input.classList.contains('bd-opt-name--reject')).toBe(false);
+  });
+
   it("typing a new name then clicking another row's delete flushes the rename first (no loss)", () => {
     const renamed: any[] = []; const deleted: string[] = [];
     const host = render(opts(), {
