@@ -27,15 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.1] - 2026-06-20
 
-### Fixed
-
-- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly across the board: **table cells**, the **Description** column, and **kanban cards** (title, body preview, and field chips). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
-
 ### Added
 
 - **Per-column Filter shortcut + tidier column menu (c39)** — a board column's **⋯ menu** now leads with **Filter** (on status / tag columns), which opens a small **mini-filter** for just that column: the field's value chips, a **Clear** that resets only that field, and an **All filters…** link down to the full filter panel. Toggling a chip hides cards live and keeps the toolbar filter's count badge in sync — it edits the same session filter. The menu was also reorganized so the "shape what you see" actions sit together up top — **Filter · Group by this · Sort** (the three sort options now tuck into a single **Sort ▸** flyout) — with **Rename · Edit options · Reset column width · Hide column** below a divider. (c39)
 - **Row & column handles + cell selection for regular tables (c46)** — plain markdown tables now have Notion-style edge handles. **Hover a cell** → a thin stroke marks its **row** (left edge) and **column** (top edge); drift toward an edge (a forgiving zone — no precision needed) and a **⠿ grip emerges**. **Click** the grip to select the whole row/column and open its menu — rows: **Insert row above / below**, **Duplicate row**, **Delete row**; columns: **Insert column left / right**, **Duplicate column**, **Delete column** — or **drag** a stroke to reorder. Hovering a row highlights just that **row** (not the whole table). Tables also gained a real **selection state** drawn as a **blue outline box** on the edges (like the board, never a fill): the cell you click, a selected row/column, or a **drag across cells / shift-click** range. The header row stays first (its menu only offers **Insert row below**; it can't be dragged or deleted), and a table always keeps at least one column. Handles only show when the document is editable and never appear on board tables (which have their own). The margin block handle still moves the whole table. (c46)
 - **Click below the page to add a block (c51)** — clicking the empty space beneath the last block now lands your cursor in a new paragraph, so you can always keep typing at the bottom of a doc. Previously this was a no-op whenever the document ended in a block with no place for the caret (a board, code block, image, or table). **Hovering** that area first previews a faint "Start writing, or press / for commands" hint so it reads as clickable before you click. If the doc already ends in an empty paragraph, the click just focuses it instead of stacking another. In **read-only** docs nothing is shown and nothing is added — and the empty-state hint no longer appears there either, since you can't write. (c51)
+
+### Fixed
+
+- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly across the board: **table cells**, the **Description** column, and **kanban cards** (title, body preview, and field chips). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
 
 ## [0.7.0] - 2026-06-20
 
@@ -76,7 +76,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Image controls** — click any image in the document body to reveal a small menu styled like the text bubble menu (one row of actions, one row of sizes): drag the **resize grips** on the image's left/right edges (or pick S / M / L / Full) to resize, **Replace** to swap it via the drill-down picker (upload / browse / clipboard), **Compress** to re-encode it locally (canvas pass, no server round-trip; never writes a larger file — its tooltip shows the current file size and, after compressing, the saving, e.g. `1.2 MB → 410 KB`), **Reveal in Finder** to open the containing folder, and **Remove** to delete the node. Resized images are stored as a standard HTML `<img src="…" width="…">` so they render at the right size everywhere the file is read (GitHub, Obsidian, VS Code preview, other editors); images that have never been resized continue to round-trip as plain `![](src)` Markdown. The board image manager (table and kanban image cells) also gained per-thumbnail **Compress** and **Reveal in Finder** actions. (Image bytes are read through the extension, since the webview's content-security policy blocks `fetch()` of local files.)
-
 - **Smart typography everywhere you type** — type `->` / `<-` and they turn into `→` / `←` as you go (plus `<->` → `↔`, `=>` → `⇒`, `--` → `—`, `...` → `…`, and `(c)` / `(r)` / `(tm)` → `©` / `®` / `™`), Notion-style. Previously this only fired in the rich-text body; it now also works in **board table cells, the Title column, card titles, the "new card" input, and column/field rename**. Code spans and code blocks are left untouched, and the whole thing honours the Visual-settings toggle. Arrows in board cells also render in the correct text font now (they were falling through to a heavier symbol-font fallback, so a `→` in a table looked like a mismatched icon next to one in the body).
 - **Add image — four ways in** — the **Image** block now drills down inside the block picker (like Callout) instead of doing nothing: **Upload from computer** (copied into a per-note `<note>.assets/` folder next to your file), **Browse project** (native file picker showing real folders, referenced in place — no duplicate copy), **Embed link** (an in-window field for a URL or project path), and **Embed from clipboard** (use the image link already on your clipboard). Uploaded files get a clean relative link (`![](./Note.assets/photo.png)`), so your Markdown stays portable and the image survives closing and reopening the file. Filenames are kept readable, with a `-2` suffix only when there's a name clash. _(Known issue: "Embed link" isn't inserting reliably in the editor yet — tracked in the backlog.)_
 - **Paste images into the body** — paste an image from the clipboard (⌘V / Ctrl+V) anywhere in the document and it's saved into the per-note `<note>.assets/` folder and inserted inline, named `pasted-YYYY-MM-DD.<ext>`. _(Dragging an image file in from Finder is a known limitation: VS Code's workbench opens the dropped file in a tab before the editor can catch it — use paste, or the Image block's Upload, for now.)_
@@ -119,7 +118,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Broader trigger wording for the generated blocks skill** — the `SKILL.md` description now lists the synonyms people actually type (project/task/sprint board, database view, flowchart/graph, the specific callout names, expandable/collapsible) so the user's AI recognizes a match more reliably, while staying anchored to "MD Editor Plus" + Markdown files so the app-specific board format never hijacks generic markdown.
-
 - **Find in page (⌘F / Ctrl+F)** — a Notion-style find bar for the editor. VS Code's native find can't reach inside a custom-editor webview, so this is a built-in search over the document. Highlights every match with a live `3 / 12` count, <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> (or ↑ ↓) navigates, <kbd>Esc</kbd> closes. Also reachable from the `⋯` menu as **Find in page**.
   - **Searches the document model, not the DOM**, via a ProseMirror decoration plugin — so it finds text inside a *collapsed* toggle, then auto-expands the toggle and scrolls the match into view. Decorations never touch content, so highlighting can't dirty the file.
   - **Works in both views** — Preview and Code. Switching views while the bar is open moves the search to the now-active editor.
@@ -133,10 +131,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.2] - 2026-06-02
 
-### Fixed
-
-- **Critical: board card data lost on file reopen** — boards in markdown files round-tripped through the editor were silently losing every card on the second open. Root cause: `preprocessMarkdownBoards` wrapped the board region in `<div data-board source="...">` without escaping newlines inside the attribute. markdown-it (used by tiptap-markdown) saw the multi-line attribute, terminated the HTML block at the blank line inside it, parsed the markdown table as a sibling, and the browser then dropped the entire malformed `<div>` from the DOM. With no `<div data-board>` in the DOM, TipTap had nothing to attach the source to, the board rendered empty, and the next autosave overwrote the file with the empty state. Fixed by escaping `\n` → `&#10;` in `htmlEscape` so the source attribute is single-line — markdown-it now sees a complete `<div>` and the browser parses it cleanly. `getAttribute('source')` decodes `&#10;` back to `\n`, so `parseBoardSource` sees the same string it always did.
-
 ### Added
 
 - **Turn selection into… (using AI)** — select a run of blocks and the ✨ AI button in the bubble menu (or the **Using AI** group in *Turn into*) builds a ready-to-paste prompt for a **file-aware AI** (Claude Code, Cursor, the VS Code AI). The prompt carries the file path, the selection's location (line + text anchors), and the app's *exact* block grammar so the AI's output round-trips into a real board/table/diagram. **No network, no API keys — the prompt travels through the clipboard, nothing else.**
@@ -146,9 +140,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hardened against agents that reply "done" without acting — the prompt asks them to either edit the file or output the block, never just acknowledge.
   - A small panel previews the exact prompt (read-only) with a 3-step "what to do next", and copies it to the clipboard.
 - **Delete blocks** — remove any block from the **⠿ dragger menu** ("Delete"), a board from its **⋯ menu** ("Delete board"), a Mermaid diagram from its **⋯ menu** ("Delete"), or select a board and press **Delete / Backspace** (click the board's chrome to select it; it shows a selected outline).
-
 - **Create blocks skill** — a ⋯-menu action ("Create blocks skill…") that generates a reusable **Claude Skill** (`SKILL.md`) documenting the exact grammar for this app's blocks (Kanban/Table boards, Mermaid, Callouts, Toggles). Tick which blocks to include, then **Install in project** (`.claude/skills/`), **Install globally** (`~/.claude/skills/`), or **Download**. The grammar is shared with the ✨ AI prompts via a single source of truth, and the board examples are proven to round-trip through the parser. No network — local file write only.
 - **End-to-end pipeline regression test** ([tests/board/pipeline.test.ts](tests/board/pipeline.test.ts)) — runs the full chain `preprocess → markdown-it → DOMParser → parseBoardSource` and asserts every card survives. Covers single board, multi-word column names ("Up Next", "In Progress"), two boards in one file, and boards with `board:body` blocks attached. Locks the fix in.
+
+### Fixed
+
+- **Critical: board card data lost on file reopen** — boards in markdown files round-tripped through the editor were silently losing every card on the second open. Root cause: `preprocessMarkdownBoards` wrapped the board region in `<div data-board source="...">` without escaping newlines inside the attribute. markdown-it (used by tiptap-markdown) saw the multi-line attribute, terminated the HTML block at the blank line inside it, parsed the markdown table as a sibling, and the browser then dropped the entire malformed `<div>` from the DOM. With no `<div data-board>` in the DOM, TipTap had nothing to attach the source to, the board rendered empty, and the next autosave overwrote the file with the empty state. Fixed by escaping `\n` → `&#10;` in `htmlEscape` so the source attribute is single-line — markdown-it now sees a complete `<div>` and the browser parses it cleanly. `getAttribute('source')` decodes `&#10;` back to `\n`, so `parseBoardSource` sees the same string it always did.
 
 ### Developer
 
@@ -259,3 +256,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Settings (`mdEditorPlus.*`)
 - `theme`, `font`, `textSize`, `pageWidth`, `fullWidth`
 - `alwaysDarkCode`, `alwaysDarkSource`, `sourceFullWidth`, `shortenCodeSnippets`
+
+[Unreleased]: https://github.com/aviranrevach/md-editor-plus/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.5...v0.6.0
+[0.5.5]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.2.0...v0.5.0
+[0.2.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/aviranrevach/md-editor-plus/releases/tag/v0.1.0
