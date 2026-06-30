@@ -98,6 +98,34 @@ function alignPanes(): void {
       if (next) next.parentElement!.insertBefore(f, next); else leftEditor!.view.dom.appendChild(f);
     }
   }
+  buildRail();
+}
+
+function buildRail(): void {
+  const rail = document.getElementById('diff-rail')!;
+  rail.replaceChildren();
+  if (!lastInit || !leftEditor || !rightEditor) return;
+  const baseBlocks = blocksOf(leftEditor, lastInit.base);
+  const curBlocks = blocksOf(rightEditor, lastInit.current);
+  const rows = computeAlignment(baseBlocks, curBlocks);
+  const leftEls = blockElements(leftEditor).filter((el) => !el.classList.contains('diff-filler'));
+  const rightEls = blockElements(rightEditor).filter((el) => !el.classList.contains('diff-filler'));
+  const docH = Math.max(document.documentElement.scrollHeight, window.innerHeight);
+
+  let painted = 0;
+  for (const row of rows) {
+    if (row.kind === 'eq') continue;
+    if (painted >= 200) break; // reuse the c55 ceiling
+    const anchor = row.right !== null ? rightEls[row.right] : (row.left !== null ? leftEls[row.left] : null);
+    if (!anchor) continue;
+    const top = anchor.getBoundingClientRect().top + window.scrollY;
+    const mark = document.createElement('div');
+    mark.className = `diff-mark ${row.kind}`;
+    mark.style.top = `${(top / docH) * 100}%`;
+    mark.dataset.top = String(top);
+    rail.appendChild(mark);
+    painted++;
+  }
 }
 
 // --------------------------
@@ -166,6 +194,13 @@ function mount(msg: InitMsg): void {
 window.addEventListener('message', (e: MessageEvent) => {
   const msg = e.data as InitMsg;
   if (msg?.type === 'init') mount(msg);
+});
+
+// Rail click handler — attached once at module init (not per alignPanes pass).
+document.getElementById('diff-rail')?.addEventListener('click', (e) => {
+  const mark = (e.target as HTMLElement).closest<HTMLElement>('.diff-mark');
+  if (!mark?.dataset.top) return;
+  window.scrollTo({ top: Math.max(0, Number(mark.dataset.top) - 80), behavior: 'smooth' });
 });
 
 injectStyles();
