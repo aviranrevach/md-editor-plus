@@ -41,6 +41,45 @@ export { setMediaBaseUri };
 
 const lowlight = createLowlight(common);
 
+// Returns the shared extension set. `suppressEmptyPlaceholder` drops the
+// generic empty hint (used by the board card panel, c50). The diff panes
+// also suppress it — an empty base side should look empty, not prompt.
+function editorExtensions(options?: { suppressEmptyPlaceholder?: boolean }) {
+  return [
+    StarterKit.configure({
+      codeBlock: false,
+      dropcursor: { color: '#2383e2', width: 3 },
+    }),
+    MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    TableWithRail.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    ResolvedImage,
+    Link.configure({ openOnClick: false }),
+    Underline,
+    TextStyle,
+    Color,
+    Highlight.configure({ multicolor: true }),
+    Markdown.configure({ transformCopiedText: true }),
+    Callout,
+    Board,
+    Toggle,
+    BlockDirection,
+    BlockOutline,
+    SmartTypography,
+    SearchExtension,
+    ImagePasteDrop,
+    ClickBelowContent,
+    GlobalDragHandle.configure({ dragHandleWidth: 48 }),
+    // The board card panel supplies its own "Add a description…" placeholder,
+    // so suppress this generic hint there to avoid two overlapping placeholders (c50).
+    ...(options?.suppressEmptyPlaceholder ? [] : [EmptyPlaceholder]),
+  ];
+}
+
 let _editor: Editor | null = null;
 let _editDebounce: FlushableDebounce | null = null;
 let _frontmatter = '';
@@ -133,39 +172,7 @@ function buildRichEditor(
   let debounce: FlushableDebounce | null = null;
   const editor = new Editor({
     element,
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false,
-        dropcursor: { color: '#2383e2', width: 3 },
-      }),
-      MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      TableWithRail.configure({ resizable: false }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      ResolvedImage,
-      Link.configure({ openOnClick: false }),
-      Underline,
-      TextStyle,
-      Color,
-      Highlight.configure({ multicolor: true }),
-      Markdown.configure({ transformCopiedText: true }),
-      Callout,
-      Board,
-      Toggle,
-      BlockDirection,
-      BlockOutline,
-      SmartTypography,
-      SearchExtension,
-      ImagePasteDrop,
-      ClickBelowContent,
-      GlobalDragHandle.configure({ dragHandleWidth: 48 }),
-      // The board card panel supplies its own "Add a description…" placeholder,
-      // so suppress this generic hint there to avoid two overlapping placeholders (c50).
-      ...(options?.suppressEmptyPlaceholder ? [] : [EmptyPlaceholder]),
-    ],
+    extensions: editorExtensions(options),
     editorProps: {
       attributes: { spellcheck: 'true' },
     },
@@ -396,4 +403,24 @@ export function getEditor(): Editor | null {
 
 export function getSourceEditor(): Editor | null {
   return _sourceEditor;
+}
+
+// Build a standalone, read-only editor for ONE diff pane. Does NOT touch the
+// module singletons (_editor/_editDebounce/_frontmatter) — the diff renders two
+// of these and must not hijack the main editor's state. Read-only sidesteps the
+// whole save/dirty family (c56, c28, c37); the diff never writes.
+export function createDiffEditor(element: HTMLElement, markdown: string): Editor {
+  const split = splitFrontmatter(markdown);
+  let body: string;
+  try {
+    body = preprocessMarkdownBoards(preprocessMarkdownCallouts(split.body));
+  } catch {
+    body = split.body;
+  }
+  return new Editor({
+    element,
+    editable: false,
+    extensions: editorExtensions({ suppressEmptyPlaceholder: true }),
+    content: body,
+  });
 }
