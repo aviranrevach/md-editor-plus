@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Toggles stay intact across saves** — a collapsible toggle no longer duplicates its title text (`ToggleToggleToggle…`) or doubles a following horizontal rule (`---`) every time the file is saved. The toggle's summary is now kept out of its body when parsed, and a blank line is emitted after the block so a trailing `---` isn't absorbed into it.
+
 ## [0.8.0] - 2026-06-25
 
 ### Added

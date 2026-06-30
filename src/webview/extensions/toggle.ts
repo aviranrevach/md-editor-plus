@@ -30,7 +30,21 @@ const Toggle = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'details' }];
+    return [
+      {
+        tag: 'details',
+        // The <summary> is captured as the `summary` attribute, so exclude it
+        // from the parsed body. Without this, ProseMirror folds the summary
+        // text into the toggle's content and it re-accumulates on every save
+        // (the "ToggleToggleToggle…" corruption). Clone so the attribute
+        // parser above still sees the original <summary>.
+        contentElement: (dom) => {
+          const clone = (dom as HTMLElement).cloneNode(true) as HTMLElement;
+          clone.querySelector(':scope > summary')?.remove();
+          return clone;
+        },
+      },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {
@@ -59,11 +73,12 @@ const Toggle = Node.create({
       return {
         dom,
         contentDOM: content,
-        ignoreMutation(mutation: MutationRecord) {
-          if (mutation.type === 'attributes' && mutation.attributeName === 'open') {
+        ignoreMutation(mutation) {
+          const mut = mutation as { type: string; attributeName?: string; target: unknown };
+          if (mut.type === 'attributes' && mut.attributeName === 'open') {
             return true;
           }
-          if (summary.contains(mutation.target as Node)) return true;
+          if (summary.contains(mut.target as globalThis.Node)) return true;
           return false;
         },
         update(updatedNode) {
@@ -83,6 +98,10 @@ const Toggle = Node.create({
           const content = node.textContent as string;
           state.write(toggleToMarkdown(node.attrs.summary, content));
           state.ensureNewLine();
+          // Emit a blank line after the block (same as callout). Without it,
+          // markdown-it glues a following `---` into the toggle's HTML block,
+          // where it gets backslash-escaped and doubles on every save.
+          state.write('\n');
         },
       },
     };
