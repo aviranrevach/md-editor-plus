@@ -93,6 +93,10 @@ export function placeFloating(el: HTMLElement, anchor: HTMLElement, opts: PlaceO
   }
 
   function reposition(): void {
+    // Anchor detached from the DOM (e.g. its host re-rendered while this
+    // floating element is open): its rect collapses to {0,0,0,0}, which would
+    // fling the element to the top-left corner. Keep the current position.
+    if (!anchor.isConnected) return;
     const a = anchor.getBoundingClientRect();
     const natH = naturalHeight();
     lastNaturalH = natH;
