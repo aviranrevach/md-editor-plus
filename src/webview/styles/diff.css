@@ -1,0 +1,12 @@
+#diff-panes { display: flex; gap: 8px; align-items: flex-start; }
+.diff-pane { flex: 1 1 0; min-width: 0; }
+.diff-pane-hd {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted, #8a93a0); padding: 4px 10px;
+  position: sticky; top: 0; background: var(--bg, #fff); z-index: 2;
+}
+.diff-pane-body { padding: 0 12px; }
+
+.diff-block-add    { background: #e9fbef; box-shadow: inset 3px 0 #2da44e; border-radius: 4px; }
+.diff-block-del    { background: #fdeef0; box-shadow: inset 3px 0 #cf222e; border-radius: 4px; }
+.diff-block-change { background: #fff7e6; box-shadow: inset 3px 0 #d4a017; border-radius: 4px; }
