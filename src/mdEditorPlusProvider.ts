@@ -7,7 +7,6 @@ import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from 
 import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 import { ApplyingTracker } from './applyingTracker';
 import { openFullDiff, resolveBaseForDocument } from './diffViewer';
-import { applyEditThenDiff } from './diffPrepare';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -271,10 +270,14 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       }
       if (msg.type === 'openFullDiff') {
         const m = msg as unknown as { baseContent?: string; baseLabel?: string; markdown?: string };
-        await applyEditThenDiff(
-          m.markdown,
-          (md) => this._applyEdit(document, md),
-          () => openFullDiff(document, { baseContent: m.baseContent, baseLabel: m.baseLabel }, openSnapshot),
+        // Pass the webview's live markdown straight into the diff's current side.
+        // Do NOT flush it into the document first — that marked the file "modified"
+        // even when nothing was edited (c56). The diff is a read-only preview; it
+        // never needs to mutate the underlying document.
+        await openFullDiff(
+          document,
+          { baseContent: m.baseContent, baseLabel: m.baseLabel, currentMarkdown: m.markdown },
+          openSnapshot,
         );
         return;
       }

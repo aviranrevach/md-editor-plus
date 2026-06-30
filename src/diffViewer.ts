@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { resolveDiffBase, diffSidePaths, type GitApiLike, type DiffBase } from './diffBase';
+import { resolveDiffBase, resolveCurrentSide, diffSidePaths, type GitApiLike, type DiffBase } from './diffBase';
 
 const SCHEME = 'md-editor-plus-diff';
 // token -> base (left) content. Read-only docs served to vscode.diff's left pane.
@@ -46,7 +46,7 @@ export async function resolveBaseForDocument(
 /** Open VS Code's native diff editor: base (left) vs the live document (right). */
 export async function openFullDiff(
   document: vscode.TextDocument,
-  msg: { baseContent?: string; baseLabel?: string },
+  msg: { baseContent?: string; baseLabel?: string; currentMarkdown?: string },
   snapshot: string,
 ): Promise<void> {
   const explicitBase: DiffBase | undefined =
@@ -63,13 +63,20 @@ export async function openFullDiff(
   });
 
   // Serve BOTH sides from the read-only scheme. The right side is a point-in-time
-  // snapshot of the live document (already flushed by the caller), NOT document.uri
-  // itself — feeding document.uri would let the *.md custom editor claim the pane
-  // and render a webview instead of a text diff (c54).
+  // snapshot of the live content, NOT document.uri itself — feeding document.uri
+  // would let the *.md custom editor claim the pane and render a webview instead
+  // of a text diff (c54).
+  //
+  // Prefer the webview's live markdown (msg.currentMarkdown) over document.getText().
+  // The webview may hold freshly-typed, unsaved edits; using its markdown directly
+  // shows them in the diff WITHOUT writing them back into the document. Writing them
+  // back (the old c54 flush) marked the file "modified" even when nothing changed —
+  // and asymmetrically so across split panes, since each pane serializes its own
+  // model slightly differently (c56).
   const baseToken = String(++seq);
   bases.set(baseToken, base.content);
   const curToken = String(++seq);
-  bases.set(curToken, document.getText());
+  bases.set(curToken, resolveCurrentSide(msg.currentMarkdown, document.getText()));
 
   const fileName = document.uri.path.split('/').pop() ?? 'document.md';
   const { leftPath, rightPath } = diffSidePaths(fileName, base.label);

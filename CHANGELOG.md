@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Toggles stay intact across saves** — a collapsible toggle no longer duplicates its title text (`ToggleToggleToggle…`) or doubles a following horizontal rule (`---`) every time the file is saved. The toggle's summary is now kept out of its body when parsed, and a blank line is emitted after the block so a trailing `---` isn't absorbed into it.
+- **Opening the diff no longer marks the file "modified" (c56)** — clicking **Show Diff** (the ↔ toggle) used to flip a clean file to *modified* without you changing anything — and only from one pane when the file was open in two, since each pane serialized its own model slightly differently. The diff was writing the webview's current text back into the document just to capture unsaved edits. It no longer does: the diff is a read-only preview that takes the webview's live text straight into its "current" side, so unsaved sections still show (the c54 behavior) but your document is never touched. (c56)
 
 ## [0.8.0] - 2026-06-25
 

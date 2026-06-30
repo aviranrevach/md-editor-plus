@@ -1,4 +1,4 @@
-import { resolveDiffBase, diffSidePaths } from '../src/diffBase';
+import { resolveDiffBase, resolveCurrentSide, diffSidePaths } from '../src/diffBase';
 
 const opts = (over: Record<string, unknown> = {}) =>
   ({ fsPath: '/w/TODO.md', uri: {}, gitApi: null, snapshot: 'SNAP', ...over }) as Parameters<typeof resolveDiffBase>[0];
@@ -54,5 +54,20 @@ describe('diffSidePaths', () => {
     const { leftPath, rightPath } = diffSidePaths('a.mdx', 'HEAD (last commit)');
     expect(MD_EXT.test(leftPath)).toBe(false);
     expect(MD_EXT.test(rightPath)).toBe(false);
+  });
+});
+
+describe('resolveCurrentSide (c56)', () => {
+  it('prefers the webview live markdown over the document text', () => {
+    expect(resolveCurrentSide('WEBVIEW EDITS', 'DOC TEXT')).toBe('WEBVIEW EDITS');
+  });
+
+  it('falls back to the document text when the webview supplied nothing', () => {
+    expect(resolveCurrentSide(undefined, 'DOC TEXT')).toBe('DOC TEXT');
+  });
+
+  it('treats an empty webview as a valid current state (?? not ||)', () => {
+    // The user cleared the doc — the empty buffer must win, not fall through.
+    expect(resolveCurrentSide('', 'DOC TEXT')).toBe('');
   });
 });

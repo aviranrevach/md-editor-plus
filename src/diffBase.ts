@@ -28,6 +28,17 @@ export function diffSidePaths(fileName: string, baseLabel: string): { leftPath: 
   };
 }
 
+/**
+ * Right-side ("current") content for the diff. Prefer the webview's live markdown
+ * — it may hold freshly-typed, unsaved edits we want to show — and fall back to the
+ * document text only when the webview supplied nothing. Must use `??`, not `||`: an
+ * empty string is a valid current state (the user cleared the doc) and must win over
+ * the document text rather than falling through to it (c56).
+ */
+export function resolveCurrentSide(currentMarkdown: string | undefined, documentText: string): string {
+  return currentMarkdown ?? documentText;
+}
+
 /** Left-side content for the diff: explicit > git HEAD > open-snapshot. */
 export async function resolveDiffBase(opts: ResolveDiffBaseOptions): Promise<DiffBase> {
   if (opts.explicitBase) return opts.explicitBase;
