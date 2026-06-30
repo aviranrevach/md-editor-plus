@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Rendered two-pane diff (c57)** — the diff view now renders both sides through the
+  editor — formatted text, callouts, boards, images — instead of VS Code's
+  plain-text diff. Changed blocks are tinted, paired blocks align with filler
+  gaps, and a change rail jumps between edits.
+
+### Changed
+
+- The diff (↔) toolbar action now opens the rendered two-pane diff in a panel
+  beside the editor, replacing the native text diff.
+
 ### Fixed
 
 - **Toggles stay intact across saves** — a collapsible toggle no longer duplicates its title text (`ToggleToggleToggle…`) or doubles a following horizontal rule (`---`) every time the file is saved. The toggle's summary is now kept out of its body when parsed, and a blank line is emitted after the block so a trailing `---` isn't absorbed into it.
