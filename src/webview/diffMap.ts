@@ -1,9 +1,7 @@
 import type { Editor } from '@tiptap/core';
 import type { Node as PMNode } from '@tiptap/pm/model';
 import { computeDiffMarks, type BlockSide, type DiffMark } from './diffMapCore';
-import { preprocessMarkdownBoards } from './extensions/board';
-import { preprocessMarkdownCallouts } from './extensions/callout';
-import { splitFrontmatter } from './frontmatter';
+import { createDiffEditor } from './editor';
 
 export interface DiffMap {
   setBase: (markdown: string) => void;
@@ -31,18 +29,27 @@ export function createDiffMap(opts: { editor: Editor; railEl: HTMLElement }): Di
     }
   }
 
-  // Parse base markdown the SAME way the editor loads content, then serialize each
-  // top-level node — so base + current blocks are normalized identically.
+  // Render base markdown through a throwaway read-only editor — the SAME load path
+  // the live editor uses (createDiffEditor does the frontmatter/board/callout
+  // preprocessing + parse) — then serialize each top-level node. So base + current
+  // blocks are normalized identically.
+  //
+  // We deliberately do NOT call `editor.storage.markdown.parser.parse(md).forEach`:
+  // tiptap-markdown's parser.parse() returns an HTML *string*, not a ProseMirror
+  // node, so `.forEach` threw and the old catch silently returned [] — leaving the
+  // base side empty and marking every block as "added".
   function blocksFromMarkdown(markdown: string): string[] {
-    const body = splitFrontmatter(markdown).body;
-    const pre = preprocessMarkdownBoards(preprocessMarkdownCallouts(body));
+    const el = document.createElement('div');
+    const tmp = createDiffEditor(el, markdown);
     try {
-      const doc = editor.storage.markdown.parser.parse(pre) as PMNode;
       const out: string[] = [];
-      doc.forEach((node) => { out.push(serializeNode(node)); });
+      tmp.state.doc.forEach((node) => {
+        try { out.push((tmp.storage.markdown.serializer.serialize(node) as string).trim()); }
+        catch { out.push(node.textContent.trim()); }
+      });
       return out;
-    } catch {
-      return [];
+    } finally {
+      tmp.destroy();
     }
   }
 
