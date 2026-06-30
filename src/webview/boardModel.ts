@@ -62,10 +62,23 @@ export function setStatusOptions(board: Board, fieldName: string, options: Colum
   };
 }
 
+/** True if `name` (trimmed, case-insensitive) is free to use on a status field,
+ *  ignoring the option named `exclude` (the one being renamed). */
+export function isStatusNameAvailable(
+  board: Board, fieldName: string, name: string, exclude?: string,
+): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const target = norm(name);
+  return !getStatusOptions(board, fieldName).some(
+    (o) => o.name !== exclude && norm(o.name) === target,
+  );
+}
+
 /** Rename a status option and migrate every card value holding the old name. */
 export function renameStatusOption(
   board: Board, fieldName: string, oldName: string, newName: string,
 ): Board {
+  if (!isStatusNameAvailable(board, fieldName, newName, oldName)) return board;
   const opts = getStatusOptions(board, fieldName).map(
     (o) => (o.name === oldName ? { ...o, name: newName } : o),
   );

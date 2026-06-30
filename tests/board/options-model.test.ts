@@ -1,4 +1,4 @@
-import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption } from '../../src/webview/boardModel';
+import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption, isStatusNameAvailable } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 
 describe('10-color palette', () => {
@@ -77,6 +77,32 @@ describe('status-option mutations migrate card values', () => {
     const opts = next.fields.find(f => f.name === 'Impact')!.options!;
     expect(opts.map(o => o.name)).toEqual(['Low', 'High']);
     expect(opts[1].color).not.toBe(opts[0].color);
+  });
+});
+
+describe('status rename uniqueness guard', () => {
+  it('isStatusNameAvailable is false for an existing name (case/space-insensitive)', () => {
+    const b = makeBoard(); // Status: Todo, Done
+    expect(isStatusNameAvailable(b, 'Status', '  done ')).toBe(false);
+    expect(isStatusNameAvailable(b, 'Status', 'Backlog')).toBe(true);
+  });
+
+  it('isStatusNameAvailable ignores the option being renamed (exclude)', () => {
+    const b = makeBoard();
+    // Renaming "Todo" to "todo" (case fix) is allowed: only itself matches.
+    expect(isStatusNameAvailable(b, 'Status', 'todo', 'Todo')).toBe(true);
+  });
+
+  it('renameStatusOption returns the board UNCHANGED when the new name collides', () => {
+    const b = makeBoard();
+    const next = renameStatusOption(b, 'Status', 'Todo', 'Done'); // Done already exists
+    expect(next).toBe(b); // identical reference — no mutation
+  });
+
+  it('renameStatusOption allows a case-only change of the same option', () => {
+    const next = renameStatusOption(makeBoard(), 'Status', 'Todo', 'todo');
+    expect(next.columns[0]).toEqual({ name: 'todo', color: 'blue' });
+    expect(next.cards[0].values.Status).toBe('todo');
   });
 });
 
