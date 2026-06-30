@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { resolveDiffBase, resolveCurrentSide, diffSidePaths, type GitApiLike, type DiffBase } from './diffBase';
+import { resolveDiffBase, resolveCurrentSide, type GitApiLike, type DiffBase } from './diffBase';
+import { openRenderedDiff } from './diffPaneView';
 
 const SCHEME = 'md-editor-plus-diff';
 // token -> base (left) content. Read-only docs served to vscode.diff's left pane.
@@ -43,8 +44,9 @@ export async function resolveBaseForDocument(
   });
 }
 
-/** Open VS Code's native diff editor: base (left) vs the live document (right). */
+/** Open the rendered two-pane diff: base (left) vs current (right), in the editor (c57). */
 export async function openFullDiff(
+  context: vscode.ExtensionContext,
   document: vscode.TextDocument,
   msg: { baseContent?: string; baseLabel?: string; currentMarkdown?: string },
   snapshot: string,
@@ -61,45 +63,6 @@ export async function openFullDiff(
     gitApi,
     snapshot,
   });
-
-  // Serve BOTH sides from the read-only scheme. The right side is a point-in-time
-  // snapshot of the live content, NOT document.uri itself — feeding document.uri
-  // would let the *.md custom editor claim the pane and render a webview instead
-  // of a text diff (c54).
-  //
-  // Prefer the webview's live markdown (msg.currentMarkdown) over document.getText().
-  // The webview may hold freshly-typed, unsaved edits; using its markdown directly
-  // shows them in the diff WITHOUT writing them back into the document. Writing them
-  // back (the old c54 flush) marked the file "modified" even when nothing changed —
-  // and asymmetrically so across split panes, since each pane serializes its own
-  // model slightly differently (c56).
-  const baseToken = String(++seq);
-  bases.set(baseToken, base.content);
-  const curToken = String(++seq);
-  bases.set(curToken, resolveCurrentSide(msg.currentMarkdown, document.getText()));
-
-  const fileName = document.uri.path.split('/').pop() ?? 'document.md';
-  const { leftPath, rightPath } = diffSidePaths(fileName, base.label);
-  const leftUri = vscode.Uri.from({ scheme: SCHEME, path: leftPath, query: baseToken });
-  const rightUri = vscode.Uri.from({ scheme: SCHEME, path: rightPath, query: curToken });
-
-  // The synthetic paths have no .md extension (so the custom editor skips them),
-  // which also drops markdown syntax highlighting — restore it explicitly.
-  try {
-    const [l, r] = await Promise.all([
-      vscode.workspace.openTextDocument(leftUri),
-      vscode.workspace.openTextDocument(rightUri),
-    ]);
-    await vscode.languages.setTextDocumentLanguage(l, 'markdown');
-    await vscode.languages.setTextDocumentLanguage(r, 'markdown');
-  } catch {
-    // highlighting is best-effort; the diff still works as plain text
-  }
-
-  await vscode.commands.executeCommand(
-    'vscode.diff',
-    leftUri,
-    rightUri,
-    `${fileName} — changes since ${base.label}`,
-  );
+  const current = resolveCurrentSide(msg.currentMarkdown, document.getText());
+  await openRenderedDiff(context, document, base, current);
 }

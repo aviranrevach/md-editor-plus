@@ -73,10 +73,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   // clear suppression for another still mid-apply, leaking an echo update.
   private readonly _applying = new ApplyingTracker();
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _context: vscode.ExtensionContext,
+  ) {}
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    const provider = new MdEditorPlusProvider(context.extensionUri);
+    const provider = new MdEditorPlusProvider(context.extensionUri, context);
     return vscode.window.registerCustomEditorProvider(
       MdEditorPlusProvider.viewType,
       provider,
@@ -275,6 +278,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         // even when nothing was edited (c56). The diff is a read-only preview; it
         // never needs to mutate the underlying document.
         await openFullDiff(
+          this._context,
           document,
           { baseContent: m.baseContent, baseLabel: m.baseLabel, currentMarkdown: m.markdown },
           openSnapshot,
