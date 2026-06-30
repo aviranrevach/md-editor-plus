@@ -3,10 +3,12 @@ import {
   getStatusOptions, isStatusNameAvailable,
   addStatusOption, renameStatusOption, recolorStatusOption, deleteStatusOption,
   addTagOption, renameTagOption, deleteTagOption,
+  reorderStatusOption,
 } from './boardModel';
 import type { Board, ColumnDef, ColorToken } from './boardModel';
 import { createPopover } from './popover';
 import type { Popover } from './popover';
+import { startDrag, dropIndicator, DRAG_THRESHOLD_PX } from './boardDragShared';
 
 export interface OptionsEditorConfig {
   getOptions: () => ColumnDef[];
@@ -14,6 +16,23 @@ export interface OptionsEditorConfig {
   onRename: (oldName: string, newName: string) => boolean;
   onRecolor: (name: string, color: ColorToken) => void;
   onDelete: (name: string) => void;
+  onReorder?: (from: number, to: number) => void;
+}
+
+/** Insertion slot (0..n) for a pointer Y over a vertical list of row rects. */
+export function dropInsertionIndex(rects: { top: number; bottom: number }[], clientY: number): number {
+  for (let i = 0; i < rects.length; i++) {
+    const mid = (rects[i].top + rects[i].bottom) / 2;
+    if (clientY < mid) return i;
+  }
+  return rects.length;
+}
+
+/** Convert an insertion slot to the index after the dragged row is removed.
+ *  Returns null when the move would not change order. */
+export function insertionToFinalIndex(from: number, insertion: number): number | null {
+  if (insertion === from || insertion === from + 1) return null;
+  return insertion > from ? insertion - 1 : insertion;
 }
 
 /**
@@ -34,9 +53,22 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig, 
   // (.bd-opt-popover, which carries position/border/shadow) keeps its class.
   host.classList.add('bd-opt-editor');
 
-  for (const opt of cfg.getOptions()) {
+  const optList = cfg.getOptions();
+  optList.forEach((opt, index) => {
     const row = document.createElement('div');
     row.className = 'bd-opt-row';
+
+    const grip = document.createElement('button');
+    grip.type = 'button';
+    grip.className = 'bd-opt-grip';
+    grip.textContent = '⠿';
+    grip.tabIndex = -1;
+    grip.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startReorderDrag(e, host, index, cfg);
+    });
+    row.appendChild(grip);
 
     const swatch = document.createElement('button');
     swatch.type = 'button';
@@ -86,7 +118,7 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig, 
     row.appendChild(del);
 
     host.appendChild(row);
-  }
+  });
 
   const add = document.createElement('button');
   add.type = 'button';
@@ -98,6 +130,32 @@ export function buildOptionsEditor(host: HTMLElement, cfg: OptionsEditorConfig, 
     cfg.onAdd();
   });
   host.appendChild(add);
+}
+
+function startReorderDrag(e: MouseEvent, host: HTMLElement, fromIndex: number, cfg: OptionsEditorConfig): void {
+  const rows = Array.from(host.querySelectorAll('.bd-opt-row')) as HTMLElement[];
+  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  const indicator = dropIndicator();
+  host.appendChild(indicator);
+
+  startDrag(e, {
+    thresholdPx: DRAG_THRESHOLD_PX,
+    onMove: (ev) => {
+      const rects = rows.map((r) => r.getBoundingClientRect());
+      const slot = dropInsertionIndex(rects, ev.clientY);
+      const hostRect = host.getBoundingClientRect();
+      const y = slot < rects.length ? rects[slot].top : rects[rects.length - 1].bottom;
+      indicator.show(0, y - hostRect.top, host.clientWidth, 2);
+    },
+    onDrop: (ev) => {
+      indicator.remove();
+      const rects = rows.map((r) => r.getBoundingClientRect());
+      const slot = dropInsertionIndex(rects, ev.clientY);
+      const to = insertionToFinalIndex(fromIndex, slot);
+      if (to !== null) cfg.onReorder?.(fromIndex, to);
+    },
+    onCancel: () => indicator.remove(),
+  });
 }
 
 function openPalette(anchor: HTMLElement, current: ColorToken, pick: (c: ColorToken) => void, parent?: Popover): void {
@@ -147,6 +205,7 @@ export function openStatusOptionsEditor(
     },
     onRecolor: (n, c) => { onChange(recolorStatusOption(getBoard(), fieldName, n, c)); rerender(); },
     onDelete:  (n) => { onChange(isTags() ? deleteTagOption(getBoard(), fieldName, n) : deleteStatusOption(getBoard(), fieldName, n)); rerender(); },
+    onReorder: (from, to) => { onChange(reorderStatusOption(getBoard(), fieldName, from, to)); rerender(); },
   }, popover);
   rerender();
 

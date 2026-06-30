@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { buildOptionsEditor } from '../../src/webview/boardStatusOptions';
+import { buildOptionsEditor, dropInsertionIndex, insertionToFinalIndex } from '../../src/webview/boardStatusOptions';
 import type { Board, ColumnDef } from '../../src/webview/boardModel';
 import { openFieldActionMenu, promptNewField } from '../../src/webview/boardProperties';
 
@@ -171,6 +171,36 @@ describe('field action menu — Edit options: sequential edits compose (no stale
 
     expect(latest).not.toBeNull();
     expect(latest.columns.length).toBe(3); // started with 1 + two adds
+  });
+});
+
+describe('reorder index math', () => {
+  const rects = [
+    { top: 0,  bottom: 20 },
+    { top: 20, bottom: 40 },
+    { top: 40, bottom: 60 },
+  ];
+  it('dropInsertionIndex picks the slot by the row mid-line', () => {
+    expect(dropInsertionIndex(rects, 5)).toBe(0);   // above mid of row 0
+    expect(dropInsertionIndex(rects, 15)).toBe(1);  // below mid of row 0
+    expect(dropInsertionIndex(rects, 55)).toBe(3);  // below last row
+  });
+  it('insertionToFinalIndex converts slots and detects no-ops', () => {
+    expect(insertionToFinalIndex(0, 0)).toBeNull();   // same slot
+    expect(insertionToFinalIndex(0, 1)).toBeNull();   // slot just after itself
+    expect(insertionToFinalIndex(0, 2)).toBe(1);      // move down one
+    expect(insertionToFinalIndex(2, 0)).toBe(0);      // move to top
+  });
+});
+
+describe('buildOptionsEditor — grip', () => {
+  it('renders a drag grip on every option row', () => {
+    const host = document.createElement('div');
+    buildOptionsEditor(host, {
+      getOptions: () => [{ name: 'Low', color: 'gray' }, { name: 'High', color: 'red' }],
+      onAdd: () => {}, onRename: () => true, onRecolor: () => {}, onDelete: () => {},
+    });
+    expect(host.querySelectorAll('.bd-opt-row .bd-opt-grip')).toHaveLength(2);
   });
 });
 
