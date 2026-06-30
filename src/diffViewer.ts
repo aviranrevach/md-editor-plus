@@ -2,21 +2,6 @@ import * as vscode from 'vscode';
 import { resolveDiffBase, resolveCurrentSide, type GitApiLike, type DiffBase } from './diffBase';
 import { openRenderedDiff } from './diffPaneView';
 
-const SCHEME = 'md-editor-plus-diff';
-// token -> base (left) content. Read-only docs served to vscode.diff's left pane.
-const bases = new Map<string, string>();
-let seq = 0;
-
-/** Register the read-only content provider that serves the diff's base side. */
-export function registerDiffContentProvider(context: vscode.ExtensionContext): void {
-  const provider: vscode.TextDocumentContentProvider = {
-    provideTextDocumentContent(uri) { return bases.get(uri.query) ?? ''; },
-  };
-  context.subscriptions.push(
-    vscode.workspace.registerTextDocumentContentProvider(SCHEME, provider),
-  );
-}
-
 /** Adapt the built-in vscode.git extension's (untyped) API to GitApiLike, or null. */
 async function getGitApi(): Promise<GitApiLike | null> {
   const ext = vscode.extensions.getExtension('vscode.git');
