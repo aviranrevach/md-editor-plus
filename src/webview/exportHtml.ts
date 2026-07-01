@@ -1,6 +1,7 @@
 import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
+import { unresolveImageSrc } from './mediaResolve';
 
 const BUNDLED_CSS = lightCss + '\n' + darkCss + '\n' + editorCss;
 
@@ -76,6 +77,15 @@ function cleanContent(editorEl: HTMLElement): string {
   });
   // Strip the class from the outer editor element too (the clone root).
   STATE_CLASSES.forEach((cls) => clone.classList.remove(cls));
+  // Turn resolved webview-resource image URLs back into document-relative paths.
+  // Those relative paths are portable and let the extension inline the bytes as
+  // data: URIs; a raw webview URI would 404 in a standalone file.
+  clone.querySelectorAll('img[src]').forEach((el) => {
+    const img = el as HTMLImageElement;
+    const raw = img.getAttribute('src') ?? '';
+    const rel = unresolveImageSrc(raw);
+    if (rel !== raw) img.setAttribute('src', rel);
+  });
   return clone.innerHTML;
 }
 

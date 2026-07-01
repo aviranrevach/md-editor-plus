@@ -8,6 +8,7 @@ import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetP
 import { ApplyingTracker } from './applyingTracker';
 import { openFullDiff, resolveBaseForDocument } from './diffViewer';
 import { assessWrite } from './saveGuard';
+import { inlineImagesAsDataUris } from './exportInline';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -48,8 +49,15 @@ function findChromiumBinary(): string | null {
 
 function renderHtmlToPdf(chromePath: string, htmlPath: string, pdfPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
+    // A throwaway, unique --user-data-dir is essential: modern Chrome maps
+    // --headless to "new headless", which otherwise shares the user's default
+    // profile. If Chrome is already running (the common case), that profile is
+    // locked and the headless launch fails to render — the classic "export PDF
+    // does nothing" bug. A private profile dir sidesteps the lock entirely.
+    const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-editor-plus-chrome-'));
     const proc = spawn(chromePath, [
       '--headless',
+      `--user-data-dir=${profileDir}`,
       '--disable-gpu',
       '--no-sandbox',
       '--no-pdf-header-footer',
@@ -59,11 +67,30 @@ function renderHtmlToPdf(chromePath: string, htmlPath: string, pdfPath: string):
     ], { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
     proc.stderr?.on('data', (d) => { stderr += d.toString(); });
-    proc.on('error', reject);
+    const cleanup = () => { try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch { /* ignore */ } };
+    proc.on('error', (err) => { cleanup(); reject(err); });
     proc.on('close', (code) => {
+      cleanup();
       if (code === 0) resolve();
       else reject(new Error(`Chrome exited with code ${code}: ${stderr.slice(0, 400)}`));
     });
+  });
+}
+
+// Rewrite document-relative <img> sources in exported HTML to self-contained
+// data: URIs by reading the bytes from disk (relative to the document's folder).
+// Keeps HTML/PDF exports portable — webview-resource URIs would 404 outside VS Code.
+function inlineExportImages(document: vscode.TextDocument, html: string): Promise<string> {
+  return inlineImagesAsDataUris(html, async (relPath) => {
+    if (/^(?:https?:|data:|\/\/)/i.test(relPath)) return null;
+    if (!document.uri.scheme.startsWith('file')) return null;
+    try {
+      const clean = relPath.replace(/^\.\//, '');
+      const docDir = vscode.Uri.joinPath(document.uri, '..');
+      return await vscode.workspace.fs.readFile(vscode.Uri.joinPath(docDir, clean));
+    } catch {
+      return null;
+    }
   });
 }
 
@@ -536,9 +563,10 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         return;
       }
       if (msg.type === 'exportPdf') {
-        const html = (msg as unknown as { html?: unknown }).html;
+        const rawHtml = (msg as unknown as { html?: unknown }).html;
         const fname = (msg as unknown as { filename?: unknown }).filename;
-        if (typeof html !== 'string' || !html) return;
+        if (typeof rawHtml !== 'string' || !rawHtml) return;
+        const html = await inlineExportImages(document, rawHtml);
         const base = (typeof fname === 'string' ? fname : 'document.md')
           .replace(/\.[^.]+$/, '')
           .replace(/[^a-zA-Z0-9_.\-]+/g, '_') || 'document';
@@ -593,8 +621,9 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         );
       }
       if (msg.type === 'exportHtml') {
-        const html = (msg as unknown as { html?: unknown }).html;
-        if (typeof html !== 'string' || !html) return;
+        const rawHtml = (msg as unknown as { html?: unknown }).html;
+        if (typeof rawHtml !== 'string' || !rawHtml) return;
+        const html = await inlineExportImages(document, rawHtml);
         const base = (document.uri.path.split('/').pop() ?? 'document.md').replace(/\.[^.]+$/, '');
         const dir = vscode.Uri.joinPath(document.uri, '..');
         const defaultUri = vscode.Uri.joinPath(dir, `${base}.html`);

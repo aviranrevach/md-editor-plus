@@ -20,3 +20,19 @@ export function resolveImageSrc(src: string): string {
     return src;
   }
 }
+
+// Reverse of resolveImageSrc: turn a resolved webview-resource URL back into the
+// document-relative path. Used when exporting so the standalone HTML/PDF carries
+// portable relative paths (which the extension then inlines as data: URIs)
+// instead of webview URIs that only resolve inside VS Code. Anything that isn't
+// under the media base (remote URLs, data: URIs) passes through unchanged.
+export function unresolveImageSrc(src: string): string {
+  if (!src || !_mediaBaseUri) return src;
+  if (!src.startsWith(_mediaBaseUri)) return src;
+  const rel = src.slice(_mediaBaseUri.length);
+  try {
+    return decodeURI(rel);
+  } catch {
+    return rel;
+  }
+}
