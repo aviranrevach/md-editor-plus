@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Copy & Copy as plain text in the selection toolbar (c23)** — the bubble menu that pops up over a text selection now has two copy buttons. **Copy** keeps the formatting (bold, links, colours), so pasting into a doc or email carries the styling through. **Copy as plain text** strips everything down to the visible words — no markdown, no marks — for when a selection was pasting in with the wrong styling. Both confirm with a toast; the styled copy falls back to a plain copy if the browser can't write rich clipboard data. (c23)
+
 ## [0.9.0] - 2026-07-01
 
 ### Added
