@@ -77,6 +77,25 @@ function cleanContent(editorEl: HTMLElement): string {
   });
   // Strip the class from the outer editor element too (the clone root).
   STATE_CLASSES.forEach((cls) => clone.classList.remove(cls));
+  // Boards (kanban + table) render interactive chrome and hidden layout mirrors
+  // that must not appear in a static export (c15). We keep the active view's real
+  // content — status/tag pills are <span>s, card text is real DOM — and remove:
+  //   • every <button> (view switcher, + New card / + Add row, ⋯ menus) — none work in a file
+  //   • aria-hidden sizing mirrors, which carry DUPLICATE column/card text
+  //   • drag handles, add-row/add-card affordances, and toolbar control clusters
+  clone.querySelectorAll('.board-block').forEach((board) => {
+    board.querySelectorAll('button').forEach((el) => el.remove());
+    board.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
+    const CHROME = [
+      '.board-chrome .bd-view-seg', '.board-chrome .bd-more',
+      '.board-add', '.board-add-card',
+      '.board-add-column-big', '.board-add-column-spacer', '.board-add-column-mirror',
+      '.bd-row-grip', '.bd-col-drag-handle', '.bd-col-menu-btn',
+      '.bd-table-addrow', '.bd-addrow-placeholder', '.bd-group-add',
+      '.board-properties-handle', '.board-properties-add', '.board-properties-more',
+    ].join(',');
+    board.querySelectorAll(CHROME).forEach((el) => el.remove());
+  });
   // Turn resolved webview-resource image URLs back into document-relative paths.
   // Those relative paths are portable and let the extension inline the bytes as
   // data: URIs; a raw webview URI would 404 in a standalone file.
