@@ -25,7 +25,7 @@ const P = {
   quotes:        'M100,52H40A20,20,0,0,0,20,72v64a20,20,0,0,0,20,20H96v4a28,28,0,0,1-28,28,12,12,0,0,0,0,24,52.06,52.06,0,0,0,52-52V72A20,20,0,0,0,100,52Zm-4,80H44V76H96ZM216,52H156a20,20,0,0,0-20,20v64a20,20,0,0,0,20,20h56v4a28,28,0,0,1-28,28,12,12,0,0,0,0,24,52.06,52.06,0,0,0,52-52V72A20,20,0,0,0,216,52Zm-4,80H160V76h52Z',
   minus:         'M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z',
   copy:          'M216,28H88A12,12,0,0,0,76,40V76H40A12,12,0,0,0,28,88V216a12,12,0,0,0,12,12H168a12,12,0,0,0,12-12V180h36a12,12,0,0,0,12-12V40A12,12,0,0,0,216,28ZM156,204H52V100H156Zm48-48H180V88a12,12,0,0,0-12-12H100V52H204Z',
-  copyPlain:     'M164,152a12,12,0,0,1-12,12H104a12,12,0,0,1,0-24h48A12,12,0,0,1,164,152Zm-12-52H104a12,12,0,0,0,0,24h48a12,12,0,0,0,0-24Zm60-52V216a12,12,0,0,1-12,12H56a12,12,0,0,1-12-12V48A12,12,0,0,1,56,36H82.75a48,48,0,0,1,90.5,0H200A12,12,0,0,1,212,48ZM100,64h56a28,28,0,0,0-56,0ZM188,60H175.4a47.71,47.71,0,0,1,.6,7.61V72a12,12,0,0,1-12,12H92a12,12,0,0,1-12-12V67.61A47.71,47.71,0,0,1,80.6,60H68V204H188Z',
+  subtractSquare:'M228,160V96a12,12,0,0,0-12-12H172V40a12,12,0,0,0-12-12H40A12,12,0,0,0,28,40V160a12,12,0,0,0,12,12H84v44a12,12,0,0,0,12,12H216a12,12,0,0,0,12-12V160Zm-63,44-32-32H155l32,32Zm7-49V133l32,32V187Zm32-24-23-23h23ZM52,52h96v52h0v44H52Zm56,129,23,23H108Z',
 } as const;
 
 function svg(path: string, size = 20): string {
@@ -194,7 +194,7 @@ function buildEl(): HTMLElement {
       <button class="bm-btn" data-action="code" data-tip-html="Inline code<kbd>⌘E</kbd>">${svg(P.code)}</button>
       ${DIV}
       <button class="bm-btn" data-action="copy" data-tip="Copy">${svg(P.copy)}</button>
-      <button class="bm-btn" data-action="copy-plain" data-tip="Copy as plain text">${svg(P.copyPlain)}</button>
+      <button class="bm-btn" data-action="copy-plain" data-tip="Copy as plain text">${svg(P.subtractSquare)}</button>
     </div>
     <div class="bubble-row">
       <button class="bm-btn" data-action="link" data-tip-html="Add link<kbd>⌘K</kbd>">${svg(P.link)}</button>
