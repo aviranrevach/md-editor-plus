@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Slimmer selection toolbar** — the floating text toolbar is now two tidy rows: character formatting on top (Bold, Italic, Underline, Strikethrough, Inline code), and Link, Text color, Highlight, Emoji plus a **⋯** menu below. The standalone AI button and the two Copy buttons moved into that **⋯** menu (**Turn into**, **Turn into using AI**, **Copy**, **Copy as plain text**), so the bar covers less of your text.
 
+### Fixed
+
+- **No more false "changed outside the editor" banner while editing a card description (c41)** — editing a board card's description could pop the conflict banner claiming the file was changed elsewhere, when *both* changes were your own. The card-description edit takes a long, double-debounced path (detached editor → board → main editor), so the host's echo of an *earlier* keystroke could arrive late and out of order — after the editor had already moved on — and get mistaken for an external write. The webview now remembers the **last several versions it sent** (not just the most recent one) and recognizes a stale, reordered echo as its own, deduping it instead of raising a conflict. Genuinely external changes still surface the banner. (c41)
+
 ## [0.9.0] - 2026-07-01
 
 ### Added
