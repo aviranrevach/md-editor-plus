@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Exports are now self-contained (c15)** — **Export to HTML** and **Export to PDF** now embed every local image directly in the file as a `data:` URI. The exported file is fully portable — images show even when it's moved, emailed, or opened outside your workspace. Previously images pointed at internal editor URLs that only resolved inside VS Code, so a standalone export showed blank/broken images.
+
+### Fixed
+
+- **Export to PDF now works when a browser is already open (c15)** — PDF export shells out to headless Chrome/Edge, which on modern browsers shares your everyday profile. If that browser was already running, the profile was locked and the export silently produced nothing. It now renders in a private throwaway profile, so the PDF is created whether or not your browser is open. (c15)
+- **Boards export cleanly (c15)** — exporting a board-heavy document used to dump all the interactive chrome into the static file: the view switcher, `+ New card` / `+ Add row` buttons, `⋯` menus, drag handles, and hidden layout mirrors that duplicated card and column text as loose runs. Exports now strip that chrome and keep the board's active view (kanban stays kanban, table stays table) with its real content — status/tag pills, card text, everything. (c15)
+
 ## [0.9.0] - 2026-07-01
 
 ### Added
