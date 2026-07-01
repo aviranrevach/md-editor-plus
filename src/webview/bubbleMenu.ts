@@ -830,6 +830,7 @@ export function createBubbleMenu(editor: Editor): void {
       closeSwatch();
       closeInto();
       closeAi();
+      closeMenu();
     }
   });
 

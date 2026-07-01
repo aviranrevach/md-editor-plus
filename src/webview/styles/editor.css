@@ -4940,7 +4940,6 @@ html.theme-dark .ProseMirror .mb-vTb-grid.mb-vTb-active {
 .bubble-ai:hover::-webkit-scrollbar { width: 8px; }
 .bubble-ai:hover::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.35); border-radius: 4px; border: 1.5px solid transparent; background-clip: padding-box; }
 .bubble-ai:hover::-webkit-scrollbar-thumb:hover { background: rgba(127,127,127,0.55); background-clip: padding-box; }
-.bm-ai-btn.active { color: var(--link); }
 
 .bm-into-divider {
   height: 1px;
