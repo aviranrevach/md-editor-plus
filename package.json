@@ -236,6 +236,10 @@
     "testMatch": [
       "**/tests/**/*.test.ts"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.worktrees/"
+    ],
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js",
       "^(\\.{1,2}/)*editor$": "<rootDir>/tests/__mocks__/editorMock.js",
