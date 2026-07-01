@@ -6,6 +6,7 @@ import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
 import { placeFloating, type PlacementHandle } from './menuPosition';
 import { copySelectionAsPlainText, copySelectionRich } from './copySelection';
+import { MORE_MENU_ITEMS, runMoreMenuAction, type MoreMenuId } from './moreMenu';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -26,10 +27,40 @@ const P = {
   minus:         'M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z',
   copy:          'M216,28H88A12,12,0,0,0,76,40V76H40A12,12,0,0,0,28,88V216a12,12,0,0,0,12,12H168a12,12,0,0,0,12-12V180h36a12,12,0,0,0,12-12V40A12,12,0,0,0,216,28ZM156,204H52V100H156Zm48-48H180V88a12,12,0,0,0-12-12H100V52H204Z',
   subtractSquare:'M228,160V96a12,12,0,0,0-12-12H172V40a12,12,0,0,0-12-12H40A12,12,0,0,0,28,40V160a12,12,0,0,0,12,12H84v44a12,12,0,0,0,12,12H216a12,12,0,0,0,12-12V160Zm-63,44-32-32H155l32,32Zm7-49V133l32,32V187Zm32-24-23-23h23ZM52,52h96v52h0v44H52Zm56,129,23,23H108Z',
+  squaresFour:   'M100,36H56A20,20,0,0,0,36,56v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V56A20,20,0,0,0,100,36ZM96,96H60V60H96ZM200,36H156a20,20,0,0,0-20,20v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V56A20,20,0,0,0,200,36Zm-4,60H160V60h36Zm-96,40H56a20,20,0,0,0-20,20v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V156A20,20,0,0,0,100,136Zm-4,60H60V160H96Zm104-60H156a20,20,0,0,0-20,20v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V156A20,20,0,0,0,200,136Zm-4,60H160V160h36Z',
+  sparkle:       'M128 24 L150 106 L232 128 L150 150 L128 232 L106 150 L24 128 L106 106 Z',
+  caretRight:    'M181,133.66l-80,80A8,8,0,0,1,89,202.34L163.31,128,89,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181,133.66Z',
 } as const;
 
 function svg(path: string, size = 20): string {
   return `<svg width="${size}" height="${size}" viewBox="0 0 256 256" fill="currentColor"><path d="${path}"/></svg>`;
+}
+
+const MENU_ICONS: Record<MoreMenuId, string> = {
+  'turn-into':    P.squaresFour,
+  'turn-into-ai': P.sparkle,
+  'copy':         P.copy,
+  'copy-plain':   P.subtractSquare,
+};
+
+// Rows for the ⋯ menu, rendered from the shared MORE_MENU_ITEMS list. A divider
+// is inserted before the first non-chevron (Copy) row.
+function moreMenuHtml(): string {
+  let html = '';
+  let dividerDone = false;
+  for (const item of MORE_MENU_ITEMS) {
+    if (!item.chevron && !dividerDone) {
+      html += `<div class="bm-into-divider"></div>`;
+      dividerDone = true;
+    }
+    const chev = item.chevron
+      ? `<span class="bm-menu-chevron">${svg(P.caretRight, 16)}</span>`
+      : '';
+    html += `<button class="bm-into-item bm-menu-item" data-menu="${item.id}">`
+      + `<span class="bm-menu-ic">${svg(MENU_ICONS[item.id], 18)}</span>`
+      + `<span class="bm-menu-label">${item.label}</span>${chev}</button>`;
+  }
+  return html;
 }
 
 const TEXT_COLORS: Array<{ value: string | null; label: string }> = [
@@ -192,9 +223,6 @@ function buildEl(): HTMLElement {
       <button class="bm-btn" data-action="strike" data-tip-html="Strikethrough<kbd>⌘⇧X</kbd>">${svg(P.textStrike)}</button>
       ${DIV}
       <button class="bm-btn" data-action="code" data-tip-html="Inline code<kbd>⌘E</kbd>">${svg(P.code)}</button>
-      ${DIV}
-      <button class="bm-btn" data-action="copy" data-tip="Copy">${svg(P.copy)}</button>
-      <button class="bm-btn" data-action="copy-plain" data-tip="Copy as plain text">${svg(P.subtractSquare)}</button>
     </div>
     <div class="bubble-row">
       <button class="bm-btn" data-action="link" data-tip-html="Add link<kbd>⌘K</kbd>">${svg(P.link)}</button>
@@ -207,8 +235,7 @@ function buildEl(): HTMLElement {
       <button class="bm-btn" data-action="highlight" data-tip="Highlight">${svg(P.highlighter)}</button>
       <button class="bm-btn" data-action="emoji" data-tip="Insert emoji">${svg(P.smiley)}</button>
       ${DIV}
-      <button class="bm-btn" data-action="more" data-tip="Turn into another block">${svg(P.dotsThree, 22)}</button>
-      <button class="bm-btn bm-ai-btn" data-action="ai" data-tip="Turn into… using AI">${svg('M128 24 L150 106 L232 128 L150 150 L128 232 L106 150 L24 128 L106 106 Z', 20)}</button>
+      <button class="bm-btn" data-action="more" data-tip="More">${svg(P.dotsThree, 22)}</button>
     </div>
     <div class="bubble-into hidden" id="bm-into">
       <div class="bubble-into-search">
@@ -220,6 +247,9 @@ function buildEl(): HTMLElement {
     <div class="bubble-ai hidden" id="bm-ai">
       <div class="bubble-into-title">Turn selection into — using AI</div>
       <div class="bubble-into-list">${aiListHtml()}</div>
+    </div>
+    <div class="bubble-into bm-menu hidden" id="bm-menu">
+      <div class="bubble-into-list">${moreMenuHtml()}</div>
     </div>
     <div class="bm-swatch-panel" id="bm-color-swatch">
       ${swatchHtml(TEXT_COLORS, 'color')}
@@ -247,7 +277,7 @@ export function createBubbleMenu(editor: Editor): void {
   const emojiSwatch  = el.querySelector<HTMLElement>('#bm-emoji-swatch')!;
   const intoPanel    = el.querySelector<HTMLElement>('#bm-into')!;
   const aiPanel      = el.querySelector<HTMLElement>('#bm-ai')!;
-  const aiBtn        = el.querySelector<HTMLElement>('[data-action="ai"]')!;
+  const menuPanel    = el.querySelector<HTMLElement>('#bm-menu')!;
   const aiTransformPanel = createAiTransformPanel();
   const intoInput    = el.querySelector<HTMLInputElement>('.bubble-into-input')!;
   const moreBtn      = el.querySelector<HTMLElement>('[data-action="more"]')!;
@@ -329,18 +359,50 @@ export function createBubbleMenu(editor: Editor): void {
 
   function closeInto(): void {
     intoPanel.classList.add('hidden');
-    moreBtn.classList.remove('active');
     unhighlightBlock();
   }
 
   function closeAi(): void {
     aiPanel.classList.add('hidden');
-    aiBtn.classList.remove('active');
+  }
+
+  function closeMenu(): void {
+    menuPanel.classList.add('hidden');
+    moreBtn.classList.remove('active');
+  }
+
+  function postToHost(msg: unknown): void {
+    const vs = (window as unknown as {
+      __mdViewerVscode?: { postMessage: (m: unknown) => void };
+    }).__mdViewerVscode;
+    vs?.postMessage(msg);
+  }
+
+  // Open the "Turn into" panel (block types + "✨ Using AI"). Was inline in the
+  // old 'more' case; now reached from the ⋯ menu.
+  function openInto(): void {
+    closeSwatch();
+    closeAi();
+    closeMenu();
+    highlightBlock();
+    intoInput.value = '';
+    filterInto('');
+    intoPanel.classList.remove('hidden');
+    setTimeout(() => intoInput.focus({ preventScroll: true }), 30);
+  }
+
+  // Open the AI transform list. Was the old ✦ button's job.
+  function openAi(): void {
+    closeSwatch();
+    closeInto();
+    closeMenu();
+    aiPanel.classList.remove('hidden');
   }
 
   function openLinkRow(): void {
     closeSwatch();
     closeInto();
+    closeMenu();
     const existing = (editor.getAttributes('link').href as string | undefined) ?? '';
     linkRowInput.value = existing;
     buttonRows.forEach((r) => { r.style.display = 'none'; });
@@ -637,6 +699,19 @@ export function createBubbleMenu(editor: Editor): void {
   el.addEventListener('click', e => {
     const target = e.target as HTMLElement;
 
+    // ⋯ menu row clicked?
+    const menuItem = target.closest<HTMLElement>('[data-menu]');
+    if (menuItem) {
+      e.stopPropagation();
+      runMoreMenuAction(menuItem.dataset.menu!, {
+        openTurnInto:   openInto,
+        openTurnIntoAi: openAi,
+        copyRich:  () => { void copySelectionRich(editor, postToHost); closeMenu(); },
+        copyPlain: () => { copySelectionAsPlainText(editor, postToHost); closeMenu(); },
+      });
+      return;
+    }
+
     // AI turn-into item clicked? (from either the ✨ panel or the "Using AI" group)
     const aiItem = target.closest<HTMLElement>('[data-ai], [data-ai-into]');
     if (aiItem) {
@@ -672,20 +747,6 @@ export function createBubbleMenu(editor: Editor): void {
       case 'underline': editor.chain().focus().toggleUnderline().run(); break;
       case 'strike':    editor.chain().focus().toggleStrike().run();    break;
       case 'code':      editor.chain().focus().toggleCode().run();      break;
-      case 'copy': {
-        const vs = (window as unknown as {
-          __mdViewerVscode?: { postMessage: (m: unknown) => void };
-        }).__mdViewerVscode;
-        if (vs) void copySelectionRich(editor, (m) => vs.postMessage(m));
-        break;
-      }
-      case 'copy-plain': {
-        const vs = (window as unknown as {
-          __mdViewerVscode?: { postMessage: (m: unknown) => void };
-        }).__mdViewerVscode;
-        if (vs) copySelectionAsPlainText(editor, (m) => vs.postMessage(m));
-        break;
-      }
       case 'link': {
         if (editor.isActive('link')) {
           editor.chain().focus().unsetLink().run();
@@ -694,32 +755,16 @@ export function createBubbleMenu(editor: Editor): void {
         }
         break;
       }
-      case 'color':     colorSwatch.classList.toggle('open'); hlSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); break;
-      case 'highlight': hlSwatch.classList.toggle('open');    colorSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); break;
-      case 'emoji':     emojiSwatch.classList.toggle('open'); colorSwatch.classList.remove('open'); hlSwatch.classList.remove('open'); closeInto(); closeAi(); break;
-      case 'ai': {
-        closeSwatch();
-        closeInto();
-        const open = !aiPanel.classList.contains('hidden');
-        if (!open) { aiPanel.classList.remove('hidden'); aiBtn.classList.add('active'); }
-        else closeAi();
-        break;
-      }
+      case 'color':     colorSwatch.classList.toggle('open'); hlSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); closeMenu(); break;
+      case 'highlight': hlSwatch.classList.toggle('open');    colorSwatch.classList.remove('open'); emojiSwatch.classList.remove('open'); closeInto(); closeAi(); closeMenu(); break;
+      case 'emoji':     emojiSwatch.classList.toggle('open'); colorSwatch.classList.remove('open'); hlSwatch.classList.remove('open'); closeInto(); closeAi(); closeMenu(); break;
       case 'more': {
         closeSwatch();
+        closeInto();
         closeAi();
-        const isOpen = !intoPanel.classList.contains('hidden');
-        if (!isOpen) {
-          // Opening: highlight the target block, reset filter, focus input
-          highlightBlock();
-          intoInput.value = '';
-          filterInto('');
-          intoPanel.classList.remove('hidden');
-          moreBtn.classList.add('active');
-          setTimeout(() => intoInput.focus({ preventScroll: true }), 30);
-        } else {
-          closeInto();
-        }
+        const isOpen = !menuPanel.classList.contains('hidden');
+        if (!isOpen) { menuPanel.classList.remove('hidden'); moreBtn.classList.add('active'); }
+        else closeMenu();
         break;
       }
     }

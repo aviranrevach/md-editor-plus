@@ -1853,6 +1853,28 @@ html.source-full-width #source-view {
   color: var(--link);
 }
 
+/* ⋯ menu rows: left-aligned, small leading icon, optional trailing chevron
+   (they reuse .bm-into-item for padding/hover but not the boxed .bm-into-icon). */
+.bm-menu-item { justify-content: flex-start; }
+.bm-menu-ic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+.bm-menu-ic svg { width: 18px; height: 18px; }
+.bm-menu-label { flex: 1 1 auto; }
+.bm-menu-chevron {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  color: var(--text-secondary);
+}
+.bm-menu-chevron svg { width: 16px; height: 16px; }
+
 .bm-into-icon {
   width: 36px;
   height: 36px;
