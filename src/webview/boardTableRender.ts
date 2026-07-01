@@ -111,6 +111,7 @@ function cssEscape(s: string): string {
 }
 
 function beginHeaderRename(label: HTMLElement, fieldName: string, ctx: BoardRendererCtx): void {
+  if (ctx.isReadonly()) return; // c47: a locked doc never enters edit mode
   if (label.getAttribute('contenteditable') === 'true') return;
   const original = label.textContent ?? fieldName;
   label.setAttribute('contenteditable', 'true');
@@ -1368,6 +1369,7 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
 function beginInlineText(
   td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx,
 ): void {
+  if (ctx.isReadonly()) return; // c47: board cells must respect read-only too
   if (td.getAttribute('contenteditable') === 'true') return;
   // Replace any rendered DOM (which may contain <img> thumbnails) with editable
   // text: plain text plus colored tokens for each ![](…) link, so image refs

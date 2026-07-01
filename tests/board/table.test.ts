@@ -53,6 +53,7 @@ function makeCtx(
     openSidePanel: (_id: string) => { /* no-op */ },
     requestDelete: () => { /* no-op */ },
     readonly: false,
+    isReadonly: () => ctx.readonly,
     getFilter: () => ({}),
     setFilter: (_next) => {},
     ...overrides,
@@ -148,6 +149,25 @@ describe('inline text/person editor', () => {
     titleCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(titleCell.getAttribute('contenteditable')).toBe('true');
+
+    ops.destroy();
+  });
+
+  it('does NOT make a cell editable while read-only, even if locked after render (c47)', () => {
+    // Board rendered editable, then read-only is toggled ON without a re-render
+    // (the c47 bug: stale click listeners stay live). beginInlineText must read
+    // read-only LIVE via ctx.isReadonly() and refuse to enter edit mode.
+    const { ctx } = makeCtx(makeBoard());
+    const ops = mountTable(ctx);
+
+    ctx.readonly = true; // simulate the read-only toggle, no re-render
+
+    const titleCell = ctx.root.querySelector(
+      'td.bd-table-cell[data-field="Title"]',
+    ) as HTMLElement;
+    titleCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(titleCell.getAttribute('contenteditable')).not.toBe('true');
 
     ops.destroy();
   });

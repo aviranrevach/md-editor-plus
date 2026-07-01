@@ -29,6 +29,7 @@ function makeCtx(board: Board): BoardRendererCtx {
     openSidePanel: () => {},
     requestDelete: () => {},
     readonly: false,
+    isReadonly: () => false,
     getFilter: () => filter,
     setFilter: (next: FilterState) => { filter = next; },
   } as unknown as BoardRendererCtx;
