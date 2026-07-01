@@ -56,12 +56,8 @@ async function writeRich(html: string, text: string): Promise<boolean> {
       ]);
       return true;
     }
-  } catch { /* fall through to execCommand */ }
-  try {
-    return document.execCommand('copy');
-  } catch {
-    return false;
-  }
+  } catch { /* fall through to plain-text copy */ }
+  return false;
 }
 
 /**

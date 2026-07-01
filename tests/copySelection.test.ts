@@ -94,7 +94,19 @@ describe('copySelectionRich', () => {
 
   it('falls back to a plain-text copyText when rich writing is unavailable', async () => {
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
-    document.execCommand = jest.fn(() => false);
+    const { editor } = mockEditor({ from: 0, to: 5, textBetween: jest.fn(() => 'hello') });
+    const post = jest.fn();
+    await copySelectionRich(editor, post);
+    expect(post).toHaveBeenCalledWith({ type: 'copyText', text: 'hello', toast: 'Copied' });
+  });
+
+  it('falls back to plain-text copyText when the rich write rejects', async () => {
+    (globalThis as unknown as { ClipboardItem: unknown }).ClipboardItem =
+      class { constructor(public items: unknown) {} };
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { write: jest.fn().mockRejectedValue(new Error('denied')) },
+      configurable: true,
+    });
     const { editor } = mockEditor({ from: 0, to: 5, textBetween: jest.fn(() => 'hello') });
     const post = jest.fn();
     await copySelectionRich(editor, post);
