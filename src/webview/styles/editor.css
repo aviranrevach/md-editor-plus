@@ -904,6 +904,12 @@ body {
 #source-view .cb-body {
   display: flex;
   overflow-x: auto;
+  /* Explicit (not the default `visible`) so the UA doesn't auto-promote this
+     to `overflow-y: auto` per the CSS overflow spec — an accidental nested
+     scroll container here breaks find-in-page's scrollIntoView() in Code
+     view (c58), since it stops adjusting at the first "already in view"
+     scrollable ancestor before ever reaching the page scroll. */
+  overflow-y: hidden;
   padding: 26px 0 14px;
 }
 
@@ -1057,6 +1063,9 @@ body.cb-line-drag-active .cb-line:hover:not(.cb-line-dragging)::before {
   line-height: 1.7;
   flex: 1;
   overflow-x: auto;
+  /* See .cb-body above (c58) — keep this from becoming its own vertical
+     scroll container, which would swallow find-in-page's scrollIntoView(). */
+  overflow-y: hidden;
   font-family: var(--font-mono);
   color: var(--text-primary);
   white-space: pre;

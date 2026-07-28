@@ -115,7 +115,15 @@ function revealAndScroll(view: EditorView, match: SearchMatch): void {
     cursor = cursor.parentElement;
   }
 
-  el.scrollIntoView({ block: 'center', inline: 'nearest' });
+  // Defer the actual scroll a frame: opening a <details> reflows synchronously,
+  // but the Code view's codeBlock NodeView also re-renders its line-number
+  // gutter off a MutationObserver (a microtask queued by the decoration update
+  // that just landed this element in the DOM), which can still be pending when
+  // this line runs. Scrolling before that settles measures against stale
+  // geometry (c58 — the match count updates but the viewport never moves).
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });
+  });
 }
 
 declare module '@tiptap/core' {
