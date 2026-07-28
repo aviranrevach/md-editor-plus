@@ -64,6 +64,7 @@
 | Clicking the diff toggle marks the file as "modified" (unclear what actually changed). Happens only when clicking it in the RIGHT pane — clicking in the left pane does NOT make the file modified. | Done | c56 | High | Diff |  |
 | Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57 | High | Diff |  |
 | Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57-2 | High | Diff |  |
+| Search in Code view doesn't scroll to the match it found | Todo | c58 | Medium | Search / Code view | Gilad |
 
 <!-- board:body id="c8" -->
 
@@ -182,6 +183,14 @@ Reported by a friend testing the editor (original Hebrew):
 Translation: clicking the diff (↔) toggle turns the file into "modified" — and it's not clear what actually changed. It only happens when the toggle is clicked in the **right** pane; clicking it in the **left** pane does not mark the file modified.
 
 Likely the same phantom-dirty / save-sync family as c28 (editor reports unsaved changes when nothing was edited): merely opening the diff view shouldn't dirty the buffer. Investigate why the right-pane diff toggle pushes a transaction / edit while the left-pane one doesn't.
+
+<!-- board:body id="c58" -->
+
+Reported by Gilad (original Hebrew):
+
+> כשאני עושה חיפוש בקוד וויו הוא לא עושה לי סקרול למקום שבו הוא מצא את התוצאה
+
+Translation: when searching in Code view, the match counter updates (e.g. "1/2") but the editor doesn't scroll the viewport to where the match actually is.
 
 <!-- board:end -->
 
