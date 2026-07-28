@@ -10,7 +10,7 @@
 | In some block types, clicking the dragger doesn't let you reach "Turn into", "Delete", "Duplicate", etc. | Done | c2 | High | Add / Modify Block |  |
 | Pasting Image in - add image to workspace options (consider also in table / board table) | Done | c10 | High | General |  |
 | Bug! Changing column size | Todo | c11 | High | Board table |  |
-| Bug in description when pasting | Todo | c9 | Medium | General |  |
+| Bug in description when pasting | Review | c9 | Medium | General |  |
 | Add "Delete property" option to the table column three-dot menu | Todo | c3 | Medium | Board Table -> Three dot menu |  |
 | In the column three-dot menu, give Sort a dropdown: None / Ascending / Descending | Todo | c4 | Medium | Board Table -> Three dot menu |  |
 | Board table view bug when moving title  column (Bug) | Todo | c6 | Medium | Board Table |  |
@@ -19,7 +19,7 @@
 | Board table grouping visual bugs- the color doesnt fill the whole cell | Done | c12 | High | Board table grouping |  |
 | Board table grouping - allow dragging whole group and reorder groups, or organize by sorting order | Todo | c13 | Medium | Board table grouping |  |
 | Main three dots menu duplicate should have two options- save in workspace, or download (saved in your download) | Todo | c14 | Medium | Main three dots menu |  |
-| Export pdf doesnt work, probably html too. | Todo | c15 | High | Main three dots menu |  |
+| Export pdf doesnt work, probably html too. | Review | c15 | High | Main three dots menu |  |
 | Verify c15 export: reload the F5 window, open demo-tester.md, then ⋯ → Export → Export to PDF (and Export to HTML). Check images actually show (no broken placeholders) and the board reads cleanly with no + New card / ⋯ / drag-handle clutter and no duplicated text. | Todo | c15-verify | High | Main three dots menu |  |
 | Board table cells - the content of status clipped out of their cells when you are scaling down the window | Done | c16 | Medium | Board table -> cell |  |
 | ID doesnt added automatically whe you unhide it. maybe should be read only | Done | c17 | Urgent!! | Board table |  |
@@ -58,13 +58,16 @@
 | two empty states one upon each other in description (is it happening in other places?) | Done | c50 | High |  |  |
 | Clicking below EVERYTHING in a doc wont suggest adding a new block, it should be selectable and if I click it, its added | Done | c51 | Urgent!! |  |  |
 | Unify the board table's draggers with the regular table's new c46 handles — give the board table the same look & behaviour: Notion-style edge strokes that promote to an emerging ⠿ grip on hover, drag-to-reorder, and the blue outline-box selection (cell / row / column). Today the board table still uses the older dots-in-the-gutter grips. | Todo | c52 | Medium | Board table / Tables |  |
-| navigating down with the keyboard doesnt scroll the pop | Todo | c53 | Medium |  |  |
+| navigating down with the keyboard doesnt scroll the pop | Review | c53 | Medium |  |  |
+| Verify c53 menu scroll: F5, open a doc, press ⌘/ to open the block picker, then hold ↓ from the top. The list should scroll to follow the highlight and the selected row should never hide behind the footer. Also check the ⠿ drag-handle menu and its Turn into ▸ flyout. | Todo | c53-verify | Medium | Block picker |  |
 | Diff is still broken, when add new section, didnt see it as diff. also missing the navigation map like in vscode | Done | c54 | High |  |  |
 | Diff map: paint the structure-map rail with red/green change markers vs the last commit (like VS Code's minimap diff overview), click a change to jump to it | Done | c55 | Medium | Structure map / Diff |  |
 | Clicking the diff toggle marks the file as "modified" (unclear what actually changed). Happens only when clicking it in the RIGHT pane — clicking in the left pane does NOT make the file modified. | Done | c56 | High | Diff |  |
 | Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57 | High | Diff |  |
 | Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57-2 | High | Diff |  |
-| Search in Code view doesn't scroll to the match it found | Todo | c58 | Medium | Search / Code view | Gilad |
+| Search in Code view doesn't scroll to the match it found | Review | c58 | Medium | Search / Code view | Gilad |
+| Verify c58 search scroll: F5, open a long file, switch to Code view, ⌘F and search for a word far down the page. The view should jump to the match, not just update the 1/N counter. Check Preview view still scrolls to matches too. | Todo | c58-verify | Medium | Search / Code view | Gilad |
+| Verify c9 description preview: F5, open TODO.md, paste something rich into a card's description in the side panel (a code block, a list, or copied web content), then look at that row's Description cell in the table view and the card in kanban. Should read as clean text with no code fences, table pipes, or raw HTML tags. | Todo | c9-verify | Medium | Boards / Description |  |
 
 <!-- board:body id="c8" -->
 
