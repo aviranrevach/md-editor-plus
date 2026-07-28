@@ -2,6 +2,7 @@
 .vscode-test/**
 .git/**
 .github/**
+.worktrees/**
 .superpowers/**
 .DS_Store
 src/**
@@ -21,6 +22,10 @@ demo-rtl.md
 demo-tester.md
 demo-*.md
 *-test.md
+*.assets/**
+TODO.md
+BOARD-PARSE-BUG-FINDINGS.md
+ai-turn-into-test.md
 PUBLISHING.md
 .playwright-mcp/**
 .claude/**
