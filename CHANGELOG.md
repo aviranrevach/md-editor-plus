@@ -6,12 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Copy & Copy as plain text (c23)** — the selection toolbar can copy your selection with formatting intact (**Copy**) or as clean unformatted text (**Copy as plain text**), fixing selections that used to paste in with the wrong styling. Both live in the ⋯ menu (see below). (c23)
+
+### Changed
+
+- **Slimmer selection toolbar** — the floating text toolbar is now two tidy rows: character formatting on top (Bold, Italic, Underline, Strikethrough, Inline code), and Link, Text color, Highlight, Emoji plus a **⋯** menu below. The standalone AI button and the two Copy buttons moved into that **⋯** menu (**Turn into**, **Turn into using AI**, **Copy**, **Copy as plain text**), so the bar covers less of your text.
+
 ### Fixed
 
 - **Pasting into a card description no longer shows raw code in board views (c9)** — a description is edited in the side panel with the *full* block editor, so it can hold headings, lists, tables, fenced code and pasted rich text. The table view's **Description** column and the kanban card preview only understood *inline* Markdown, so every block construct was printed as literal syntax — a pasted code block showed its ` ``` ` fences, a table showed its `|` pipes, a list showed its bullets. It looked correct in the panel and wrong on the board. Both previews now flatten the block layer first: a code block reads as `code`, a table as its cell values, headings and list markers drop away, and lines join with ` • `. Inline styling (bold, italic, links, color, thumbnails) still renders as before. (c9)
 - **Resized images and pasted links render in board previews (c9)** — a resized image is stored as `<img src="…" width="N">` and a pasted link can keep its `<a href="…">` tag; board cells printed both as raw tags. They now render as a thumbnail and a real link.
 - **Search scroll in Code view (c58)** — searching in Code view updated the match counter but never scrolled to the match. Its code block could silently become its own (never-scrolling) scroll container, and the jump ran before the line-number gutter finished redrawing. Find now scrolls to the match in Code view. (c58)
 - **Arrowing through a long menu now scrolls it (c53)** — in the block picker (`+` / `⌘/` / the drag-handle actions and its *Turn into ▸* flyout), holding ↓ moved the highlight but never scrolled the list, so the selected row walked off the bottom and slid behind the sticky footer — you were navigating blind. The menu now follows the highlight, keeping the active row clear of the footer, and scrolls only when the row is genuinely out of view. (c53)
+- **No more false "changed outside the editor" banner while editing a card description (c41)** — editing a board card's description could pop the conflict banner claiming the file was changed elsewhere, when *both* changes were your own. The card-description edit takes a long, double-debounced path (detached editor → board → main editor), so the host's echo of an *earlier* keystroke could arrive late and out of order — after the editor had already moved on — and get mistaken for an external write. The webview now remembers the **last several versions it sent** (not just the most recent one) and recognizes a stale, reordered echo as its own, deduping it instead of raising a conflict. Genuinely external changes still surface the banner. (c41)
 
 ### Developer
 

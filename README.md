@@ -27,7 +27,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 - **Drag-handle reordering** — hover any block for a `⠿` handle and move it anywhere
 - **Block action menu** — click the `⠿` handle for one consistent menu on any block: **Turn into**, **Duplicate**, **Delete**, with a search box to jump straight to a type
 - **Slash / block picker** — `⌘/` (`Ctrl+/`) opens an inline picker; type to filter
-- **Bubble menu** — select text for inline formatting, links, color, highlight, emoji, a "Turn into" converter, and a ✨ **AI** button ([see below](#turn-selection-into-ai))
+- **Bubble menu** — select text for inline formatting (bold, italic, underline, strikethrough, inline code), links, color, highlight, and emoji. A **⋯** menu holds the rest: **Turn into**, **Turn into using AI** ([see below](#turn-selection-into-ai)), **Copy**, and **Copy as plain text** (clean, unformatted text for when a selection pastes in with the wrong styling)
 - **Click-to-edit** — every block is editable in place; no mode switching
 - **Click below to keep typing** — hover the empty space under the last block and a faint "Start writing…" hint previews where a new block will land; click to drop your cursor into a fresh paragraph, even when the doc ends in a board, table, code block, or image (hidden in read-only)
 - **Delete any block** — from the `⠿` dragger menu, a block's own `⋯` menu (boards, diagrams), or select it and press Delete / Backspace
@@ -46,7 +46,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 ### Turn selection into… (AI)
 
-Select any run of blocks, click the ✨ button in the bubble menu (or the **Using AI** group inside *Turn into*), and MD Editor Plus builds a ready-to-paste prompt for your **file-aware AI** (Claude Code, Cursor, the VS Code AI). Paste it in — the AI edits the file, and the viewer re-renders. **No network, no API keys, no accounts: the prompt travels through your clipboard, nothing else.**
+Select any run of blocks, open the bubble menu's **⋯** menu and choose **Turn into using AI** (or the **Using AI** group inside *Turn into*), and MD Editor Plus builds a ready-to-paste prompt for your **file-aware AI** (Claude Code, Cursor, the VS Code AI). Paste it in — the AI edits the file, and the viewer re-renders. **No network, no API keys, no accounts: the prompt travels through your clipboard, nothing else.**
 
 The prompt carries the file path, the selection's location (line + text anchors), and — crucially — the app's *exact* block grammar, so the AI's output round-trips into a real board/table/diagram instead of a near-miss. Targets:
 

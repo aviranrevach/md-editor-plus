@@ -157,7 +157,7 @@ function init(): void {
     const fresh = editorReady ? getCurrentMarkdown() : currentMarkdown;
     if (fresh !== currentMarkdown) {
       currentMarkdown = fresh;
-      lastSentMarkdown = normalizeMd(fresh);
+      rememberSent(fresh);
       vscode.postMessage({ type: 'edit', markdown: fresh });
     }
     if (sourceEditorReady) {
@@ -166,7 +166,7 @@ function init(): void {
     }
     createSourceEditor(sourceEditorEl, currentMarkdown, (md) => {
       currentMarkdown = md;
-      lastSentMarkdown = normalizeMd(md);
+      rememberSent(md);
       vscode.postMessage({ type: 'edit', markdown: md });
     }, () => applySaveEvent('localEdit'));
     sourceEditorReady = true;
@@ -413,7 +413,7 @@ function init(): void {
     pendingExternalMarkdown = null;
     hideConflictBanner();
     currentMarkdown = md;
-    lastSentMarkdown = normalizeMd(md);
+    rememberSent(md);
     updateContent(md);
     if (sourceMode && sourceEditorReady) updateSourceContent(md);
   });
@@ -422,13 +422,27 @@ function init(): void {
     hideConflictBanner();
     // Push our current version back so disk catches up on next save.
     const ours = getCurrentMarkdown();
-    lastSentMarkdown = normalizeMd(ours);
+    rememberSent(ours);
     vscode.postMessage({ type: 'edit', markdown: ours });
   });
 
   let editorReady     = false;
   let currentMarkdown = '';
   let lastSentMarkdown: string | null = null;
+  // A short window of recently-sent versions. A leaked host echo can arrive late
+  // and out of order (c41) — matching only lastSentMarkdown misses a stale echo
+  // of an earlier send, which then looks like an external conflict. rememberSent
+  // is the single place both are updated.
+  const recentSentMarkdowns: string[] = [];
+  const RECENT_SENT_MAX = 10;
+  function rememberSent(md: string): void {
+    const n = normalizeMd(md);
+    lastSentMarkdown = n;
+    if (recentSentMarkdowns[recentSentMarkdowns.length - 1] !== n) {
+      recentSentMarkdowns.push(n);
+      if (recentSentMarkdowns.length > RECENT_SENT_MAX) recentSentMarkdowns.shift();
+    }
+  }
   let pendingExternalMarkdown: string | null = null;
   let sourceMode      = false;
   let widthMode: WidthMode = 'normal';
@@ -447,7 +461,7 @@ function init(): void {
       const md = getSourceMarkdown();
       if (md !== currentMarkdown) {
         currentMarkdown = md;
-        lastSentMarkdown = normalizeMd(md);
+        rememberSent(md);
         vscode.postMessage({ type: 'edit', markdown: md });
       }
     }
@@ -1062,7 +1076,7 @@ function init(): void {
       refreshDefaultsButtons();
       const editorInstance = createEditor(editorEl, msg.markdown, (markdown) => {
         currentMarkdown = markdown;
-        lastSentMarkdown = normalizeMd(markdown);
+        rememberSent(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);
         vscode.postMessage({ type: 'edit', markdown });
         diffMap?.recompute();
@@ -1092,7 +1106,7 @@ function init(): void {
           // source editor, not the preview one.
           const md = sourceMode ? getSourceMarkdown() : getCurrentMarkdown();
           currentMarkdown = md;
-          lastSentMarkdown = normalizeMd(md);
+          rememberSent(md);
           vscode.postMessage({ type: 'save', markdown: md });
         }
       });
@@ -1178,12 +1192,19 @@ function init(): void {
         incoming:      normalizeMd(msg.markdown),
         editorCurrent: normalizeMd(getCurrentMarkdown()),
         lastSent:      lastSentMarkdown,
+        recentSent:    recentSentMarkdowns,
         isRefresh:     msg.source === 'refresh',
       });
 
       if (decision === 'dedup') {
         // Echo of our own edit. Re-running setContent would force lowlight to
         // re-tokenize, briefly clearing syntax colors — so don't.
+        // A STALE self-echo (matches a recent send but not the latest) is a
+        // leaked host echo of an earlier edit arriving after lastSent advanced —
+        // the c41 phantom-conflict trigger. Don't adopt it as currentMarkdown; a
+        // pending edit is the real latest, so leaving the editor untouched is
+        // correct. Only a fresh echo (== lastSent) updates currentMarkdown.
+        if (normalizeMd(msg.markdown) !== lastSentMarkdown) return;
         currentMarkdown = msg.markdown;
         if (sourceMode && sourceEditorReady) updateSourceContent(msg.markdown);
         return;
@@ -1201,7 +1222,7 @@ function init(): void {
           { editorChars: ours.length, hadLocalEdit: lastSentMarkdown !== null },
         );
         currentMarkdown = ours;
-        lastSentMarkdown = normalizeMd(ours);
+        rememberSent(ours);
         vscode.postMessage({ type: 'edit', markdown: ours });
         return;
       }
@@ -1216,7 +1237,7 @@ function init(): void {
           : null;
         if (merged !== null) {
           currentMarkdown = merged;
-          lastSentMarkdown = normalizeMd(merged);
+          rememberSent(merged);
           updateContent(merged);
           if (sourceMode && sourceEditorReady) updateSourceContent(merged);
           vscode.postMessage({ type: 'edit', markdown: merged });
