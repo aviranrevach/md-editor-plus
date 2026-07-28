@@ -20,17 +20,18 @@
 | Board table grouping - allow dragging whole group and reorder groups, or organize by sorting order | Todo | c13 | Medium | Board table grouping |  |
 | Main three dots menu duplicate should have two options- save in workspace, or download (saved in your download) | Todo | c14 | Medium | Main three dots menu |  |
 | Export pdf doesnt work, probably html too. | Todo | c15 | High | Main three dots menu |  |
+| Verify c15 export: reload the F5 window, open demo-tester.md, then ⋯ → Export → Export to PDF (and Export to HTML). Check images actually show (no broken placeholders) and the board reads cleanly with no + New card / ⋯ / drag-handle clutter and no duplicated text. | Todo | c15-verify | High | Main three dots menu |  |
 | Board table cells - the content of status clipped out of their cells when you are scaling down the window | Done | c16 | Medium | Board table -> cell |  |
 | ID doesnt added automatically whe you unhide it. maybe should be read only | Done | c17 | Urgent!! | Board table |  |
 | Board table remove stroke on left dragger edge cell | Todo | c18 | Low | Board table |  |
-| Status is broken on boards (spotted on table view). doesnt allow you to change order, when you add new it was synched with another status- changing it would change the other one. plus on the main three dot menu- editing it from there is blocked altogether | Todo | c19 | High | Boards |  |
+| Status is broken on boards (spotted on table view). doesnt allow you to change order, when you add new it was synched with another status- changing it would change the other one. plus on the main three dot menu- editing it from there is blocked altogether | Done | c19 | High | Boards |  |
 | Filter on Boards- allow to show / hide specific items by status / tag etc | Done | c20 | Low | Boards |  |
 | Handle pasting images from clipboard. can we drop the image in a folder in the workspace? ask the user? need to brainstorm | Done | c21 | High | Images |  |
 | Allow images in table cells on board list. it can be a view of a link in mid text or something? brainstorm on this | Done | c22 | High | Images |  |
-| Copy unstyled (refine the naming) - when a user copied text he got this | Done | c23 | Medium | General |  |
+| Copy unstyled (refine the naming) - when a user copied text he got this | Review | c23 | Medium | General |  |
 | Diff viewer like in vs code. | Done | c24 | Medium | General |  |
 | in description panel there's no text blinking typing indicator sometimes when you click somewhere to type | Todo | c25 | Medium | Board side panel |  |
-| RTL not working well usecase | Todo | c26 | Urgent!! | General |  |
+| RTL not working well usecase | Todo | c26 | High | General |  |
 | text styles doesnt work in board views | Done | c27 | Urgent!! | Boards |  |
 | Editor reports "unsaved changes" when nothing was edited, so an external / other-tab change pops a conflict banner you didn't cause. And when the two changes don't actually collide, it should merge silently instead of asking. | Done | c28 | High | Boards / Save |  |
 | When the "changed outside the editor" conflict banner appears, show WHAT changed (a diff of the rows/lines that differ) so you can choose Reload vs Keep my version with context, instead of blind. Ties into c24 (diff viewer). | Done | c29 | High | Conflict banner |  |
@@ -45,23 +46,24 @@
 | On the image bubble menu, add another items with 2 options- 1. find file on finder. 2. copy path. it pops these options to choose- make it make sense | Done | c38 | High |  | Gilad |
 | Redesign column menu for the same look and feel, icons, and grouping as the other menus. allow filtering shortcut (that opens the regular filter) | Done | c39 | Medium | Board table |  |
 | Change icons of these areas | Todo | c40 | Low |  |  |
-| the save callout saying something was saved someplace else, where its not. both was me- i was changing something in the description | Todo | c41 | High |  |  |
+| the save callout saying something was saved someplace else, where its not. both was me- i was changing something in the description | Done | c41 | High |  |  |
 | Block dragger, plus, and empty state - make it more like notion, right now the dragger icon and the plus are too small in its space, and relation to the hover background space. also missing the empty state placeholder sentense that explain what you can do | Done | c42 | Medium |  |  |
 | Menu list just like in notion - more compact menu lines and with icons with no borders- less padding, and footer (the footer text should be with smaller text like caption and not like notion) | Done | c43 | Medium |  |  |
 | Read-only mode was silently ON without me ever turning it on, and it broke the whole app — no blinking cursor / can't click-to-type in card descriptions, kanban titles, and tables. Board cells still edited (they bypass read-only), which hid the fact I was locked. Find why read-only turns on by itself / make it impossible to get stuck, and show a clear, obvious indicator when read-only is active. | Done | c44 | Urgent!! | Read-only |  |
 | Read-only needs a REAL on/off toggle (a switch like elsewhere in the app), not the confusing blue "active highlight" on the button that no one understands. | Done | c45 | High | Read-only / Settings menu |  |
 | Add a Notion-style row handle to regular markdown tables (hover gutter + grip), with drag-to-reorder and a row-actions menu — the affordance c36 adds to board tables, but for plain tables (which today have no dragger at all). | Done | c46 | Medium | Tables |  |
-| Board table cells stay editable even when read-only is ON — they re-enable contenteditable on click and commit through a path that bypasses the editor's read-only state. This masked c44 (you could still edit cells while the whole doc was "locked", hiding that read-only was on). Make board cell editing respect read-only so a locked doc is truly locked everywhere. | Review | c47 | High | Read-only / Board table |  |
+| Board table cells stay editable even when read-only is ON — they re-enable contenteditable on click and commit through a path that bypasses the editor's read-only state. This masked c44 (you could still edit cells while the whole doc was "locked", hiding that read-only was on). Make board cell editing respect read-only so a locked doc is truly locked everywhere. | Done | c47 | High | Read-only / Board table |  |
 | DATA-LOSS incident (2026-06-20): opening/saving the board silently reverted the WHOLE of TODO.md back to the last git commit — rows c40–c47 and the Done statuses on c34/c37 were wiped, recoverable only from the chat transcript. Same family as c37. Proposed fix: (1) treat any board save that DROPS rows or shrinks the doc as suspect — refuse it / require an explicit delete; (2) auto-snapshot the file before every board write; (3) on load, never let a stale in-memory model silently overwrite newer content on disk. Bump c37 to the top — this is the highest-impact open bug. | Review | c48 | Urgent!! | Boards / Save |  |
-| clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Review | c49 | Urgent!! |  |  |
-| two empty states one upon each other in description (is it happening in other places?) | Todo | c50 | High |  |  |
+| clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Done | c49 | Urgent!! |  |  |
+| two empty states one upon each other in description (is it happening in other places?) | Done | c50 | High |  |  |
 | Clicking below EVERYTHING in a doc wont suggest adding a new block, it should be selectable and if I click it, its added | Done | c51 | Urgent!! |  |  |
 | Unify the board table's draggers with the regular table's new c46 handles — give the board table the same look & behaviour: Notion-style edge strokes that promote to an emerging ⠿ grip on hover, drag-to-reorder, and the blue outline-box selection (cell / row / column). Today the board table still uses the older dots-in-the-gutter grips. | Todo | c52 | Medium | Board table / Tables |  |
 | navigating down with the keyboard doesnt scroll the pop | Todo | c53 | Medium |  |  |
 | Diff is still broken, when add new section, didnt see it as diff. also missing the navigation map like in vscode | Done | c54 | High |  |  |
 | Diff map: paint the structure-map rail with red/green change markers vs the last commit (like VS Code's minimap diff overview), click a change to jump to it | Done | c55 | Medium | Structure map / Diff |  |
-| Clicking the diff toggle marks the file as "modified" (unclear what actually changed). Happens only when clicking it in the RIGHT pane — clicking in the left pane does NOT make the file modified. | Review | c56 | High | Diff |  |
-| Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Todo | c57 | High | Diff |  |
+| Clicking the diff toggle marks the file as "modified" (unclear what actually changed). Happens only when clicking it in the RIGHT pane — clicking in the left pane does NOT make the file modified. | Done | c56 | High | Diff |  |
+| Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57 | High | Diff |  |
+| Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57-2 | High | Diff |  |
 
 <!-- board:body id="c8" -->
 
