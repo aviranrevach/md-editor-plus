@@ -68,6 +68,7 @@
 | Search in Code view doesn't scroll to the match it found | Review | c58 | Medium | Search / Code view | Gilad |
 | Verify c58 search scroll: F5, open a long file, switch to Code view, ⌘F and search for a word far down the page. The view should jump to the match, not just update the 1/N counter. Check Preview view still scrolls to matches too. | Todo | c58-verify | Medium | Search / Code view | Gilad |
 | Verify c9 description preview: F5, open TODO.md, paste something rich into a card's description in the side panel (a code block, a list, or copied web content), then look at that row's Description cell in the table view and the card in kanban. Should read as clean text with no code fences, table pipes, or raw HTML tags. | Todo | c9-verify | Medium | Boards / Description |  |
+| Duplicating a board gives the copy the SAME id as the original, so the app warns they are the same board. Two problems: (1) board ids are not random/unique - they are short and predictable, so two boards can collide on their own; (2) duplicate copies the id verbatim instead of minting a fresh one (check card ids too). Boards that share an id risk sharing state or matching the wrong card bodies. | Todo | c59 | High | Boards / Duplicate |  |
 
 <!-- board:body id="c8" -->
 
