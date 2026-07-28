@@ -24,6 +24,7 @@ import { openStatusOptionsEditor } from './boardStatusOptions';
 import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
 import { renderInlineMarkdown } from './boardInlineRender';
+import { flattenMarkdownToInline } from './boardBodyPreview';
 import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
@@ -1142,7 +1143,10 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
   // Click opens the side panel for full markdown editing.
   if (field.name === DESCRIPTION_FIELD.name) {
     const body = (card.body || '').trim();
-    const preview = body.replace(/[\r\n]+/g, ' • ').slice(0, 200);
+    // c9 — the body is full block markdown (headings, lists, tables, fenced
+    // code, pasted HTML). Flatten the block layer first; renderInlineMarkdown
+    // below handles inline marks only and would print block syntax literally.
+    const preview = flattenMarkdownToInline(body, 200);
     if (preview) {
       renderInlineMarkdown(td, preview);
     } else {

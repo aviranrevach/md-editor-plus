@@ -20,6 +20,19 @@ const SAFE_STYLE_VALUE = /^[a-z0-9#(),.%\s/-]+$/i;
 // here but its inner text is NOT re-parsed (handled below).
 const HTML_TAGS = ['u', 'mark', 's', 'strong', 'em', 'b', 'i', 'code'];
 
+// URL schemes allowed on a rendered href. Relative paths, anchors and
+// scheme-less values pass; javascript:/data:/vbscript: are dropped (the link
+// text still renders, just not as a live link).
+const SAFE_HREF_SCHEMES = new Set(['http', 'https', 'mailto', 'tel']);
+
+function safeHref(raw: string): string | null {
+  const href = raw.trim();
+  if (!href) return null;
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href);
+  if (scheme && !SAFE_HREF_SCHEMES.has(scheme[1].toLowerCase())) return null;
+  return href;
+}
+
 interface Token {
   index: number;
   length: number;
@@ -51,17 +64,43 @@ function firstToken(text: string): Token | null {
         },
       };
     },
+    // Image from inline HTML. The editor emits `<img src="…" width="N" />` for a
+    // resized image (imageMarkdown.ts), so a description holding one used to
+    // show the raw tag. Only `src`/`alt` are read — never onerror & co.
+    () => {
+      const m = /<img\b([^>]*?)\/?>/i.exec(text);
+      if (!m) return null;
+      const src = /src\s*=\s*"([^"]*)"/i.exec(m[1]);
+      if (!src) return null;
+      const alt = /alt\s*=\s*"([^"]*)"/i.exec(m[1]);
+      return {
+        index: m.index, length: m[0].length,
+        build: () => {
+          const img = document.createElement('img');
+          img.className = 'bd-inline-thumb';
+          img.src = resolveImageSrc(src[1].trim());
+          img.alt = alt ? alt[1] : '';
+          return img;
+        },
+      };
+    },
     // Link — inner text is re-parsed for marks.
     () => {
       const m = /\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/.exec(text);
       return m && {
         index: m.index, length: m[0].length,
-        build: () => {
-          const a = document.createElement('a');
-          a.setAttribute('href', m[2].trim());
-          parseInto(a, m[1]);
-          return a;
-        },
+        build: () => buildAnchor(m[2], m[1]),
+      };
+    },
+    // Anchor from inline HTML (a pasted link keeps its <a> tag). As with <span>,
+    // only the `href` attribute is ever read.
+    () => {
+      const m = /<a\b([^>]*)>([\s\S]*?)<\/a>/i.exec(text);
+      if (!m) return null;
+      const href = /href\s*=\s*"([^"]*)"/i.exec(m[1]);
+      return {
+        index: m.index, length: m[0].length,
+        build: () => buildAnchor(href ? href[1] : '', m[2]),
       };
     },
     // Color / highlight span from inline HTML. We match any <span …> but only
@@ -131,6 +170,16 @@ function el(tag: string, text: string): HTMLElement {
   const node = document.createElement(tag);
   node.textContent = text;
   return node;
+}
+
+// An <a> whose href is dropped when the scheme isn't trusted — the label still
+// renders, so no text is ever lost to a rejected URL.
+function buildAnchor(rawHref: string, label: string): HTMLElement {
+  const a = document.createElement('a');
+  const href = safeHref(rawHref);
+  if (href) a.setAttribute('href', href);
+  parseInto(a, label);
+  return a;
 }
 
 function applySafeStyle(node: HTMLElement, style: string): void {

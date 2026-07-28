@@ -94,6 +94,53 @@ describe('renderInlineMarkdown — inline HTML (color/underline)', () => {
   });
 });
 
+describe('renderInlineMarkdown — inline HTML img & anchor (c9)', () => {
+  test('<img> with width renders a thumbnail, not raw markup', () => {
+    // What the editor emits for a resized image (imageMarkdown.ts).
+    const h = render('pic <img src="shot.png" width="320" /> end');
+    const img = h.querySelector('img')!;
+    expect(img).not.toBeNull();
+    expect(img.className).toContain('bd-inline-thumb');
+    expect(h.textContent).not.toContain('<img');
+  });
+
+  test('<img> alt is carried over', () => {
+    expect(render('<img src="a.png" alt="a shot" />').querySelector('img')!.alt).toBe('a shot');
+  });
+
+  test('<img> without a src is left as text rather than a broken image', () => {
+    expect(render('<img width="10" />').querySelector('img')).toBeNull();
+  });
+
+  test('<img> onerror is never applied', () => {
+    const img = render('<img src="a.png" onerror="evil()" />').querySelector('img')!;
+    expect(img.getAttribute('onerror')).toBeNull();
+  });
+
+  test('<a href> renders a real anchor with re-parsed inner marks', () => {
+    const a = render('<a href="https://x.test">go **now**</a>').querySelector('a')!;
+    expect(a.getAttribute('href')).toBe('https://x.test');
+    expect(a.querySelector('strong')!.textContent).toBe('now');
+  });
+
+  test('javascript: href is dropped but the label still shows', () => {
+    const a = render('[click](javascript:alert(1))').querySelector('a')!;
+    expect(a.getAttribute('href')).toBeNull();
+    expect(a.textContent).toBe('click');
+  });
+
+  test('javascript: href is dropped on an HTML anchor too', () => {
+    const a = render('<a href="JaVaScRiPt:alert(1)">x</a>').querySelector('a')!;
+    expect(a.getAttribute('href')).toBeNull();
+  });
+
+  test('relative and anchor hrefs still work', () => {
+    expect(render('[a](./docs/x.md)').querySelector('a')!.getAttribute('href')).toBe('./docs/x.md');
+    expect(render('[b](#section)').querySelector('a')!.getAttribute('href')).toBe('#section');
+    expect(render('[c](mailto:a@b.test)').querySelector('a')!.getAttribute('href')).toBe('mailto:a@b.test');
+  });
+});
+
 describe('renderInlineMarkdown — safety & robustness', () => {
   test('never uses innerHTML to inject script-like content', () => {
     const h = render('<script>alert(1)</script> hi');

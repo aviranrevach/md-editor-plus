@@ -11,6 +11,7 @@ import { applyFilter } from './boardFilter';
 import { resolveImageSrc } from './mediaResolve';
 import { firstImageSrc } from './boardImageLinks';
 import { renderInlineMarkdown } from './boardInlineRender';
+import { flattenMarkdownLines } from './boardBodyPreview';
 import { attachSmartTypography } from './extensions/smartTypography';
 import { createPopover } from './popover';
 
@@ -982,13 +983,10 @@ function nextColor(used: string[]): ColorToken {
 }
 
 function bodyPreview(body: string): string {
-  if (!body) return '';
-  // Strip simple markdown: leading #, *, -, [task] markers.
-  const lines = body
-    .split('\n')
-    .map((l) => l.replace(/^\s*[#>\-*]\s*\[.\]\s*/, '').replace(/^\s*[#>\-*]\s*/, '').trim())
-    .filter(Boolean);
-  return lines[0] || '';
+  // c9 — first line with real content, block syntax already stripped. Shares the
+  // table Description column's flattener so both views agree on what a body
+  // looks like as one line (fenced code, tables and pasted block HTML included).
+  return flattenMarkdownLines(body, { maxLines: 1 })[0] ?? '';
 }
 
 function formatDate(iso: string): string {

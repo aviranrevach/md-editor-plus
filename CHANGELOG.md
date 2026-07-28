@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pasting into a card description no longer shows raw code in board views (c9)** — a description is edited in the side panel with the *full* block editor, so it can hold headings, lists, tables, fenced code and pasted rich text. The table view's **Description** column and the kanban card preview only understood *inline* Markdown, so every block construct was printed as literal syntax — a pasted code block showed its ` ``` ` fences, a table showed its `|` pipes, a list showed its bullets. It looked correct in the panel and wrong on the board. Both previews now flatten the block layer first: a code block reads as `code`, a table as its cell values, headings and list markers drop away, and lines join with ` • `. Inline styling (bold, italic, links, color, thumbnails) still renders as before. (c9)
+- **Resized images and pasted links render in board previews (c9)** — a resized image is stored as `<img src="…" width="N">` and a pasted link can keep its `<a href="…">` tag; board cells printed both as raw tags. They now render as a thumbnail and a real link.
+- **Search scroll in Code view (c58)** — searching in Code view updated the match counter but never scrolled to the match. Its code block could silently become its own (never-scrolling) scroll container, and the jump ran before the line-number gutter finished redrawing. Find now scrolls to the match in Code view. (c58)
+
+### Developer
+
+- New `boardBodyPreview.ts` — a pure `flattenMarkdownLines()` / `flattenMarkdownToInline()` shared by the table Description column and the kanban card preview, so both views agree on how a body reads as one line (38 tests).
+- `boardInlineRender.ts` hardens rendered links: only `http`, `https`, `mailto` and `tel` schemes (plus relative paths and anchors) become a live `href` — `javascript:` and `data:` URLs are dropped while the link text still renders.
+
 ## [0.9.1] - 2026-07-01
 
 ### Changed
