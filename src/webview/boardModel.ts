@@ -621,6 +621,23 @@ export function mintBoardId(taken: Iterable<string>): string {
   return id;
 }
 
+// Read / swap the board id straight off a region's start marker. Both work on
+// the raw `source` string so a pasted board can be re-identified (c59) without a
+// parse → serialize round-trip, which would also renormalize everything else in
+// the region. `id` is documented as the first start-marker attribute, but the
+// lazy prefix tolerates it appearing later.
+const BOARD_ID_RE = /(<!--\s*board:start[^>]*?\bid=")([^"]*)(")/i;
+
+/** The board id on `source`'s start marker, or '' when absent / malformed. */
+export function boardIdOf(source: string): string {
+  return BOARD_ID_RE.exec(source)?.[2] ?? '';
+}
+
+/** `source` with its board id replaced — every other byte untouched. */
+export function replaceBoardId(source: string, id: string): string {
+  return source.replace(BOARD_ID_RE, (_m, before: string, _old: string, after: string) => `${before}${id}${after}`);
+}
+
 // Duplicate a board's `source`: parse it, assign a fresh unique board id, and
 // re-serialize. Card ids are scoped inside this board's own region, so they are
 // preserved as-is — only the board id must be unique across the document.

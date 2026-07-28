@@ -97,11 +97,17 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
       const color = nextColor(board.columns.map((c) => c.color));
       mutate({ ...board, columns: [...board.columns, { name: nm, color }] });
       // After mutate(), the row variable references a now-detached element.
-      // Query the FRESH DOM via the board id (set as data-board-id on .board-block).
+      // Re-find THIS board's fresh DOM. Anchor on our own `.board-block`
+      // ancestor rather than a document-wide [data-board-id] lookup: if two
+      // boards ever share an id, that query returns whichever comes first in the
+      // document and we'd focus/scroll the wrong board (c59).
+      const ownBlock = row.closest('.board-block') as HTMLElement | null;
       requestAnimationFrame(() => {
-        const boardDom = board.id
-          ? (document.querySelector(`.board-block[data-board-id="${board.id}"]`) as HTMLElement | null)
-          : null;
+        const boardDom = ownBlock?.isConnected
+          ? ownBlock
+          : (board.id
+              ? (document.querySelector(`.board-block[data-board-id="${board.id}"]`) as HTMLElement | null)
+              : null);
         if (!boardDom) return;
         const newColDom = boardDom.querySelector(
           `.board-column[data-column="${cssEscape(nm)}"]`,

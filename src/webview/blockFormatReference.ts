@@ -47,6 +47,7 @@ const BOARD_RULES = [
   'A `tags` cell is a comma-separated list of tag names (a card can have several); each tag is its own coloured chip. A tag not listed in `field-options` is auto-coloured. Names in `columns`/`field-options`/tags must not contain `| ; : =` (tag names also drop `,`).',
   'Group the Table view by any status or tag column with a view marker placed right after `board:start`: `<!-- board:view name="table" group="FieldName" -->`.',
   'Every card needs a unique `id` (C1, C2, …) used in BOTH its table row and its `<!-- board:body id="…" -->` block.',
+  "The board's own `id` must be unique within the file — do NOT copy `b1` from the example. Use a short random id like `b-k4x9`. Two boards sharing an id make the app treat them as the same board.",
   'Dates as `YYYY-MM-DD`; people as `@name`. In table cells, escape pipes as `\\|` and use `<br>` for line breaks.',
 ];
 

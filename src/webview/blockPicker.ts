@@ -1196,7 +1196,10 @@ function insertBoardWith(
   editor: Editor,
   pos: number,
 ): void {
-  const id = `b-${Math.random().toString(36).slice(2, 6)}`;
+  // Mint against the ids already in the doc (c59). Rolling a bare random id here
+  // could collide with an existing board — and two boards sharing an id alias
+  // each other through the `[data-board-id]` lookups below.
+  const id = mintBoardId(existingBoardIds(editor));
   const source = freshBoardSource(id, activeView);
   // Insert the board followed by an empty paragraph so the cursor has
   // somewhere to land below the (atom) board.

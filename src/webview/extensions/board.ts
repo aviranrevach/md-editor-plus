@@ -1,7 +1,9 @@
 import { Node, mergeAttributes } from '@tiptap/core';
-import { NodeSelection } from '@tiptap/pm/state';
+import { NodeSelection, Plugin } from '@tiptap/pm/state';
+import { Fragment, Slice, type Node as PMNode } from '@tiptap/pm/model';
 import { createBoardView, BOARD_INTERACTIVE_SELECTOR } from '../boardBlock';
 import { commitBoardSource } from '../boardCommit';
+import { boardIdOf, replaceBoardId, mintBoardId } from '../boardModel';
 
 const REGION_RE =
   /<!--\s*board:start[\s\S]*?<!--\s*board:end\s*-->/gi;
@@ -24,6 +26,90 @@ export function preprocessMarkdownBoards(markdown: string): string {
   return markdown.replace(REGION_RE, (region) => {
     return `<div data-board source="${htmlEscape(region)}"></div>`;
   });
+}
+
+// Which modifier turns a drag into a COPY — mirrors prosemirror-view's own
+// `dragCopyModifier` (Alt on macOS/iOS, Ctrl elsewhere).
+const COPY_MODIFIER: 'altKey' | 'ctrlKey' =
+  /Mac|iP(hone|[oa]d)/.test(typeof navigator === 'undefined' ? '' : navigator.platform)
+    ? 'altKey'
+    : 'ctrlKey';
+
+// Recorded by the drop DOM handler and consumed by `transformPasted` on that same
+// drop. Null means "no drop involved" — i.e. a clipboard paste.
+let lastDropWasCopy: boolean | null = null;
+
+/**
+ * Should a pasted / dropped board whose id collides be given a fresh one?
+ *
+ * Only an internal drag-MOVE keeps its id: the "collision" there is the very
+ * board being moved, which is removed in the same transaction. A COPY-drag
+ * (Option on macOS, Ctrl elsewhere) is a genuine duplicate and must be re-minted.
+ *
+ * `dropWasCopy` comes from the DROP event and wins when present, because
+ * ProseMirror freezes `dragging.move` at DRAGSTART (view.dragging is built there)
+ * while deciding move-vs-copy from the modifier held at DROP. Those disagree
+ * whenever the modifier is pressed mid-drag — which is exactly how you
+ * option-drag to duplicate: start moving, then hold Option before releasing.
+ */
+export function shouldRemintOnPaste(opts: {
+  isInternalDrag: boolean;
+  dropWasCopy: boolean | null;
+  draggingMove: boolean;
+}): boolean {
+  if (!opts.isInternalDrag) return true;   // clipboard paste, or a drop from outside
+  return opts.dropWasCopy ?? !opts.draggingMove;
+}
+
+/** Every board id present in `doc` (c59). */
+export function collectBoardIds(doc: PMNode, nodeName = 'board'): Set<string> {
+  const ids = new Set<string>();
+  doc.descendants((node) => {
+    if (node.type.name === nodeName) {
+      const id = boardIdOf(node.attrs.source as string);
+      if (id) ids.add(id);
+    }
+    return true;
+  });
+  return ids;
+}
+
+/**
+ * Re-mint the board id of any board in `slice` whose id is already in `taken`,
+ * walking nested content so a board pasted inside a wrapper is still caught.
+ * Returns the original slice untouched when nothing collides, so a normal paste
+ * costs one walk and produces no change. `taken` is mutated as ids are claimed,
+ * which is what keeps two colliding boards in ONE paste from landing on the
+ * same fresh id.
+ */
+export function remapPastedBoardIds(slice: Slice, taken: Set<string>, nodeName = 'board'): Slice {
+  if (taken.size === 0) return slice;
+  let changed = false;
+
+  const remap = (fragment: Fragment): Fragment => {
+    const out: PMNode[] = [];
+    fragment.forEach((node) => {
+      if (node.type.name === nodeName) {
+        const source = node.attrs.source as string;
+        const id = boardIdOf(source);
+        if (id && taken.has(id)) {
+          const fresh = mintBoardId(taken);
+          taken.add(fresh);
+          changed = true;
+          out.push(node.type.create({ ...node.attrs, source: replaceBoardId(source, fresh) }, node.content, node.marks));
+          return;
+        }
+        if (id) taken.add(id);
+        out.push(node);
+        return;
+      }
+      out.push(node.content.size ? node.copy(remap(node.content)) : node);
+    });
+    return Fragment.fromArray(out);
+  };
+
+  const next = remap(slice.content);
+  return changed ? new Slice(next, slice.openStart, slice.openEnd) : slice;
 }
 
 const Board = Node.create({
@@ -55,6 +141,47 @@ const Board = Node.create({
     return [
       'div',
       mergeAttributes({ 'data-board': '' }, HTMLAttributes),
+    ];
+  },
+
+  // c59 — a copied board pastes its `source` verbatim, id and all, so
+  // copy→paste produced two boards claiming the same `board:start id`. Boards
+  // that share an id alias each other through the document-wide
+  // `.board-block[data-board-id="…"]` lookups, so one board's focus / scroll /
+  // measure work can land on the other's DOM. Re-mint any pasted board whose id
+  // is already taken.
+  //
+  // Scoped to `transformPasted` on purpose: it runs only for clipboard + drop,
+  // never on load. Rewriting ids in an appendTransaction would dirty a file just
+  // for being opened — the phantom-dirty family (c28/c56) we already fixed once.
+  addProseMirrorPlugins() {
+    const name = this.name;
+    return [
+      new Plugin({
+        props: {
+          // Observe the drop's copy-modifier only — never handle the event, so
+          // ProseMirror's own drop logic runs exactly as before. This fires
+          // before the built-in drop handler, hence before transformPasted.
+          handleDOMEvents: {
+            drop(_view, event) {
+              lastDropWasCopy = !!(event as DragEvent)[COPY_MODIFIER];
+              return false;
+            },
+          },
+          transformPasted(slice, view) {
+            const dragging = view.dragging;
+            const dropWasCopy = lastDropWasCopy;
+            lastDropWasCopy = null;
+            const remint = shouldRemintOnPaste({
+              isInternalDrag: !!dragging,
+              dropWasCopy,
+              draggingMove: !!dragging?.move,
+            });
+            if (!remint) return slice;
+            return remapPastedBoardIds(slice, collectBoardIds(view.state.doc, name), name);
+          },
+        },
+      }),
     ];
   },
 
