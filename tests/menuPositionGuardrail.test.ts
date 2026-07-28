@@ -33,6 +33,24 @@ describe('menu positioning guardrail (c34)', () => {
     expect(src).toMatch(/export function placeFloating/);
     expect(src).toMatch(/export function computePlacement/);
   });
+
+  // c53: keyboard-nav scrolling belongs to menuPosition.ts too — it owns the
+  // height cap + .is-scroll that create the scroll container in the first place.
+  // A menu must not hand-roll scrollTop math, and must not reach for
+  // scrollIntoView(), which can scroll the PAGE and trip the popover registry's
+  // window-scroll dismissal (closing the menu being navigated).
+  test('menuPosition.ts exports the keyboard-nav scroll helpers', () => {
+    const src = fs.readFileSync(path.join(dir, 'menuPosition.ts'), 'utf8');
+    expect(src).toMatch(/export function scrollRowIntoView/);
+    expect(src).toMatch(/export function computeListScrollTop/);
+  });
+
+  test('blockPicker.ts routes keyboard-nav scrolling through the helper', () => {
+    const src = fs.readFileSync(path.join(dir, 'blockPicker.ts'), 'utf8');
+    expect(src).toMatch(/scrollRowIntoView\s*\(/);
+    expect(src).not.toMatch(/\.scrollTop\s*=/);
+    expect(src).not.toMatch(/\.scrollIntoView\s*\(\s*\{/);
+  });
 });
 
 // ---------------------------------------------------------------------------

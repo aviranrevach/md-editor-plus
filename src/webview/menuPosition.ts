@@ -158,6 +158,110 @@ export function placeFloatingAtRect(el: HTMLElement, rect: Rect, opts: PlaceOpts
   else { el.classList.remove('is-scroll'); el.style.maxHeight = ''; }
 }
 
+// ─── Keyboard-nav scrolling (c53) ───────────────────────────────────────────
+// Arrowing through a capped menu moved the highlight but never scrolled the
+// list, so the active row walked off the bottom (and hid behind the picker's
+// sticky footer). placeFloating owns the cap + `.is-scroll`, so the matching
+// "keep the highlighted row visible" rule lives here too.
+
+export interface ListScrollInput {
+  /** The container's current scrollTop. */
+  scrollTop: number;
+  /** Visible height of the scroll container (clientHeight). */
+  viewport: number;
+  /** Full scrollable content height (scrollHeight). */
+  content: number;
+  /** The row's top edge, in the container's scroll-content coordinates. */
+  rowTop: number;
+  rowHeight: number;
+  /** Height of a sticky header overlaying the top of the viewport. */
+  insetTop?: number;
+  /** Height of a sticky footer overlaying the bottom of the viewport. */
+  insetBottom?: number;
+  /** Breathing room kept between the row and the band edge. */
+  pad?: number;
+}
+
+/**
+ * The scrollTop that brings `rowTop…rowTop+rowHeight` inside the visible band,
+ * moving as little as possible. Returns `scrollTop` unchanged when the row is
+ * already fully visible — scroll only on true overflow, matching computePlacement.
+ */
+export function computeListScrollTop(input: ListScrollInput): number {
+  const insetTop = input.insetTop ?? 0;
+  const insetBottom = input.insetBottom ?? 0;
+  const pad = input.pad ?? 0;
+  const maxScroll = Math.max(0, input.content - input.viewport);
+
+  // The slice of content the user can actually see: the viewport minus whatever
+  // sticky chrome floats over its top and bottom edges.
+  const bandTop = input.scrollTop + insetTop + pad;
+  const bandBottom = input.scrollTop + input.viewport - insetBottom - pad;
+  const bandHeight = input.viewport - insetTop - insetBottom - 2 * pad;
+
+  let next = input.scrollTop;
+  if (input.rowTop < bandTop || input.rowHeight >= bandHeight) {
+    // Above the band, or too tall to ever fit inside it — align to the top edge
+    // so the row's start is what shows, never its middle.
+    next = input.rowTop - insetTop - pad;
+  } else if (input.rowTop + input.rowHeight > bandBottom) {
+    next = input.rowTop + input.rowHeight - input.viewport + insetBottom + pad;
+  }
+  return clamp(next, 0, maxScroll);
+}
+
+/**
+ * Keep the keyboard-highlighted `row` visible inside its scrolling menu.
+ *
+ * Deliberately moves `container.scrollTop` rather than calling
+ * `row.scrollIntoView()`: scrollIntoView walks up to the nearest scrollable
+ * ancestor and can scroll the PAGE, which both yanks the document behind the
+ * menu and makes the popover registry's window-scroll handler dismiss the very
+ * menu being navigated (popover.ts only ignores scrolls whose target is inside
+ * the popover). Touching scrollTop keeps the event inside the container.
+ */
+export function scrollRowIntoView(
+  container: HTMLElement,
+  row: HTMLElement,
+  opts: { pad?: number } = {},
+): void {
+  if (container.scrollHeight <= container.clientHeight) return;  // nothing to scroll
+  const insets = stickyInsets(container);
+  const cRect = container.getBoundingClientRect();
+  const rRect = row.getBoundingClientRect();
+  // Row top in content coordinates: screen delta, past the border, plus how far
+  // the content is already scrolled.
+  const rowTop = rRect.top - cRect.top - container.clientTop + container.scrollTop;
+  const next = computeListScrollTop({
+    scrollTop: container.scrollTop,
+    viewport: container.clientHeight,
+    content: container.scrollHeight,
+    rowTop,
+    rowHeight: rRect.height,
+    insetTop: insets.top,
+    insetBottom: insets.bottom,
+    pad: opts.pad ?? 4,
+  });
+  if (next !== container.scrollTop) container.scrollTop = next;
+}
+
+// Sticky children float over the scroll viewport, so a row scrolled flush to an
+// edge still ends up hidden behind them (the block picker's footer is
+// `position: sticky; bottom: 0`). Measure them so the band excludes their height.
+function stickyInsets(container: HTMLElement): { top: number; bottom: number } {
+  let top = 0;
+  let bottom = 0;
+  for (const child of Array.from(container.children)) {
+    if (!(child instanceof HTMLElement)) continue;
+    const cs = getComputedStyle(child);
+    if (cs.position !== 'sticky') continue;
+    // A sticky element pins to whichever inset it declares.
+    if (cs.bottom !== 'auto' && cs.bottom !== '') bottom = Math.max(bottom, child.offsetHeight);
+    else if (cs.top !== 'auto' && cs.top !== '') top = Math.max(top, child.offsetHeight);
+  }
+  return { top, bottom };
+}
+
 export interface FlyoutInput {
   panel: Rect;                                  // the action panel's bounding rect
   row: Rect;                                    // the Turn-into row's rect (vertical anchor)

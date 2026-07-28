@@ -220,7 +220,7 @@ Clears the saved defaults and restores the built-in ones (Light theme, Sans font
 
 ## Editor blocks
 
-Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**. Filter by typing.
+Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**. Filter by typing, or walk the list with `↑` / `↓` — the menu scrolls to follow the highlight, so the selected row stays visible however long the list is. `↵` inserts, `esc` closes.
 
 | Section | Blocks |
 | --- | --- |

@@ -13,7 +13,7 @@ import { type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
 import { createPopover, type Popover } from './popover';
-import { placeFlyout } from './menuPosition';
+import { placeFlyout, scrollRowIntoView } from './menuPosition';
 
 export interface BlockDef {
   id: string;
@@ -688,9 +688,11 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function updateFlyoutActive(): void {
-    flyoutList.querySelectorAll<HTMLElement>('.block-picker-item').forEach((row, i) => {
-      row.classList.toggle('active', i === flyoutIdx);
-    });
+    const rows = flyoutList.querySelectorAll<HTMLElement>('.block-picker-item');
+    rows.forEach((row, i) => row.classList.toggle('active', i === flyoutIdx));
+    // The Turn-into flyout scrolls on its own element (c53).
+    const activeRow = rows[flyoutIdx];
+    if (activeRow) scrollRowIntoView(flyoutEl, activeRow);
   }
 
   let flyoutAnchorRow: HTMLElement | null = null;
@@ -925,9 +927,12 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   }
 
   function updateActive(): void {
-    list.querySelectorAll<HTMLElement>('.block-picker-item').forEach((row, i) => {
-      row.classList.toggle('active', i === activeIdx);
-    });
+    const rows = list.querySelectorAll<HTMLElement>('.block-picker-item');
+    rows.forEach((row, i) => row.classList.toggle('active', i === activeIdx));
+    // c53 — the picker itself is the scroll container (placeFloating caps it),
+    // so follow the highlight or it walks off the bottom / behind the footer.
+    const activeRow = rows[activeIdx];
+    if (activeRow) scrollRowIntoView(el, activeRow);
   }
 
   function backToList(): void {
