@@ -9,8 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Copy & Copy as plain text (c23)** — the selection toolbar can copy your selection with formatting intact (**Copy**) or as clean unformatted text (**Copy as plain text**), fixing selections that used to paste in with the wrong styling. Both live in the ⋯ menu (see below). (c23)
+- **Delete a property from the column menu (c3)** — the board table's column **⋯** menu gained **Delete property**, so a column can be removed from where you're already looking at it instead of only from the Properties popover. It drops the column and its values on every card, and asks for confirmation first when cards actually hold data (naming how many). Unavailable for the built-in Title, Status and Description fields. (c3)
 
 ### Changed
+
+- **Sort is now a dropdown in the column menu (c4)** — the column **⋯** menu's *Sort* row shows the column's current sort at a glance (**None**, **Ascending**, **Descending**) and its flyout offers those same three choices with a ✓ on the active one. Previously it read *Ascending · Descending · Clear sort* with no indication of what was in effect, so you had to sort and watch the table to find out. Picking *None* clears the sort — and on a column that isn't the sorted one it now correctly does nothing, instead of clearing the sort another column owned. (c4)
 
 - **Slimmer selection toolbar** — the floating text toolbar is now two tidy rows: character formatting on top (Bold, Italic, Underline, Strikethrough, Inline code), and Link, Text color, Highlight, Emoji plus a **⋯** menu below. The standalone AI button and the two Copy buttons moved into that **⋯** menu (**Turn into**, **Turn into using AI**, **Copy**, **Copy as plain text**), so the bar covers less of your text.
 
@@ -24,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Developer
 
+- The column menu reuses the Properties panel's `deleteFieldWithConfirm`, and `deleteFieldFromBoard` now routes through `boardOps.deleteField` — so a deleted field is also scrubbed from every view (columns, hidden, sort, groupBy, widths) on *both* entry points, instead of leaving dangling references behind on the Properties path. `menu.ts` renders an item's `trailing` element before the submenu caret so a value hint reads "Sort  Ascending ›" (10 tests in `boardColumnMenu.test.ts`).
 - New `boardBodyPreview.ts` — a pure `flattenMarkdownLines()` / `flattenMarkdownToInline()` shared by the table Description column and the kanban card preview, so both views agree on how a body reads as one line (38 tests).
 - `menuPosition.ts` gains `computeListScrollTop()` (pure, 14 tests) + `scrollRowIntoView()` for keyboard-nav scrolling — it already owned the height cap and `.is-scroll` that create the scroll container. It moves `scrollTop` rather than calling `scrollIntoView()`, which can scroll the page and trip the popover registry's window-scroll dismissal, closing the menu being navigated. The c34 guardrail now also asserts menus don't hand-roll this.
 - `boardInlineRender.ts` hardens rendered links: only `http`, `https`, `mailto` and `tel` schemes (plus relative paths and anchors) become a live `href` — `javascript:` and `data:` URLs are dropped while the link text still renders.

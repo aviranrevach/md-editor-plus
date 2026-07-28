@@ -21,6 +21,7 @@ import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInVie
 import { startDrag, dropIndicator } from './boardDragShared';
 import { attachSmartTypography } from './extensions/smartTypography';
 import { openStatusOptionsEditor } from './boardStatusOptions';
+import { deleteFieldWithConfirm } from './boardProperties';
 import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
 import { renderInlineMarkdown } from './boardInlineRender';
@@ -965,7 +966,24 @@ const COL_MENU_ICONS = {
   editOptions: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
   filter: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M230.6,49.53A15.81,15.81,0,0,0,216,40H40A16,16,0,0,0,28.19,66.76l.08.09L96,139.17V216a16,16,0,0,0,24.87,13.3l32-21.34A16,16,0,0,0,160,194.66V139.17l67.74-72.32.08-.09A15.8,15.8,0,0,0,230.6,49.53ZM40,56h0Zm106.18,74.58A8,8,0,0,0,144,136v58.66L112,216V136a8,8,0,0,0-2.16-5.47L40,56H216Z"/></svg>`,
   sort: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,181.66l-32,32a8,8,0,0,1-11.32,0l-32-32A8,8,0,0,1,144,168h24V96a8,8,0,0,1,16,0v72h24a8,8,0,0,1,5.66,13.66ZM82.34,42.34a8,8,0,0,0-11.32,0l-32,32A8,8,0,0,0,44,88H68v72a8,8,0,0,0,16,0V88h24a8,8,0,0,0,5.66-13.66Z"/></svg>`,
+  trash: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>`,
 };
+
+const SORT_DIR_LABEL = { none: 'None', asc: 'Ascending', desc: 'Descending' } as const;
+
+/** The table view's sort direction for `field`, or null when it isn't the sorted column. */
+function sortDirFor(ctx: BoardRendererCtx, field: string): 'asc' | 'desc' | null {
+  const sort = ctx.getBoard().views.find(x => x.name === 'table')?.sort;
+  return sort?.field === field ? sort.dir : null;
+}
+
+/** Muted right-aligned value text for a menu row that behaves like a dropdown. */
+function menuValueHint(text: string): HTMLElement {
+  const el = document.createElement('span');
+  el.className = 'mp-menu-value';
+  el.textContent = text;
+  return el;
+}
 
 function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx, collapsedGroups: Set<string>): void {
   // Rename is the FIRST item — most-common reason to open this menu.
@@ -1007,38 +1025,41 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     {
       icon: COL_MENU_ICONS.sort,
       label: 'Sort',
-      submenu: () => [{ items: [
-        {
-          icon: COL_MENU_ICONS.sortAsc,
-          label: 'Ascending',
-          onSelect: () => {
-            const cur = ctx.getBoard();
-            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-            setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
-            ctx.mutate(b2);
+      // Reads like a dropdown: the row shows the current choice, the flyout
+      // offers None / Ascending / Descending with a ✓ on the active one (c4).
+      trailing: menuValueHint(SORT_DIR_LABEL[sortDirFor(ctx, f.name) ?? 'none']),
+      submenu: () => {
+        const active = sortDirFor(ctx, f.name);
+        const applySortDir = (dir: 'asc' | 'desc' | null) => {
+          // "None" on a column that isn't the sorted one must not clear the
+          // sort another column owns.
+          if (dir === null && active === null) return;
+          const cur = ctx.getBoard();
+          const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+          setViewSort(b2, 'table', dir ? { field: f.name, dir } : null);
+          ctx.mutate(b2);
+        };
+        return [{ items: [
+          {
+            icon: COL_MENU_ICONS.sortClear,
+            label: SORT_DIR_LABEL.none,
+            checked: active === null,
+            onSelect: () => applySortDir(null),
           },
-        },
-        {
-          icon: COL_MENU_ICONS.sortDesc,
-          label: 'Descending',
-          onSelect: () => {
-            const cur = ctx.getBoard();
-            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-            setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
-            ctx.mutate(b2);
+          {
+            icon: COL_MENU_ICONS.sortAsc,
+            label: SORT_DIR_LABEL.asc,
+            checked: active === 'asc',
+            onSelect: () => applySortDir('asc'),
           },
-        },
-        {
-          icon: COL_MENU_ICONS.sortClear,
-          label: 'Clear sort',
-          onSelect: () => {
-            const cur = ctx.getBoard();
-            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-            setViewSort(b2, 'table', null);
-            ctx.mutate(b2);
+          {
+            icon: COL_MENU_ICONS.sortDesc,
+            label: SORT_DIR_LABEL.desc,
+            checked: active === 'desc',
+            onSelect: () => applySortDir('desc'),
           },
-        },
-      ] }],
+        ] }];
+      },
     },
   ];
 
@@ -1082,9 +1103,29 @@ function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx,
     },
   ];
 
+  // Section 3 — destructive. Same action (and same smart confirm) as the
+  // Properties panel's row menu, so a column can be removed from where the
+  // user is already looking at it (c3).
+  const dangerItems = [
+    {
+      icon: COL_MENU_ICONS.trash,
+      label: 'Delete property',
+      variant: 'danger' as const,
+      disabled: isLockedName,
+      onSelect: () => {
+        // Grouping/sort/width on the deleted field are cleared by
+        // deleteFieldFromBoard; the collapsed-group set is view state, so it
+        // has to be dropped here like the "Remove grouping" path does.
+        if (tableGroupBy === f.name) collapsedGroups.clear();
+        deleteFieldWithConfirm(ctx.getBoard(), f.name, ctx.mutate);
+      },
+    },
+  ];
+
   createMenu({ className: 'bd-col-menu' }).open(anchor, [
     { items: viewItems },
     { items: fieldItems },
+    { items: dangerItems },
   ]);
 }
 

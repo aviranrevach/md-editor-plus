@@ -29,13 +29,14 @@ export function createMenu(opts: PopoverOpts = {}): Menu {
     const label = document.createElement('span'); label.className = 'mp-menu-label'; label.textContent = item.label;
     row.appendChild(label);
     if (item.checked) { const c = document.createElement('span'); c.className = 'mp-menu-check'; c.textContent = '✓'; row.appendChild(c); }
-    if (item.submenu) { const ca = document.createElement('span'); ca.className = 'mp-menu-caret'; ca.textContent = '›'; row.appendChild(ca); }
+    // Trailing goes BEFORE the caret so a value hint reads "Sort  Ascending ›".
     if (item.trailing) {
       item.trailing.classList.add('mp-menu-trailing');
       // clicks on the trailing control must not activate the row
       item.trailing.addEventListener('mousedown', (e) => e.stopPropagation());
       row.appendChild(item.trailing);
     }
+    if (item.submenu) { const ca = document.createElement('span'); ca.className = 'mp-menu-caret'; ca.textContent = '›'; row.appendChild(ca); }
     if (item.submenu) {
       row.addEventListener('mousedown', (e) => { e.preventDefault(); stack.push(item.submenu!()); renderCurrent(); });
     } else if (!item.disabled) {

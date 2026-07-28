@@ -241,6 +241,8 @@
 .mp-menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-menu-check, .mp-menu-caret { color: var(--text-secondary, #888); flex-shrink: 0; }
 .mp-menu-trailing { flex-shrink: 0; }
+/* Current-value text on a menu row that acts as a dropdown (e.g. Sort). */
+.mp-menu-value { color: var(--text-secondary, #888); font-size: 12px; }
 .mp-menu-section { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary, #888); padding: 6px 10px 4px; }
 .mp-menu-divider { height: 1px; background: var(--border); margin: 5px 4px; }
 .mp-menu-back .mp-menu-label { color: var(--text-secondary, #888); }
