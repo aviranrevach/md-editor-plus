@@ -11,8 +11,9 @@
 | Pasting Image in - add image to workspace options (consider also in table / board table) | Done | c10 | High | General |  |
 | Bug! Changing column size | Todo | c11 | High | Board table |  |
 | Bug in description when pasting | Review | c9 | Medium | General |  |
-| Add "Delete property" option to the table column three-dot menu | Todo | c3 | Medium | Board Table -> Three dot menu |  |
-| In the column three-dot menu, give Sort a dropdown: None / Ascending / Descending | Todo | c4 | Medium | Board Table -> Three dot menu |  |
+| Add "Delete property" option to the table column three-dot menu | Review | c3 | Medium | Board Table -> Three dot menu |  |
+| In the column three-dot menu, give Sort a dropdown: None / Ascending / Descending | Review | c4 | Medium | Board Table -> Three dot menu |  |
+| Verify c3 + c4 column menu: F5, open a board in table view, click a column header's ⋯ menu. Check Delete property removes that column (with a confirm) and that Sort shows the current state as a dropdown reading None / Ascending / Descending. This shipped without ever being run in the app. | Todo | c3-c4-verify | Medium | Board Table -> Three dot menu |  |
 | Board table view bug when moving title  column (Bug) | Todo | c6 | Medium | Board Table |  |
 | board table sometimes clicking on a cell doesnt add in the curser and allow you to change its location in cell (Bug) | Done | c7 | Medium | Board table -> cell |  |
 | When typing -> <- Should actually put arrow character (like in notion), and check which combinations should also allow this | Done | c5 | Low | General |  |
