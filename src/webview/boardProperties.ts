@@ -2,7 +2,7 @@
 import type { Board, FieldDef, FieldType, ColumnDef } from './boardModel';
 import { COLOR_TOKENS_PUBLIC } from './boardModel';
 import { FIELD_TYPE_ICONS, FIELD_TYPE_LABELS } from './boardIcons';
-import { setViewColumns, hideFieldInView, showFieldInView } from './boardOps';
+import { setViewColumns, hideFieldInView, showFieldInView, deleteField } from './boardOps';
 import { buildOptionsEditor, openStatusOptionsEditor } from './boardStatusOptions';
 import { createPopover } from './popover';
 import { createMenu } from './menu';
@@ -137,15 +137,23 @@ function startManualFieldDrag(
 }
 
 export function deleteFieldFromBoard(board: Board, fieldName: string): Board {
-  return {
+  // Clone deeply enough for boardOps.deleteField to mutate freely, then let it
+  // do the work — it also scrubs the field out of every view (columns, hidden,
+  // sort, groupBy, widths), which a fields+cards-only delete would leave
+  // dangling.
+  const next: Board = {
     ...board,
-    fields: board.fields.filter((f) => f.name !== fieldName),
-    cards: board.cards.map((c) => {
-      const v: Record<string, string> = { ...c.values };
-      delete v[fieldName];
-      return { ...c, values: v };
-    }),
+    fields: [...board.fields],
+    cards: board.cards.map((c) => ({ ...c, values: { ...c.values } })),
+    views: board.views.map((v) => ({
+      ...v,
+      ...(v.columns ? { columns: [...v.columns] } : {}),
+      ...(v.hidden  ? { hidden:  [...v.hidden]  } : {}),
+      ...(v.widths  ? { widths:  { ...v.widths } } : {}),
+    })),
   };
+  deleteField(next, fieldName);
+  return next;
 }
 
 export function toggleFieldVisibility(board: Board, fieldName: string): Board {
