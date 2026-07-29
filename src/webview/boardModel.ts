@@ -62,10 +62,23 @@ export function setStatusOptions(board: Board, fieldName: string, options: Colum
   };
 }
 
+/** True if `name` (trimmed, case-insensitive) is free to use on a status field,
+ *  ignoring the option named `exclude` (the one being renamed). */
+export function isStatusNameAvailable(
+  board: Board, fieldName: string, name: string, exclude?: string,
+): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const target = norm(name);
+  return !getStatusOptions(board, fieldName).some(
+    (o) => o.name !== exclude && norm(o.name) === target,
+  );
+}
+
 /** Rename a status option and migrate every card value holding the old name. */
 export function renameStatusOption(
   board: Board, fieldName: string, oldName: string, newName: string,
 ): Board {
+  if (!isStatusNameAvailable(board, fieldName, newName, oldName)) return board;
   const opts = getStatusOptions(board, fieldName).map(
     (o) => (o.name === oldName ? { ...o, name: newName } : o),
   );
@@ -109,6 +122,19 @@ export function recolorStatusOption(
   const opts = getStatusOptions(board, fieldName).map(
     (o) => (o.name === name ? { ...o, color } : o),
   );
+  return setStatusOptions(board, fieldName, opts);
+}
+
+/** Move the status option at index `from` to index `to`. Pure array reorder. */
+export function reorderStatusOption(
+  board: Board, fieldName: string, from: number, to: number,
+): Board {
+  const opts = [...getStatusOptions(board, fieldName)];
+  if (from < 0 || from >= opts.length || to < 0 || to >= opts.length || from === to) {
+    return board;
+  }
+  const [moved] = opts.splice(from, 1);
+  opts.splice(to, 0, moved);
   return setStatusOptions(board, fieldName, opts);
 }
 
