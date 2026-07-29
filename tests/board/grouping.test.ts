@@ -5,6 +5,7 @@ import { autoColorPublic, COLOR_TOKENS_PUBLIC } from '../../src/webview/boardMod
 import { mountTable } from '../../src/webview/boardTableRender';
 import type { Board } from '../../src/webview/boardModel';
 import type { BoardRendererCtx } from '../../src/webview/boardBlock';
+import type { FilterState } from '../../src/webview/boardFilter';
 
 describe('autoColorPublic', () => {
   it('returns a valid palette token, deterministically', () => {
@@ -28,6 +29,9 @@ function makeCtx(board: Board): { ctx: BoardRendererCtx; boardRef: { current: Bo
   const root = document.createElement('div');
   document.body.appendChild(root);
   const boardRef = { current: board };
+  // Grouping tests don't filter, but the renderer always reads the session
+  // filter — so supply an empty one rather than leaving the ctx incomplete.
+  let filter: FilterState = {};
   const ctx: BoardRendererCtx = {
     root,
     getBoard: () => boardRef.current,
@@ -36,6 +40,8 @@ function makeCtx(board: Board): { ctx: BoardRendererCtx; boardRef: { current: Bo
     requestDelete: () => { /* no-op */ },
     readonly: false,
     isReadonly: () => ctx.readonly,
+    getFilter: () => filter,
+    setFilter: (next: FilterState) => { filter = next; },
   };
   return { ctx, boardRef };
 }
@@ -119,8 +125,11 @@ describe('group band color', () => {
     mountTable(ctx);
     const highRow = Array.from(ctx.root.querySelectorAll('.bd-group-row'))
       .find((r) => /High/.test(r.textContent || ''))!;
-    expect(highRow.classList.contains('bd-group-band')).toBe(true);
-    expect(highRow.classList.contains('color-red')).toBe(true);
+    // The tint lives on the group's CELL, not the row — c12 moved it there so the
+    // color fills the whole width instead of just the label's box.
+    const band = highRow.closest('td, th') ?? highRow.parentElement!;
+    expect(band.classList.contains('bd-group-band')).toBe(true);
+    expect(band.classList.contains('color-red')).toBe(true);
     const chip = highRow.querySelector('.bd-group-chip')!;
     expect(chip.classList.contains('color-red')).toBe(true);
   });
@@ -141,18 +150,21 @@ describe('group band color', () => {
     mountTable(ctx);
     const uncat = Array.from(ctx.root.querySelectorAll('.bd-group-row'))
       .find((r) => /Uncategorized/.test(r.textContent || ''))!;
-    expect(uncat.classList.contains('bd-group-band')).toBe(false);
+    const band = uncat.closest('td, th') ?? uncat.parentElement!;
+    expect(band.classList.contains('bd-group-band')).toBe(false);
   });
 });
 
 describe('Remove grouping menu item', () => {
+  // The column menu is built through the shared Menu component (c39 redesign +
+  // popover migration), so its rows are `.mp-menu-item` / `.mp-menu-label` —
+  // not the old hand-rolled `.bd-col-menu-*` classes.
   const colMenuLabels = (root: HTMLElement, fieldName: string) => {
-    // Close any existing menu first
-    document.querySelector('.bd-col-menu')?.remove();
+    document.querySelectorAll('.mp-menu').forEach((m) => m.remove());   // close any open menu
     const th = Array.from(root.querySelectorAll('th'))
       .find((h) => (h.textContent || '').includes(fieldName))!;
     (th.querySelector('.bd-col-menu-btn') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    return Array.from(document.querySelectorAll('.bd-col-menu-label')).map((n) => n.textContent);
+    return Array.from(document.querySelectorAll('.mp-menu-label')).map((n) => n.textContent);
   };
   const baseBoard = (groupBy?: string): Board => ({
     id: 'b1', name: '',
@@ -182,9 +194,11 @@ describe('Remove grouping menu item', () => {
     const { ctx, boardRef } = makeCtx(baseBoard('Impact'));
     mountTable(ctx);
     colMenuLabels(ctx.root, 'Impact'); // open menu
-    const item = Array.from(document.querySelectorAll('.bd-col-menu-item'))
+    const item = Array.from(document.querySelectorAll('.mp-menu-item'))
       .find((n) => /Remove grouping/.test(n.textContent || '')) as HTMLElement;
-    item.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // Menu rows activate on mousedown, not click — the shared Menu component
+    // commits before ProseMirror can steal focus.
+    item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     expect(boardRef.current.views.find(v => v.name === 'table')?.groupBy).toBeUndefined();
   });
 });
