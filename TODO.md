@@ -31,8 +31,8 @@
 | Allow images in table cells on board list. it can be a view of a link in mid text or something? brainstorm on this | Done | c22 | High | Images |  |
 | Copy unstyled (refine the naming) - when a user copied text he got this | Review | c23 | Medium | General |  |
 | Diff viewer like in vs code. | Done | c24 | Medium | General |  |
-| in description panel there's no text blinking typing indicator sometimes when you click somewhere to type | Review | c25 | Medium | Board side panel |  |
-| Verify c25 description panel: F5, open a card's side panel. (1) The empty description should show ONE hint - "Add a description to this card" - never that stacked on top of "Start writing, or press / for commands"; hover the blank area below it too. (2) Clicking below the description should still add a block. (3) Toggle read-only ON then OFF, reopen a card, and confirm you get a blinking cursor and that typing actually sticks after the unlock. | Todo | c25-verify | Medium | Board side panel |  |
+| in description panel there's no text blinking typing indicator sometimes when you click somewhere to type | Done | c25 | Medium | Board side panel |  |
+| Verify c25 description panel: F5, open a card's side panel. (1) The empty description should show ONE hint - "Add a description to this card" - never that stacked on top of "Start writing, or press / for commands"; hover the blank area below it too. (2) Clicking below the description should still add a block. (3) Toggle read-only ON then OFF, reopen a card, and confirm you get a blinking cursor and that typing actually sticks after the unlock. | Done | c25-verify | Medium | Board side panel |  |
 | RTL not working well usecase | Todo | c26 | High | General |  |
 | text styles doesnt work in board views | Done | c27 | Urgent!! | Boards |  |
 | Editor reports "unsaved changes" when nothing was edited, so an external / other-tab change pops a conflict banner you didn't cause. And when the two changes don't actually collide, it should merge silently instead of asking. | Done | c28 | High | Boards / Save |  |
