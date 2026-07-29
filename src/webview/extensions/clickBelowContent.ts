@@ -71,10 +71,25 @@ function buildHintWidget(): HTMLElement {
   return el;
 }
 
-const ClickBelowContent = Extension.create({
+export interface ClickBelowContentOptions {
+  /**
+   * Render the ghost "Start writing…" hint on hover. Turn OFF where the host
+   * already supplies its own empty-state text — the board card panel overlays
+   * "Add a description to this card…", and two hints in the same blank space
+   * read as a rendering glitch (c25; same reasoning as c50, which suppressed
+   * EmptyPlaceholder there). Click-to-add-a-block still works either way.
+   */
+  showHint: boolean;
+}
+
+const ClickBelowContent = Extension.create<ClickBelowContentOptions>({
   name: 'clickBelowContent',
+  addOptions() {
+    return { showHint: true };
+  },
   addProseMirrorPlugins() {
     const editor = this.editor;
+    const showHint = this.options.showHint;
     return [
       new Plugin<boolean>({
         key: hintKey,
@@ -87,6 +102,7 @@ const ClickBelowContent = Extension.create({
         },
         props: {
           decorations(state) {
+            if (!showHint) return DecorationSet.empty;
             if (!hintKey.getState(state)) return DecorationSet.empty;
             // Re-check structure against the live doc so a stale "hovering" flag
             // can't render a hint once the doc already ends in an empty paragraph.
@@ -102,6 +118,7 @@ const ClickBelowContent = Extension.create({
           },
           handleDOMEvents: {
             mousemove(view, event) {
+              if (!showHint) return false;
               const desired = shouldShowBelowHint({
                 editable: view.editable,
                 belowContent: belowLastBlock(view, event.clientY),

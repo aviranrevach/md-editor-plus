@@ -72,7 +72,9 @@ function editorExtensions(options?: { suppressEmptyPlaceholder?: boolean }) {
     SmartTypography,
     SearchExtension,
     ImagePasteDrop,
-    ClickBelowContent,
+    // Click-below-to-add-a-block stays on everywhere; only its ghost hint is
+    // dropped where the host already draws its own empty-state text (c25).
+    ClickBelowContent.configure({ showHint: !options?.suppressEmptyPlaceholder }),
     GlobalDragHandle.configure({ dragHandleWidth: 48 }),
     // The board card panel supplies its own "Add a description…" placeholder,
     // so suppress this generic hint there to avoid two overlapping placeholders (c50).

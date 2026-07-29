@@ -13,6 +13,9 @@ let currentCard: Card | null = null;
 let currentOnChange: ((next: Card) => void) | null = null;
 let currentOnBoardChange: ((next: Board) => void) | null = null;
 let currentReadOnly = false;
+// Live read-only source, refreshed into `currentReadOnly` on every render (c25).
+// Callers pass a getter so a read-only toggle after the panel opened is seen.
+let currentReadOnlyGetter: (() => boolean) | null = null;
 // The card description's own editor instance. It is INDEPENDENT of the primary
 // document editor (see createDetachedEditor). Tracked so we can flush + destroy
 // it before rebuilding the panel or closing — leaving it alive would orphan a
@@ -56,7 +59,7 @@ export function openBoardSidePanel(
   board: Board,
   card: Card,
   onChange: (next: Card) => void,
-  readOnly: boolean = false,
+  readOnly: boolean | (() => boolean) = false,
   onBoardChange?: (next: Board) => void,
 ): void {
   initBoardSidePanel();
@@ -65,7 +68,10 @@ export function openBoardSidePanel(
   currentCard = card;
   currentOnChange = onChange;
   currentOnBoardChange = onBoardChange ?? null;
-  currentReadOnly = readOnly;
+  // A getter keeps the panel honest across re-renders (c25); a plain boolean is
+  // still accepted and simply never changes.
+  currentReadOnlyGetter = typeof readOnly === 'function' ? readOnly : null;
+  currentReadOnly = typeof readOnly === 'function' ? readOnly() : readOnly;
   renderPanel();
   if (wasOpen) {
     // Already on screen (user clicked another card) — no slide-in needed.
@@ -97,6 +103,7 @@ export function closeBoardSidePanel(): void {
     currentOnChange = null;
     currentOnBoardChange = null;
     currentReadOnly = false;
+    currentReadOnlyGetter = null;
     renamingFieldName = null;
   };
   let done = false;
@@ -138,6 +145,15 @@ function commitBoard(next: Board): void {
 
 function renderPanel(): void {
   if (!panel || !currentBoard || !currentCard) return;
+
+  // c25 — re-read read-only from its live source on EVERY render. The flag is
+  // captured when the panel opens, but the panel re-renders on every commit
+  // (a property, status or tag edit), and a read-only toggle in between would
+  // otherwise be missed: a stale `true` re-locks the description editor so
+  // clicking it gives no caret and you can't type, and a stale `false` leaves
+  // it editable while the document is locked. Same staleness c47 fixed for
+  // board cells — see BoardRendererCtx.isReadonly.
+  if (currentReadOnlyGetter) currentReadOnly = currentReadOnlyGetter();
 
   // Tear down the previous description editor before wiping the DOM so its
   // debounce can't fire against a detached node / stale card.

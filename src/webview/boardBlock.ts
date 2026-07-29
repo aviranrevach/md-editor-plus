@@ -142,21 +142,28 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     openSidePanel: (cardId: string) => {
       const card = board.cards.find((c) => c.id === cardId);
       if (!card) return;
-      const ro = opts.isReadOnly();
+      // Pass read-only as a LIVE getter and guard each commit against it too
+      // (c25). Snapshotting it here baked the state in at open time: a panel
+      // opened while locked kept no-op callbacks forever, so after unlocking you
+      // could type into the description and every keystroke was silently
+      // dropped — and a panel opened while unlocked stayed writable after a
+      // lock. Both callbacks now check the live value instead.
       openBoardSidePanel(
         board,
         card,
-        ro
-          ? () => {}
-          : (nextCard) => {
-              const next: Board = {
-                ...board,
-                cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
-              };
-              mutate(next);
-            },
-        ro,
-        ro ? undefined : (nextBoard) => mutate(nextBoard),
+        (nextCard) => {
+          if (opts.isReadOnly()) return;
+          const next: Board = {
+            ...board,
+            cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
+          };
+          mutate(next);
+        },
+        opts.isReadOnly,
+        (nextBoard) => {
+          if (opts.isReadOnly()) return;
+          mutate(nextBoard);
+        },
       );
     },
     requestDelete: () => opts.onDelete?.(),

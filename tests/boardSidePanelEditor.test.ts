@@ -55,3 +55,51 @@ describe('board side panel description editor isolation (c37)', () => {
     expect(editorMock.__calls.createDetachedEditor).toBe(1);
   });
 });
+
+// c25 — "sometimes no blinking cursor" in the description. Read-only was captured
+// as a boolean when the panel opened, then re-applied verbatim on every re-render
+// (any property / status / tag commit re-renders the panel). So a read-only
+// toggle after opening was never seen: a stale `true` kept re-locking the
+// description editor — click it, no caret, can't type. Callers now hand over a
+// live getter, which the panel re-reads each render.
+describe('description editor tracks LIVE read-only, not a snapshot (c25)', () => {
+  const card: Card = { id: 'c1', values: { Title: 'Card one' }, body: '' };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    editorMock.__reset();
+  });
+  afterEach(() => closeBoardSidePanel());
+
+  it('locks the editor when the getter says read-only', () => {
+    openBoardSidePanel(makeBoard(card), card, () => {}, () => true);
+    expect(editorMock.__calls.setEditable).toEqual([false]);
+  });
+
+  it('unlocks the editor when the getter says editable', () => {
+    openBoardSidePanel(makeBoard(card), card, () => {}, () => false);
+    expect(editorMock.__calls.setEditable).toEqual([true]);
+  });
+
+  it('picks up a read-only toggle that happened AFTER the panel opened', () => {
+    let readOnly = true;
+    const board = makeBoard(card);
+    openBoardSidePanel(board, card, () => {}, () => readOnly);
+    expect(editorMock.__calls.setEditable).toEqual([false]);
+
+    // The user turns read-only OFF, then clicks a card — the panel re-renders.
+    readOnly = false;
+    openBoardSidePanel(board, card, () => {}, () => readOnly);
+    expect(editorMock.__calls.setEditable).toEqual([false, true]);
+  });
+
+  it('still accepts a plain boolean (unchanged callers keep working)', () => {
+    openBoardSidePanel(makeBoard(card), card, () => {}, true);
+    expect(editorMock.__calls.setEditable).toEqual([false]);
+  });
+
+  it('defaults to editable when no read-only argument is given', () => {
+    openBoardSidePanel(makeBoard(card), card, () => {});
+    expect(editorMock.__calls.setEditable).toEqual([true]);
+  });
+});

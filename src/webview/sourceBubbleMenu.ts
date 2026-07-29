@@ -348,6 +348,9 @@ export function createSourceBubbleMenu(editor: Editor): void {
       const { from, to } = state.selection;
       return from !== to;
     },
-    options: { offset: 8 },
+    // `options` is not a BubbleMenuPlugin prop — tippy settings go under
+    // `tippyOptions`, so this 8px offset was silently ignored (and tripped a
+    // type error). Tippy's offset is [skidding, distance].
+    tippyOptions: { offset: [0, 8] },
   }));
 }
