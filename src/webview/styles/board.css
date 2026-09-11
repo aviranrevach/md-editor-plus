@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------
    Board block — Notion-style.
-   Light tokens (use Notion defaults) and dark overrides via .dark on
+   Light tokens (use Notion defaults) and dark overrides via .theme-dark on
    the page root match the rest of the editor's theme system.
    ------------------------------------------------------------------ */
 
@@ -54,7 +54,7 @@
   --board-chip-pink-dot:  #d6499b;
 }
 
-.dark {
+.theme-dark {
   --board-text:        #d4d4d2;
   --board-text-light:  #a6a6a3;
   --board-text-muted:  #7a7a76;
@@ -758,7 +758,7 @@ button.board-column-chip-dot:hover {
 }
 .board-panel-title.is-placeholder::before {
   content: attr(data-placeholder);
-  color: #d4d4d2;
+  color: var(--board-text-muted);
 }
 .board-panel-title.is-placeholder { color: transparent; }
 
@@ -828,17 +828,17 @@ button.board-column-chip-dot:hover {
 /* Empty-state placeholder for contenteditable text/person fields */
 .board-panel-prop-value.is-empty::before {
   content: attr(data-placeholder);
-  color: #d4d4d2;
+  color: var(--board-text-muted);
 }
 .board-panel-prop-value.is-empty { color: transparent; }
 .board-panel-prop-value.is-empty:focus::before { content: ''; }
 .board-panel-prop-value.is-empty:focus { color: var(--board-text); }
 /* Empty-state for date input + tag input */
 .board-panel-prop-row input[type='date'].board-panel-prop-value:not(:focus):invalid {
-  color: #d4d4d2;
+  color: var(--board-text-muted);
 }
 .board-tag-input.board-panel-prop-value.is-empty {
-  color: #d4d4d2;
+  color: var(--board-text-muted);
 }
 
 /* + Add a property */
@@ -921,7 +921,7 @@ button.board-column-chip-dot:hover {
 }
 .board-panel-status-caret svg { width: 12px; height: 12px; }
 .board-panel-status-empty {
-  color: #d4d4d2;
+  color: var(--board-text-muted);
   font-size: 14px;
 }
 
@@ -1540,7 +1540,7 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 .bd-cell-empty { color: var(--text-secondary, #888); font-size: 12px; }
 .bd-cell-id { cursor: default; color: var(--text-secondary, #888); }
 .bd-date { display: inline-block; padding: 2px 8px; border-radius: 5px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); font: 500 11.5px var(--font-board); }
-.bd-date-overdue { background: #fee2e2; color: #b91c1c; }
+.bd-date-overdue { background: var(--board-chip-red-bg); color: var(--board-chip-red-fg); }
 .bd-tag { display: inline-block; padding: 1px 7px; background: var(--bg-secondary, rgba(0,0,0,0.05)); color: var(--text-secondary, #666); border-radius: 4px; font-size: 11px; margin-right: 4px; }
 .bd-tag.color-gray,    .board-tag-chip.color-gray    { background: var(--board-chip-gray-bg);   color: var(--board-chip-gray-fg); }
 .bd-tag.color-blue,    .board-tag-chip.color-blue    { background: var(--board-chip-blue-bg);   color: var(--board-chip-blue-fg); }
@@ -1585,9 +1585,9 @@ body.is-dragging-property .board-properties-name { user-select: none; }
 }
 .bd-group-add:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
 /* Dark theme: tint with translucent white so the badge/hover read on dark bands. */
-.dark .bd-group-caret:hover { background: rgba(255, 255, 255, 0.10); }
-.dark .bd-group-count { background: rgba(255, 255, 255, 0.12); }
-.dark .bd-group-add:hover { background: rgba(255, 255, 255, 0.08); }
+.theme-dark .bd-group-caret:hover { background: rgba(255, 255, 255, 0.10); }
+.theme-dark .bd-group-count { background: rgba(255, 255, 255, 0.12); }
+.theme-dark .bd-group-add:hover { background: rgba(255, 255, 255, 0.08); }
 
 /* ── Table add-row ──────────────────────────────────────────────────────── */
 .bd-table-addrow td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft, #f0f0f0); cursor: pointer; }
