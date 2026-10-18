@@ -35,6 +35,7 @@ Keyboard shortcuts that work right now:
 | `⌘U` / `Ctrl+U` | Underline |
 | `⌘⇧X` / `Ctrl+Shift+X` | Strikethrough |
 | `⌘E` / `Ctrl+E` | Inline code |
+| `⌘⇧E` / `Ctrl+Shift+E` | Inline equation |
 | `⌘K` / `Ctrl+K` | Insert link |
 | `⌘/` / `Ctrl+/` | Open block picker |
 
@@ -309,9 +310,23 @@ Backticks in prose: `` `foo` `` renders as `` `foo` ``. An escaped asterisk \*no
 
 ---
 
-## Math-flavored line (just text)
+## Math equations
 
-Inline math isn't a built-in block, but you can write expressions as inline code: `E = mc²`, `∀x ∈ ℝ, f(x) ≥ 0`.
+Inline equations render inside prose: the mass-energy relation is $E = mc^2$, and a fraction can use `$$` shortcuts such as $$\frac{a+b}{c}$$. Click either formula to edit its LaTeX source live.
+
+Chemistry macros from mhchem work too: $\ce{H2O + CO2 -> H2CO3}$ and $\pu{1.23 kg}$.
+
+The following is a block equation. Type `/math`, `/latex`, `/equation`, or `/公式` to open the formula command results: insert a block equation, insert an inline equation at the cursor, or convert the current block into an equation. The highlighted command shows a rendered preview beside the menu.
+
+$$
+\mathrm{AgentState} = (M, H, C)
+$$
+
+Bracket delimiters also round-trip as block equations:
+
+\[
+P = F(\mathrm{AgentState}, E, T)
+\]
 
 ---
 

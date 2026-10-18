@@ -27,7 +27,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 - **Drag-handle reordering** — hover any block for a `⠿` handle and move it anywhere
 - **Block action menu** — click the `⠿` handle for one consistent menu on any block: **Turn into**, **Duplicate**, **Delete**, with a search box to jump straight to a type
 - **Slash / block picker** — `⌘/` (`Ctrl+/`) opens an inline picker; type to filter
-- **Bubble menu** — select text for inline formatting (bold, italic, underline, strikethrough, inline code), links, color, highlight, and emoji. A **⋯** menu holds the rest: **Turn into**, **Turn into using AI** ([see below](#turn-selection-into-ai)), **Copy**, and **Copy as plain text** (clean, unformatted text for when a selection pastes in with the wrong styling)
+- **Bubble menu** — select text for inline formatting (bold, italic, underline, strikethrough, inline code, inline equation), links, color, highlight, and emoji. A **⋯** menu holds the rest: **Turn into**, **Turn into using AI** ([see below](#turn-selection-into-ai)), **Copy**, and **Copy as plain text** (clean, unformatted text for when a selection pastes in with the wrong styling)
 - **Click-to-edit** — every block is editable in place; no mode switching
 - **Click below to keep typing** — hover the empty space under the last block and a faint "Start writing…" hint previews where a new block will land; click to drop your cursor into a fresh paragraph, even when the doc ends in a board, table, code block, or image (hidden in read-only)
 - **Delete any block** — from the `⠿` dragger menu, a block's own `⋯` menu (boards, diagrams), or select it and press Delete / Backspace
@@ -40,6 +40,7 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 - **Code blocks** — syntax highlighting for \~50 languages, line-number gutter, drag lines to reorder, copy button, optional auto-collapse for long snippets
 - **Callouts** — GFM `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]` with colored backgrounds and icons
 - **Toggles** — collapsible `<details>` sections
+- **Math equations** — `/math`, `/latex`, or `/公式` opens Notion-style commands for block equations, inline equations, and converting the current block, with a live KaTeX preview. Includes `\ce` and `\pu` chemistry macros. ([see below](#math-equations))
 - **Boards** — `/board kanban` or `/board table` for project/task views with columns, cards, properties, drag-to-reorder, inline editing, hideable fields. Stored as a fenced HTML comment block so the file stays plain Markdown. ([see below](#boards-kanban--table))
 - **Mermaid diagrams** — `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart` / `/graph` / `/canvas`) drops a freeform mermaid canvas with a starter `flowchart LR` (`Idea → Next → Done`). Visual edit opens automatically: drag nodes, draw arrows, add sticky notes, change shapes, zoom and pan. Persists as a normal ```` ```mermaid ```` code fence with optional position/style sidecars in mermaid comments. Code view shows raw mermaid source you can hand-edit. ([see below](#whiteboard--mermaid-diagrams))
 - **Media & misc** — images, blockquotes, dividers
@@ -81,7 +82,7 @@ From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Cla
 ### Workflow & UX
 
 - **Auto-save + save status** — a condensed indicator by the filename always shows where you stand: `• Unsaved` the instant you type, `⟳ Saving…` while it writes, `✓ Saved` at rest. Edits auto-save to disk ~1 s after you stop typing; **⌘S / Ctrl+S** saves immediately with a confirming pulse. If the file changes on disk while you have unsaved edits, auto-save pauses and the conflict banner lets you choose — nothing is silently overwritten.
-- **Find in page** — ⌘F / Ctrl+F (or **Find in page** in the `⋯` menu) opens a Notion-style find bar: every match highlights with a live `3 / 12` count, Enter / Shift+Enter (or ↑ ↓) jumps between them, Esc closes. Works in both Preview and Code views. A match hidden inside a collapsed toggle auto-expands and scrolls into view, and search reaches **inside boards** too — card titles, body previews, field/tag values, column names — scrolling the matching card into view.
+- **Find in page** — ⌘F / Ctrl+F (or **Find in page** in the `⋯` menu) opens a Notion-style find bar: every match highlights with a live `3 / 12` count, Enter / Shift+Enter (or ↑ ↓) jumps between them, Esc closes. Works in both Preview and Code views. A match hidden inside a collapsed toggle auto-expands and scrolls into view, and search reaches **inside equations and boards** too — formula source, card titles, body previews, field/tag values, column names — scrolling the matching content into view.
 - **Structure map** — a slim navigation rail down the right edge: a **tick per heading** (bolder for H1, fainter for H3) and a box marking your current viewport. **Click a tick** to jump, **drag the box** to scroll, **hover** for the heading text. Toggle it from the toolbar — it recolors to match your theme and hides in Code view.
 - **Diff map** — the structure-map rail also paints **change marks** vs your last commit: 🟢 added · 🟠 modified · 🔴 removed, each beside the block it touches. **Click a mark** to jump to the change; marks appear only when there's something changed.
 - **Rendered two-pane diff** — click the **↔** toolbar button to open a read-only side-by-side diff panel beside the editor. Both panes render through the full editor (formatted text, callouts, boards, images), not raw Markdown. Changed blocks are tinted — 🟢 green for added, 🔴 red for removed, 🟠 amber for modified — and paired blocks align with filler gaps so nothing drifts out of context. The change rail on the right shows all edits at a glance; **click any mark** to jump straight to it, and both panes scroll in lock-step. The base is resolved automatically (HEAD commit → on-disk version → session snapshot). Both panes are read-only — edits happen in your main editor.
@@ -90,7 +91,7 @@ From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Cla
 - **Auto-fading toolbar** — drops to 50% opacity when your cursor is away, lights up when you approach
 - **Actions menu** — the `⋯` menu carries Find in page, Read only, Reload from disk, Copy page content, Copy file path, Duplicate, Open in Finder, Export, and Create blocks skill
 - **Rich tooltips** — color swatches, font and size previews, 350 ms hover delay, edge-aware flipping
-- **Keyboard shortcuts** — `⌘F` / `⌘B` / `⌘I` / `⌘U` / `⌘⇧X` / `⌘E` / `⌘K` / `⌘/` work the way you expect
+- **Keyboard shortcuts** — `⌘F` / `⌘B` / `⌘I` / `⌘U` / `⌘⇧X` / `⌘E` / `⌘⇧E` / `⌘K` / `⌘/` work the way you expect
 - **Command palette** — Open Block View / Open Source View on any file
 
 ### Privacy & footprint
@@ -226,7 +227,7 @@ Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**.
 | --- | --- |
 | **Text** | Paragraph, Heading 1, Heading 2, Heading 3 |
 | **Lists** | Bullet list, Numbered list, Task list, **Table**, Board: Kanban, Board: Table |
-| **Media & blocks** | Image, Callout, Toggle, **Whiteboard** |
+| **Media & blocks** | Image, Callout, Toggle, **Block equation**, **Inline equation**, **Whiteboard** |
 | **Other** | Blockquote, Code block, Divider |
 
 ### Images
@@ -289,6 +290,18 @@ GitHub-flavored `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, etc. Render with a colo
 ### Toggles
 
 Collapsible sections that hide their contents until clicked. Useful for FAQs, long answer keys, etc. Round-trip as HTML `<details>` blocks.
+
+### Math equations
+
+Equations follow the same core interaction model as [Notion math equations](https://www.notion.com/help/math-equations) and render locally with KaTeX — no CDN or network request. Type `/math`, `/latex`, `/equation`, or `/公式` to filter the picker to three formula commands; the highlighted command shows a rendered preview beside the menu.
+
+- **Block equation** — choose **Block equation** from the filtered picker. It replaces an empty command paragraph and immediately opens the LaTeX source editor. Click the rendered equation later to edit with a live preview; `⌘/Ctrl+Enter` finishes and `Esc` cancels.
+- **Inline equation** — choose **Inline equation** to insert at the current cursor or turn selected text into a formula. You can also type `$$`, the formula, and closing `$$`; select text and click **√x** in the bubble menu; or press `⌘⇧E` / `Ctrl+Shift+E`. Click an equation to edit it live. At either edge of the input, `←` / `→` moves the caret back into surrounding text.
+- **Source and conversion** — choose **Block equation · Turn into** from the filtered picker to convert the current block while preserving its text as LaTeX. The equation editor can copy the LaTeX source, and an inline equation can become a block equation with **Make block**.
+- **Syntax** — existing Markdown loads from `$...$`, inline `$$...$$`, `\(...\)`, standalone `$$...$$`, and `\[...\]`. The original delimiter style is preserved when possible. Math inside inline code or fenced code blocks stays literal.
+- **Coverage** — supports KaTeX's LaTeX subset plus mhchem `\ce` and `\pu`. Invalid or unsupported input remains editable and displays a visible error state instead of breaking the document.
+
+Equations participate in read-only pages, search, copy, rendered diff, standalone HTML/PDF export, and inline rendering inside board text fields.
 
 ### Whiteboard / Mermaid diagrams
 
@@ -357,7 +370,7 @@ A single search box at the top filters everything at once: leave it empty for th
 | --- | --- |
 | **Inline formatting** | Bold, italic, underline, strikethrough, inline code |
 | **Linking & color** | Insert link, text color, highlight color |
-| **Insert** | Emoji picker |
+| **Insert** | Inline equation, emoji picker |
 | **Convert** | "Turn into" submenu. Change paragraph to heading, list, quote, code block, etc. |
 
 ### Frontmatter
@@ -377,6 +390,7 @@ YAML (`---`) and TOML (`+++`) frontmatter is **detected automatically** and hidd
 | `⌘U`  /  `Ctrl+U` | Underline |
 | `⌘⇧X`  /  `Ctrl+Shift+X` | Strikethrough |
 | `⌘E`  /  `Ctrl+E` | Inline code |
+| `⌘⇧E`  /  `Ctrl+Shift+E` | Create an inline equation from the selection or at the cursor |
 | `⌘K`  /  `Ctrl+K` | Insert link |
 | `Esc` | Close any open menu / popover |
 
@@ -429,9 +443,10 @@ MD Editor Plus reads and writes **CommonMark** plus the GitHub-flavored extensio
 - Links, autolinks, images
 - HTML passthrough (`<details>`, etc.)
 - GFM callouts: `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]`
+- KaTeX equations: `$...$`, inline or block `$$...$$`, `\(...\)`, `\[...\]`
 - YAML / TOML frontmatter (preserved, not rendered)
 
-Open the bundled `demo.md` to see every supported block in one place.
+Open the bundled [demo.md](demo.md) to see every supported block in one place.
 
 ---
 

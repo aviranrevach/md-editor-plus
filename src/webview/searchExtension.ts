@@ -19,6 +19,7 @@ import { findMatches } from './search';
 export interface SearchMatch {
   from: number;
   to: number;
+  node?: boolean;
 }
 
 interface SearchState {
@@ -52,9 +53,27 @@ function computeMatches(doc: PMNode, query: string, caseSensitive: boolean): Sea
   let combined = '';
   // Maps each character offset in `combined` back to its absolute doc position.
   const offsetToPos: number[] = [];
+  const nodeOffsets = new Set<number>();
   let prevEnd = -1;
 
   doc.descendants((node, pos) => {
+    if (node.type.name === 'inlineMath' || node.type.name === 'blockMath') {
+      const latex = String(node.attrs.latex ?? '');
+      if (!latex) return false;
+      if (combined) {
+        combined += '\n';
+        offsetToPos.push(-1);
+      }
+      for (let i = 0; i < latex.length; i++) {
+        nodeOffsets.add(offsetToPos.length);
+        offsetToPos.push(pos);
+      }
+      combined += latex;
+      combined += '\n';
+      offsetToPos.push(-1);
+      prevEnd = -1;
+      return false;
+    }
     if (!node.isText || !node.text) return;
     const text = node.text;
     if (prevEnd !== -1 && pos !== prevEnd) {
@@ -70,21 +89,26 @@ function computeMatches(doc: PMNode, query: string, caseSensitive: boolean): Sea
     return true;
   });
 
-  return findMatches(combined, query, { caseSensitive }).map(({ start, end }) => ({
-    from: offsetToPos[start],
-    // `end` is exclusive; the position just past the last char is the last
-    // matched char's position + 1.
-    to: offsetToPos[end - 1] + 1,
-  }));
+  return findMatches(combined, query, { caseSensitive })
+    .filter(({ start, end }) => offsetToPos[start] >= 0 && offsetToPos[end - 1] >= 0)
+    .map(({ start, end }) => {
+      const node = nodeOffsets.has(start) && nodeOffsets.has(end - 1);
+      return {
+        from: offsetToPos[start],
+        // Math lives in an atom attribute, so its whole node is the searchable
+        // and highlightable range. Text matches keep exact character ranges.
+        to: node ? offsetToPos[start] + 1 : offsetToPos[end - 1] + 1,
+        node,
+      };
+    });
 }
 
 function buildDecorations(doc: PMNode, matches: SearchMatch[], active: number): DecorationSet {
   if (matches.length === 0) return DecorationSet.empty;
-  const decos = matches.map((m, i) =>
-    Decoration.inline(m.from, m.to, {
-      class: i === active ? 'search-match search-match-active' : 'search-match',
-    }),
-  );
+  const decos = matches.map((m, i) => {
+    const attrs = { class: i === active ? 'search-match search-match-active' : 'search-match' };
+    return m.node ? Decoration.node(m.from, m.to, attrs) : Decoration.inline(m.from, m.to, attrs);
+  });
   return DecorationSet.create(doc, decos);
 }
 

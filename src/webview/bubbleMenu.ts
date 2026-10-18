@@ -7,6 +7,7 @@ import { buildAiPanelInput } from './aiSelection';
 import { placeFloating, type PlacementHandle } from './menuPosition';
 import { copySelectionAsPlainText, copySelectionRich } from './copySelection';
 import { MORE_MENU_ITEMS, runMoreMenuAction, type MoreMenuId } from './moreMenu';
+import { insertInlineMath } from './extensions/math';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -223,6 +224,7 @@ function buildEl(): HTMLElement {
       <button class="bm-btn" data-action="strike" data-tip-html="Strikethrough<kbd>⌘⇧X</kbd>">${svg(P.textStrike)}</button>
       ${DIV}
       <button class="bm-btn" data-action="code" data-tip-html="Inline code<kbd>⌘E</kbd>">${svg(P.code)}</button>
+      <button class="bm-btn bm-math-btn" data-action="math" data-tip-html="Inline equation<kbd>⌘⇧E</kbd>">√x</button>
     </div>
     <div class="bubble-row">
       <button class="bm-btn" data-action="link" data-tip-html="Add link<kbd>⌘K</kbd>">${svg(P.link)}</button>
@@ -747,6 +749,7 @@ export function createBubbleMenu(editor: Editor): void {
       case 'underline': editor.chain().focus().toggleUnderline().run(); break;
       case 'strike':    editor.chain().focus().toggleStrike().run();    break;
       case 'code':      editor.chain().focus().toggleCode().run();      break;
+      case 'math':      insertInlineMath(editor);                       break;
       case 'link': {
         if (editor.isActive('link')) {
           editor.chain().focus().unsetLink().run();

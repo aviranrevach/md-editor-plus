@@ -2,6 +2,7 @@ import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
+import katexCss from 'katex/dist/katex.min.css';
 import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
 import { computeConflictDiff } from './conflictDiff';
 import { buildConflictDiffPanel } from './conflictDiffView';
@@ -129,7 +130,7 @@ const DEFAULT_KEYS = [
 
 function injectStyles(): void {
   const style = document.createElement('style');
-  style.textContent = lightCss + darkCss + editorCss + boardCss;
+  style.textContent = lightCss + darkCss + katexCss + editorCss + boardCss;
   document.head.appendChild(style);
 }
 

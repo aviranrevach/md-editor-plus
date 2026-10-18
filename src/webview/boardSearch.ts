@@ -88,12 +88,27 @@ function collectInContainer(
   caseSensitive: boolean,
   out: BoardMatch[],
 ): void {
+  // Equation source is stored in data-latex while KaTeX's visible DOM is a
+  // generated accessibility + layout tree. Search the source once and select
+  // the whole rendered equation; walking KaTeX text would produce duplicate
+  // matches (MathML and visual HTML both contain the same expression).
+  container.querySelectorAll<HTMLElement>('.math-inline-board[data-latex]').forEach((math) => {
+    const latex = math.dataset.latex ?? '';
+    for (const _match of findMatches(latex, query, { caseSensitive })) {
+      const range = document.createRange();
+      range.selectNode(math);
+      const el = (math.closest(SCROLL_TARGET_SELECTOR) as HTMLElement | null) ?? math;
+      out.push({ range, rect: rectOf(range), el });
+    }
+  });
+
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const text = node.textContent ?? '';
       if (!text.trim()) return NodeFilter.FILTER_REJECT;
       const parent = node.parentElement;
       if (parent && parent.closest(SKIP_SELECTOR)) return NodeFilter.FILTER_REJECT;
+      if (parent?.closest('.math-inline-board')) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });

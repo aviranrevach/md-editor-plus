@@ -6,8 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-01
+
 ### Added
 
+- **Notion-style math equations** — `/math`, `/latex`, `/equation`, and `/公式` now surface **Block equation**, **Inline equation**, and **Block equation · Turn into** commands with a rendered KaTeX preview beside the picker. Inline insertion works at the cursor or from selected text; conversion preserves the current block text as LaTeX. Equations also support `$$...$$`, `⌘/Ctrl+Shift+E`, and the bubble menu's **√x** action; render locally with KaTeX; support `$...$`, `$$...$$`, `\(...\)`, `\[...\]`, and mhchem `\ce` / `\pu`; and round-trip to Markdown without becoming images or HTML. Click-to-edit provides live preview, source copy, arrow-key exit, and inline-to-block conversion. Formula source is included in search and copy; rendered math also works in read-only pages, boards, rendered diffs, and standalone HTML/PDF exports.
 - **Copy & Copy as plain text (c23)** — the selection toolbar can copy your selection with formatting intact (**Copy**) or as clean unformatted text (**Copy as plain text**), fixing selections that used to paste in with the wrong styling. Both live in the ⋯ menu (see below). (c23)
 - **Delete a property from the column menu (c3)** — the board table's column **⋯** menu gained **Delete property**, so a column can be removed from where you're already looking at it instead of only from the Properties popover. It drops the column and its values on every card, and asks for confirmation first when cards actually hold data (naming how many). Unavailable for the built-in Title, Status and Description fields. (c3)
 

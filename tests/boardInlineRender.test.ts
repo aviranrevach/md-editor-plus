@@ -42,6 +42,13 @@ describe('renderInlineMarkdown — basic marks', () => {
     expect(code.querySelector('strong')).toBeNull();
   });
 
+  test('inline equations render through KaTeX while code stays literal', () => {
+    const h = render('value $x^2$ and `$$not math$$`');
+    expect(h.querySelectorAll('.katex')).toHaveLength(1);
+    expect(h.querySelector('.math-inline-board')?.getAttribute('data-latex')).toBe('x^2');
+    expect(h.querySelector('code')?.textContent).toBe('$$not math$$');
+  });
+
   test('highlight with ==', () => {
     expect(render('==hi==').querySelector('mark')!.textContent).toBe('hi');
   });

@@ -1,8 +1,8 @@
 import { filterBlocks, BLOCK_DEFS, footerCloseVerb, shortcutForBlock } from '../src/webview/blockPicker';
 
 describe('filterBlocks', () => {
-  it('returns all blocks when query is empty', () => {
-    expect(filterBlocks('')).toHaveLength(BLOCK_DEFS.length);
+  it('returns the regular block catalog when query is empty', () => {
+    expect(filterBlocks('')).toEqual(BLOCK_DEFS.filter((block) => !block.searchOnly));
   });
 
   it('filters by label case-insensitively', () => {
@@ -27,6 +27,21 @@ describe('filterBlocks', () => {
   it('finds image block when querying "image"', () => {
     const ids = filterBlocks('image').map(b => b.id);
     expect(ids).toContain('image');
+  });
+
+  it.each(['math', 'latex', 'equation', '公式'])(
+    'finds both equation commands and the contextual conversion through "%s"',
+    (query) => {
+      expect(filterBlocks(query).map(b => b.id)).toEqual([
+        'blockMath',
+        'inlineMath',
+        'blockMathConvert',
+      ]);
+    },
+  );
+
+  it('hides the contextual conversion until the user searches', () => {
+    expect(filterBlocks('').map(b => b.id)).not.toContain('blockMathConvert');
   });
 });
 
@@ -53,12 +68,45 @@ describe('shortcutForBlock', () => {
     expect(shortcutForBlock('taskList')).toBe('[]');
     expect(shortcutForBlock('blockquote')).toBe('"');
     expect(shortcutForBlock('codeBlock')).toBe('```');
+    expect(shortcutForBlock('blockMath')).toBe('$$');
   });
 
   it('returns undefined for blocks without a shortcut', () => {
     expect(shortcutForBlock('paragraph')).toBeUndefined();
     expect(shortcutForBlock('image')).toBeUndefined();
     expect(shortcutForBlock('zzznope')).toBeUndefined();
+  });
+});
+
+describe('math block picker entries', () => {
+  const block = BLOCK_DEFS.find((b) => b.id === 'blockMath');
+  const inline = BLOCK_DEFS.find((b) => b.id === 'inlineMath');
+  const convert = BLOCK_DEFS.find((b) => b.id === 'blockMathConvert');
+
+  it('registers a directly insertable and convertible block equation', () => {
+    expect(block).toBeDefined();
+    expect(block?.label).toBe('Block equation');
+    expect(block?.section).toBe('media');
+    expect(typeof block?.insert).toBe('function');
+    expect(typeof block?.convert).toBe('function');
+    expect(block?.previewDisplayMode).toBe(true);
+  });
+
+  it('registers an inline equation command at the cursor', () => {
+    expect(inline).toBeDefined();
+    expect(inline?.label).toBe('Inline equation');
+    expect(typeof inline?.insert).toBe('function');
+    expect(inline?.convert).toBeUndefined();
+    expect(inline?.previewDisplayMode).toBe(false);
+  });
+
+  it('registers a search-only block conversion command', () => {
+    expect(convert).toBeDefined();
+    expect(convert?.label).toBe('Block equation');
+    expect(convert?.qualifier).toBe('Turn into');
+    expect(convert?.searchOnly).toBe(true);
+    expect(typeof convert?.insert).toBe('function');
+    expect(convert?.convert).toBeUndefined();
   });
 });
 

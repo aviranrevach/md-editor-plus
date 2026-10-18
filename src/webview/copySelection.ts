@@ -1,5 +1,7 @@
 import type { Editor } from '@tiptap/core';
 import { DOMSerializer } from '@tiptap/pm/model';
+import type { Node as PMNode } from '@tiptap/pm/model';
+import { renderMath } from './extensions/math';
 
 export type Poster = (msg: unknown) => void;
 
@@ -11,7 +13,19 @@ export type Poster = (msg: unknown) => void;
 export function selectionPlainText(editor: Editor): string {
   const { from, to } = editor.state.selection;
   if (from === to) return '';
-  return editor.state.doc.textBetween(from, to, '\n\n', '\n');
+  return editor.state.doc.textBetween(from, to, '\n\n', (node: PMNode) => {
+    if (node.type.name === 'inlineMath') {
+      const delimiter = node.attrs.delimiter ?? '$';
+      const close = delimiter === '\\(' ? '\\)' : delimiter;
+      return `${delimiter}${node.attrs.latex ?? ''}${close}`;
+    }
+    if (node.type.name === 'blockMath') {
+      const delimiter = node.attrs.delimiter ?? '$$';
+      const close = delimiter === '\\[' ? '\\]' : '$$';
+      return `${delimiter}\n${node.attrs.latex ?? ''}\n${close}`;
+    }
+    return '\n';
+  });
 }
 
 /**
@@ -27,6 +41,12 @@ export function selectionHTML(editor: Editor): string {
     const fragment = DOMSerializer.fromSchema(state.schema).serializeFragment(slice.content);
     const div = document.createElement('div');
     div.appendChild(fragment);
+    div.querySelectorAll<HTMLElement>('[data-math-inline]').forEach((el) => {
+      renderMath(el, el.dataset.latex ?? '', false);
+    });
+    div.querySelectorAll<HTMLElement>('[data-math-block]').forEach((el) => {
+      renderMath(el, el.dataset.latex ?? '', true);
+    });
     return div.innerHTML;
   } catch {
     return '';

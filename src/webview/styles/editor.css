@@ -2272,6 +2272,16 @@ html.source-full-width #source-view {
   flex: 1;
 }
 
+.block-picker-qualifier {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.block-picker-item.active .block-picker-qualifier {
+  color: color-mix(in srgb, var(--link) 72%, var(--text-secondary));
+}
+
 .block-picker-caret {
   color: var(--text-secondary);
   font-size: 14px;
@@ -2389,6 +2399,46 @@ html.source-full-width #source-view {
 }
 
 .block-picker-flyout.is-scroll { overflow-y: auto; }
+
+/* Formula-command preview: a compact KaTeX card beside the highlighted row,
+   positioned by placeFlyout() just like the Turn-into panel. */
+.block-picker-math-preview {
+  position: fixed;
+  width: 250px;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
+  color: var(--text-primary);
+  z-index: 1051;
+  pointer-events: none;
+}
+
+.theme-dark .block-picker-math-preview {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.block-picker-math-preview-title {
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.block-picker-math-preview-content {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 15px;
+}
+
+.block-picker-math-preview-content .katex-display {
+  margin: 0;
+}
 
 .block-picker-emoji-icon {
   display: inline-flex;
@@ -5417,3 +5467,172 @@ html.source-mode-active .structure-map { display: none; }
 .diff-mark.del    { background: var(--callout-caution-accent, #cf222e); height: 6px; }
 
 .structure-map:hover .diff-mark { width: 5px; }
+
+/* ── Math equations ─────────────────────────────────────────────────────── */
+.math-inline {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 2px;
+  border-radius: 4px;
+  vertical-align: -0.08em;
+  cursor: pointer;
+}
+
+.math-inline:hover,
+.math-inline.math-selected {
+  background: color-mix(in srgb, var(--link) 10%, transparent);
+}
+
+.math-inline-preview {
+  color: inherit;
+  white-space: nowrap;
+}
+
+.math-inline-board {
+  cursor: default;
+}
+
+.math-inline-input-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 220;
+  display: none;
+  width: min(440px, 80vw);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--toolbar-bg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  transform: translateX(-50%);
+}
+
+.math-inline.math-editing .math-inline-input-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.math-inline-input,
+.math-block-input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  outline: none;
+  color: var(--text-primary);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.math-inline-input {
+  height: 34px;
+  padding: 6px 9px;
+}
+
+.math-inline-input:focus,
+.math-block-input:focus {
+  border-color: var(--link);
+  box-shadow: 0 0 0 1px var(--link);
+}
+
+.math-inline-actions,
+.math-block-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.math-inline-actions button,
+.math-block-actions button {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  background: transparent;
+  font: 500 12px var(--font-body);
+  cursor: pointer;
+}
+
+.math-inline-actions button:hover,
+.math-block-actions button:hover {
+  color: var(--text-primary);
+  background: var(--toolbar-btn-hover);
+}
+
+.math-block {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 10px 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.math-block:hover,
+.math-block.math-selected {
+  border-color: var(--border);
+}
+
+.math-block-preview {
+  min-height: 54px;
+  padding: 16px 28px;
+  overflow-x: auto;
+  text-align: center;
+  cursor: pointer;
+}
+
+.math-block-source {
+  display: none;
+  padding: 0 10px 10px;
+}
+
+.math-block.math-editing .math-block-source {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.math-block-input {
+  grid-column: 1 / -1;
+  min-height: 82px;
+  padding: 9px 10px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.math-block-hint {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.math-render-empty {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.9em;
+}
+
+.math-render-error {
+  color: var(--callout-caution-accent);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.bm-math-btn,
+.block-picker-equation-icon {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+
+.block-picker-equation-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}

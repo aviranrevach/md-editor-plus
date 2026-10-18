@@ -3,6 +3,7 @@ import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import boardCss from './styles/board.css';
 import diffCss from './styles/diff.css';
+import katexCss from 'katex/dist/katex.min.css';
 import { createDiffEditor } from './editor';
 import type { Editor } from '@tiptap/core';
 import { computeAlignment } from './diffAlign';
@@ -133,7 +134,7 @@ function applyTint(): void {
 
 function injectStyles(): void {
   const style = document.createElement('style');
-  style.textContent = `${lightCss}\n${darkCss}\n${editorCss}\n${boardCss}\n${diffCss}`;
+  style.textContent = `${lightCss}\n${darkCss}\n${katexCss}\n${editorCss}\n${boardCss}\n${diffCss}`;
   document.head.appendChild(style);
 }
 

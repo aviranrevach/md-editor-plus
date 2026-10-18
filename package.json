@@ -2,7 +2,7 @@
   "name": "md-editor-plus",
   "displayName": "MD Editor Plus",
   "description": "Notion-style block editor for Markdown. Edit .md files inline with rich blocks, drag-to-reorder, slash commands, callouts, and polished light/dark themes.",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "publisher": "AviranRevach",
   "license": "MIT",
   "author": {
@@ -41,6 +41,9 @@
     "notion-style",
     "preview",
     "notes",
+    "latex",
+    "math",
+    "katex",
     "mdx"
   ],
   "activationEvents": [],
@@ -222,7 +225,9 @@
     "esbuild": "^0.21.0",
     "jest": "^29.0.0",
     "jest-environment-jsdom": "^30.4.1",
+    "katex": "^0.16.47",
     "lowlight": "^3.1.0",
+    "markdown-it-texmath": "^1.0.0",
     "mermaid": "^11.4.0",
     "ovsx": "^0.9.0",
     "tiptap-extension-global-drag-handle": "^0.1.18",

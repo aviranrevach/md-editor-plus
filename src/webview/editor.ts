@@ -37,6 +37,7 @@ import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce'
 import { setMediaBaseUri, resolveImageSrc } from './mediaResolve';
 import { imageNodeToMarkdown, normalizeWidth } from './imageMarkdown';
 import { imageNodeViewFactory } from './imageNodeView';
+import { BlockMath, InlineMath, MathShortcuts } from './extensions/math';
 export { setMediaBaseUri };
 
 const lowlight = createLowlight(common);
@@ -58,12 +59,15 @@ function editorExtensions(options?: { suppressEmptyPlaceholder?: boolean }) {
     TableHeader,
     TableCell,
     ResolvedImage,
+    InlineMath,
+    BlockMath,
     Link.configure({ openOnClick: false }),
     Underline,
     TextStyle,
     Color,
     Highlight.configure({ multicolor: true }),
     Markdown.configure({ transformCopiedText: true }),
+    MathShortcuts,
     Callout,
     Board,
     Toggle,

@@ -9,6 +9,7 @@
 // markup from document content can execute. It is display-only; board editing
 // still works on the raw markdown text.
 import { resolveImageSrc } from './mediaResolve';
+import { renderMath } from './extensions/math';
 
 // Style props we allow through from inline `<span style="…">` (the editor emits
 // these for text color / highlight). Everything else is dropped.
@@ -50,6 +51,11 @@ function firstToken(text: string): Token | null {
       const m = /`([^`]+)`/.exec(text);
       return m && { index: m.index, length: m[0].length, build: () => el('code', m[1]) };
     },
+    // Inline equations. Code stays ahead of this matcher so dollar signs and
+    // LaTeX inside backticks remain literal.
+    () => mathMatcher(text, /\$\$([^$\n]+?)\$\$/),
+    () => mathMatcher(text, /\\\(([^\n]+?)\\\)/),
+    () => mathMatcher(text, /(?<!\\)\$(?!\$)([^$\n]+?)\$(?!\$)/),
     // Image — small inline thumbnail (parity with the old renderer).
     () => {
       const m = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/.exec(text);
@@ -150,6 +156,23 @@ function firstToken(text: string): Token | null {
     if (t && (best === null || t.index < best.index)) best = t;
   }
   return best;
+}
+
+function mathMatcher(text: string, re: RegExp): Token | null {
+  const m = re.exec(text);
+  if (!m || !m[1].trim() || m[1] !== m[1].trim()) return null;
+  return {
+    index: m.index,
+    length: m[0].length,
+    build: () => {
+      const span = document.createElement('span');
+      span.className = 'math-inline math-inline-board';
+      span.setAttribute('data-math-inline', '');
+      span.setAttribute('data-latex', m[1]);
+      renderMath(span, m[1], false);
+      return span;
+    },
+  };
 }
 
 function markMatcher(text: string, re: RegExp, tag: string): () => Token | null {

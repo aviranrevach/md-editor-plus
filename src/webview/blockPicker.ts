@@ -9,11 +9,13 @@ import {
 import { parseBoardSource, duplicateBoardSource, mintBoardId } from './boardModel';
 import { tableToBoardSource } from './tableToBoard';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { NodeSelection } from '@tiptap/pm/state';
 import { type AiTarget } from './aiTransforms';
 import { createAiTransformPanel } from './aiTransformPanel';
 import { buildAiPanelInput } from './aiSelection';
 import { createPopover, type Popover } from './popover';
 import { placeFlyout, scrollRowIntoView } from './menuPosition';
+import { insertBlockMath, insertInlineMath, renderMath } from './extensions/math';
 
 export interface BlockDef {
   id: string;
@@ -22,6 +24,15 @@ export interface BlockDef {
   iconHtml: string;
   section: 'text' | 'lists' | 'media' | 'other';
   aliases?: string[];
+  // Search-only entries are hidden from the unfiltered root list. They model
+  // contextual commands such as Notion's "Block equation · Turn into" result.
+  searchOnly?: boolean;
+  qualifier?: string;
+  previewLatex?: string;
+  previewDisplayMode?: boolean;
+  // Math node views focus their own source input after insertion/conversion.
+  // The picker must not steal that focus back to ProseMirror on close.
+  managesFocus?: boolean;
   // Either inserts directly, or drills down into a sub-list of options.
   // Items with subItems must omit insert; items with insert must omit subItems.
   insert?: (editor: Editor, pos: number) => void;
@@ -109,6 +120,30 @@ function replaceBlockWith(
     if (dispatch) tr.replaceWith(blockPos, blockPos + node.nodeSize, newNode);
     return true;
   }).run();
+}
+
+function convertToBlockMath(editor: Editor, blockPos: number): void {
+  editor.chain().focus().command(({ tr, state, dispatch }) => {
+    const node = tr.doc.nodeAt(blockPos);
+    const targetType = state.schema.nodes.blockMath;
+    if (!node || !targetType) return false;
+    const latex = node.textContent.trim();
+    if (dispatch) {
+      tr.replaceWith(blockPos, blockPos + node.nodeSize, targetType.create({
+        latex,
+        delimiter: '$$',
+        equationNumber: '',
+      }));
+      tr.setSelection(NodeSelection.create(tr.doc, blockPos));
+    }
+    return true;
+  }).run();
+}
+
+function convertSelectionBlockToMath(editor: Editor): void {
+  const { $from } = editor.state.selection;
+  if ($from.depth < 1) return;
+  convertToBlockMath(editor, $from.before(1));
 }
 
 // Every board id currently in the doc — so a converted board gets a fresh id.
@@ -230,6 +265,7 @@ const ICO = {
   toggle: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></svg>`,
   quote: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M100,52H40A20,20,0,0,0,20,72v64a20,20,0,0,0,20,20H96v4a28,28,0,0,1-28,28,12,12,0,0,0,0,24,52.06,52.06,0,0,0,52-52V72A20,20,0,0,0,100,52Zm-4,80H44V76H96ZM216,52H156a20,20,0,0,0-20,20v64a20,20,0,0,0,20,20h56v4a28,28,0,0,1-28,28,12,12,0,0,0,0,24,52.06,52.06,0,0,0,52-52V72A20,20,0,0,0,216,52Zm-4,80H160V76h52Z"/></svg>`,
   code: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M71.68,97.22,34.74,128l36.94,30.78a12,12,0,1,1-15.36,18.44l-48-40a12,12,0,0,1,0-18.44l48-40A12,12,0,0,1,71.68,97.22Zm176,21.56-48-40a12,12,0,1,0-15.36,18.44L221.26,128l-36.94,30.78a12,12,0,1,0,15.36,18.44l48-40a12,12,0,0,0,0-18.44ZM164.1,28.72a12,12,0,0,0-15.38,7.18l-64,176a12,12,0,0,0,7.18,15.37A11.79,11.79,0,0,0,96,228a12,12,0,0,0,11.28-7.9l64-176A12,12,0,0,0,164.1,28.72Z"/></svg>`,
+  equation: `<span class="block-picker-equation-icon" aria-hidden="true">√x</span>`,
   hr: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z"/></svg>`,
   board: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM104,200H40V56h64Zm32-144v144H120V56Zm80,0V200H152V56Z"/></svg>`,
   whiteboard: `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M240,192h-8V56a16,16,0,0,0-16-16H40A16,16,0,0,0,24,56V192H16a8,8,0,0,0,0,16H240a8,8,0,0,0,0-16ZM40,56H216V192H200V168a8,8,0,0,0-8-8H120a8,8,0,0,0-8,8v24H72V88H184v48a8,8,0,0,0,16,0V80a8,8,0,0,0-8-8H64a8,8,0,0,0-8,8V192H40ZM184,192H128V176h56Z"/></svg>`,
@@ -430,6 +466,46 @@ export const BLOCK_DEFS: BlockDef[] = [
       }).run(),
   },
   {
+    id: 'blockMath',
+    label: 'Block equation',
+    description: 'Display a LaTeX equation',
+    iconHtml: ICO.equation,
+    section: 'media',
+    aliases: ['math', 'equation', 'latex', 'formula', '公式', '公式区块', '块公式'],
+    previewLatex: String.raw`\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}`,
+    previewDisplayMode: true,
+    managesFocus: true,
+    isActive: (t) => t === 'blockMath',
+    insert: (editor, pos) => { insertBlockMath(editor, pos); },
+    convert: (editor, blockPos) => convertToBlockMath(editor, blockPos),
+  },
+  {
+    id: 'inlineMath',
+    label: 'Inline equation',
+    description: 'Insert a LaTeX equation within text',
+    iconHtml: ICO.equation,
+    section: 'media',
+    aliases: ['math', 'equation', 'latex', 'formula', 'inline math', 'inline equation', '公式', '行内公式'],
+    previewLatex: String.raw`E = mc^2`,
+    previewDisplayMode: false,
+    managesFocus: true,
+    insert: (editor) => { insertInlineMath(editor); },
+  },
+  {
+    id: 'blockMathConvert',
+    label: 'Block equation',
+    qualifier: 'Turn into',
+    description: 'Convert the current block text to a LaTeX equation',
+    iconHtml: ICO.equation,
+    section: 'media',
+    aliases: ['math', 'equation', 'latex', 'formula', '公式', '公式区块', '转换成'],
+    searchOnly: true,
+    previewLatex: String.raw`\int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}`,
+    previewDisplayMode: true,
+    managesFocus: true,
+    insert: (editor) => { convertSelectionBlockToMath(editor); },
+  },
+  {
     id: 'blockquote',
     label: 'Blockquote',
     description: 'Quoted text',
@@ -529,6 +605,7 @@ const BLOCK_SHORTCUTS: Record<string, string> = {
   taskList: '[]',
   blockquote: '"',
   codeBlock: '```',
+  blockMath: '$$',
 };
 
 export function shortcutForBlock(id: string): string | undefined {
@@ -542,8 +619,8 @@ export function footerCloseVerb(isDrilled: boolean): 'Close' | 'Back' {
 }
 
 export function filterBlocks(query: string, source: BlockDef[] = BLOCK_DEFS): BlockDef[] {
-  if (!query.trim()) return source;
-  const q = query.toLowerCase();
+  const q = query.trim().toLowerCase();
+  if (!q) return source.filter((b) => !b.searchOnly);
   return source.filter(
     b =>
       b.label.toLowerCase().includes(q) ||
@@ -580,7 +657,7 @@ export interface BlockPicker {
 export function createBlockPicker(editor: Editor): BlockPicker {
   let currentPos = 0;
   let activeIdx  = 0;
-  let filtered: BlockDef[] = BLOCK_DEFS;
+  let filtered: BlockDef[] = filterBlocks('');
   let drillParent: BlockDef | null = null;
   let context: PickerContext = {};
 
@@ -602,6 +679,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   // the DOM order used by arrow-key navigation. Lets Enter activate any row
   // type (action OR convert target) without a per-type branch in keydown.
   let activeRows: Array<() => void> = [];
+  let renderedBlocks: BlockDef[] = [];
 
   // --- flyout (Turn-into panel, contained inside the action popover el) ---
   let flyoutRows: Array<() => void> = [];
@@ -650,6 +728,49 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   flyoutList.className = 'block-picker-list';
   flyoutEl.appendChild(flyoutList);
   el.appendChild(flyoutEl);
+
+  // Formula commands get a Notion-style side preview rendered by the same
+  // local KaTeX pipeline as equations in the document.
+  const previewEl = document.createElement('div');
+  previewEl.className = 'block-picker-math-preview';
+  previewEl.style.position = 'fixed';
+  previewEl.style.display = 'none';
+  previewEl.setAttribute('aria-hidden', 'true');
+  const previewTitle = document.createElement('div');
+  previewTitle.className = 'block-picker-math-preview-title';
+  const previewMath = document.createElement('div');
+  previewMath.className = 'block-picker-math-preview-content';
+  previewEl.append(previewTitle, previewMath);
+  el.appendChild(previewEl);
+
+  let previewAnchorRow: HTMLElement | null = null;
+
+  function positionMathPreview(): void {
+    if (!previewAnchorRow || previewEl.style.display === 'none') return;
+    placeFlyout(previewEl, el, previewAnchorRow);
+  }
+
+  function hideMathPreview(): void {
+    previewEl.style.display = 'none';
+    previewAnchorRow = null;
+  }
+
+  function showMathPreview(block: BlockDef | undefined, row: HTMLElement | undefined): void {
+    if (!block?.previewLatex || !row || actionMode || drillParent || !popover?.isOpen()) {
+      hideMathPreview();
+      return;
+    }
+    previewTitle.textContent = block.qualifier
+      ? `${block.label} · ${block.qualifier}`
+      : block.label;
+    renderMath(previewMath, block.previewLatex, block.previewDisplayMode ?? true);
+    previewAnchorRow = row;
+    previewEl.style.display = '';
+    positionMathPreview();
+  }
+
+  const onMathPreviewResize = () => positionMathPreview();
+  el.addEventListener('scroll', positionMathPreview);
 
   function isFlyoutOpen(): boolean { return flyoutEl.style.display !== 'none'; }
 
@@ -725,6 +846,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
 
   function renderList(items: BlockDef[]): void {
     list.innerHTML = '';
+    renderedBlocks = [];
     let globalIdx = 0;
 
     if (drillParent) {
@@ -736,7 +858,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
         drillParent = null;
         input.placeholder = 'Filter blocks…';
         input.value = '';
-        filtered = BLOCK_DEFS;
+        filtered = filterBlocks('');
         renderList(filtered);
         input.focus();
       });
@@ -822,8 +944,10 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   // Delete). Non-empty -> matching actions + flattened convert targets.
   function renderActionMenu(): void {
     closeFlyout();
+    hideMathPreview();
     list.innerHTML = '';
     activeRows = [];
+    renderedBlocks = [];
     const { actions, targets } = searchBlockActions(input.value, BLOCK_DEFS);
 
     actions.forEach((a) => {
@@ -874,7 +998,9 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     if (isActiveItem(target)) { close(); return; }
     if (target.convert) target.convert(editor, ab.blockPos);
     close();
-    setTimeout(() => { editor.commands.focus(); editor.commands.scrollIntoView(); }, 30);
+    if (!target.managesFocus) {
+      setTimeout(() => { editor.commands.focus(); editor.commands.scrollIntoView(); }, 30);
+    }
   }
 
   // Collect every board id currently in the document, so a duplicated board
@@ -917,12 +1043,20 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     row.className = 'block-picker-item';
     if (isActiveItem(block)) row.classList.add('current');
     row.dataset.idx = String(idx);
+    renderedBlocks.push(block);
     const drillCaret = block.subItems?.length ? '<span class="block-picker-caret">›</span>' : '';
     const checkMark = isActiveItem(block) ? '<span class="block-picker-current-mark">✓</span>' : '';
     const sc = block.subItems?.length ? undefined : shortcutForBlock(block.id);
     const shortcut = sc ? `<span class="block-picker-shortcut">${sc}</span>` : '';
-    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}</span>${shortcut}${checkMark}${drillCaret}`;
+    const qualifier = block.qualifier
+      ? `<span class="block-picker-qualifier"> · ${block.qualifier}</span>`
+      : '';
+    row.innerHTML = `<span class="block-picker-icon">${block.iconHtml}</span><span class="block-picker-label">${block.label}${qualifier}</span>${shortcut}${checkMark}${drillCaret}`;
     row.addEventListener('mousedown', (e) => { e.preventDefault(); select(block); });
+    row.addEventListener('mouseenter', () => {
+      activeIdx = idx;
+      updateActive();
+    });
     return row;
   }
 
@@ -933,6 +1067,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     // so follow the highlight or it walks off the bottom / behind the footer.
     const activeRow = rows[activeIdx];
     if (activeRow) scrollRowIntoView(el, activeRow);
+    showMathPreview(renderedBlocks[activeIdx], activeRow);
   }
 
   function backToList(): void {
@@ -942,7 +1077,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       filtered = drillParent.subItems ?? [];
     } else {
       input.placeholder = 'Filter blocks…';
-      filtered = BLOCK_DEFS;
+      filtered = filterBlocks('');
     }
     input.value = '';
     renderList(filtered);
@@ -953,6 +1088,7 @@ export function createBlockPicker(editor: Editor): BlockPicker {
   // staying inside the drilled-down window. Enter submits, Escape goes back.
   function showInlineInput(block: BlockDef, pos: number): void {
     if (!block.inlineInput) return;
+    hideMathPreview();
     const cfg = block.inlineInput;
     // Hide the filter bar so typing can only land in the URL field below —
     // otherwise keystrokes hit the still-focused filter input and its `input`
@@ -1026,10 +1162,12 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     // block are handled by the action menu (renderActionMenu), not here.
     block.insert?.(editor, currentPos);
     close();
-    setTimeout(() => {
-      editor.commands.focus();
-      editor.commands.scrollIntoView();
-    }, 30);
+    if (!block.managesFocus) {
+      setTimeout(() => {
+        editor.commands.focus();
+        editor.commands.scrollIntoView();
+      }, 30);
+    }
   }
 
   input.addEventListener('input', () => {
@@ -1073,18 +1211,18 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     // ---- insert-menu (non-action) case: unchanged from today ----
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      activeIdx = Math.min(activeIdx + 1, filtered.length - 1); updateActive();
+      activeIdx = Math.min(activeIdx + 1, Math.max(0, renderedBlocks.length - 1)); updateActive();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       activeIdx = Math.max(activeIdx - 1, 0); updateActive();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filtered[activeIdx]) select(filtered[activeIdx]);
+      if (renderedBlocks[activeIdx]) select(renderedBlocks[activeIdx]);
     } else if (e.key === 'Escape') {
       if (drillParent) {
         e.preventDefault();
         drillParent = null; input.placeholder = 'Filter blocks…'; input.value = '';
-        filtered = BLOCK_DEFS; renderList(filtered); input.focus();
+        filtered = filterBlocks(''); renderList(filtered); input.focus();
       } else { close(); }
     }
   });
@@ -1097,6 +1235,8 @@ export function createBlockPicker(editor: Editor): BlockPicker {
     actionMode = false;
     flyoutFocused = false;
     closeFlyout();
+    hideMathPreview();
+    window.removeEventListener('resize', onMathPreviewResize);
     context = {};
     input.value = '';
     searchEl.style.display = '';
@@ -1119,14 +1259,16 @@ export function createBlockPicker(editor: Editor): BlockPicker {
       // + button / ⌘/ : insert a new block.
       actionMode = false;
       input.placeholder = 'Filter blocks…';
-      filtered = BLOCK_DEFS;
-      renderList(BLOCK_DEFS);
+      filtered = filterBlocks('');
+      renderList(filtered);
     }
     // Delegate lifecycle + dismissal to the popover registry (outside-click,
     // Escape, scroll are all handled centrally). Keep the .open class for
     // CSS visibility; the registry appends/removes the element from the DOM.
     popover!.open(anchorEl);
     el.classList.add('open');
+    window.addEventListener('resize', onMathPreviewResize);
+    updateActive();
     requestAnimationFrame(() => input.focus());
   }
 

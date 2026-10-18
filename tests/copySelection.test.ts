@@ -32,7 +32,7 @@ describe('selectionPlainText', () => {
   it('returns textBetween output using paragraph + leaf separators', () => {
     const { editor, textBetween } = mockEditor({ from: 3, to: 17 });
     expect(selectionPlainText(editor)).toBe('clean text');
-    expect(textBetween).toHaveBeenCalledWith(3, 17, '\n\n', '\n');
+    expect(textBetween).toHaveBeenCalledWith(3, 17, '\n\n', expect.any(Function));
   });
 
   it('returns empty string for an empty selection without calling textBetween', () => {
