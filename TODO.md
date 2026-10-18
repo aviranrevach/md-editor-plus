@@ -1,32 +1,77 @@
 # TODO
 
-<!-- board:start id="b1" name="My Board" columns="Todo|Doing|Done" column-colors="blue|amber|emerald" field-types="Title=text,Status=status,id=text,Impact=status,Area=text" field-options="Impact=Low:gray|Medium:indigo|High:red|Urgent!!:red" active-view="table" -->
-<!-- board:view name="table" columns="Title,Area,Status,Description,Impact" sort="Impact,desc" group="Impact" widths="Area=94,Impact=60,Status=85" -->
+<!-- board:start id="b1" name="My Board" columns="Todo|Doing|Review|Done" column-colors="blue|amber|purple|emerald" field-types="Title=text,Status=status,id=text,Impact=status,Area=text,Tags=tags" field-options="Impact=Low:gray|Medium:indigo|High:red|Urgent!!:red;Tags=Gilad:blue" active-view="table" -->
+<!-- board:view name="table" columns="Title,Area,Status,Description,Impact" sort="id,desc" group="Impact" widths="Area=94,Impact=60,Status=85" -->
 
-| Title | Status | id | Impact | Area |
-|---|---|---|---|---|
-| Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Done | c8 | Urgent!! | General |
-| Fix Add image feature. now it doesnt work at all when you click on it. | Todo | c1 | High | Add / Modify Block |
-| In some block types, clicking the dragger doesn't let you reach "Turn into", "Delete", "Duplicate", etc. | Todo | c2 | High | Add / Modify Block |
-| Pasting Image in - add image to workspace options (consider also in table / board table) | Todo | c10 | High | General |
-| Bug! Changing column size | Todo | c11 | High | Board table |
-| Bug in description when pasting | Todo | c9 | Medium | General |
-| Add "Delete property" option to the table column three-dot menu | Todo | c3 | Medium | Board Table -> Three dot menu |
-| In the column three-dot menu, give Sort a dropdown: None / Ascending / Descending | Todo | c4 | Medium | Board Table -> Three dot menu |
-| Board table view bug when moving title  column (Bug) | Todo | c6 | Medium | Board Table |
-| board table sometimes clicking on a cell doesnt add in the curser and allow you to change its location in cell (Bug) | Todo | c7 | Medium | Board table -> cell |
-| When typing -> <- Should actually put arrow character (like in notion), and check which combinations should also allow this | Done | c5 | Low | General |
-| Board table grouping visual bugs- the color doesnt fill the whole cell | Todo | c12 | High | Board table grouping |
-| Board table grouping - allow dragging whole group and reorder groups, or organize by sorting order | Todo | c13 | Medium | Board table grouping |
-| Main three dots menu duplicate should have two options- save in workspace, or download (saved in your download) | Todo | c14 | Medium | Main three dots menu |
-| Export pdf doesnt work, probably html too. | Todo | c15 | High | Main three dots menu |
-| Board table cells - the content of status clipped out of their cells when you are scaling down the window | Todo | c16 | Medium | Board table -> cell |
-| ID doesnt added automatically whe you unhide it. maybe should be read only | Done | c17 | Urgent!! |  |
-| Board table remove stroke on left dragger edge cell | Todo | c18 | Low | Board table |
-| Status is broken on boards (spotted on table view). doesnt allow you to change order, when you add new it was synched with another status- changing it would change the other one. plus on the main three dot menu- editing it from there is blocked altogether | Todo | c19 | High | Boards |
-| Filter on Boards- allow to show / hide specific items by status / tag etc | Todo | c20 | Low | Boards |
-| Handle pasting images from clipboard. can we drop the image in a folder in the workspace? ask the user? need to brainstorm | Todo | c21 | High | Images |
-| Allow images in table cells on board list. it can be a view of a link in mid text or something? brainstorm on this | Todo | c22 | High | Images |
+| Title | Status | id | Impact | Area | Tags |
+|---|---|---|---|---|---|
+| Bug! How do I know the file im viewing is saved?? i changed a file and to my horror when i closed and opened it i got old version. i need an indicator that this is saved, and clicking cmd S should check and give me feedback that it is saved | Done | c8 | Urgent!! | General |  |
+| Fix Add image feature. now it doesnt work at all when you click on it. | Done | c1 | High | Add / Modify Block |  |
+| In some block types, clicking the dragger doesn't let you reach "Turn into", "Delete", "Duplicate", etc. | Done | c2 | High | Add / Modify Block |  |
+| Pasting Image in - add image to workspace options (consider also in table / board table) | Done | c10 | High | General |  |
+| Bug! Changing column size | Todo | c11 | High | Board table |  |
+| Bug in description when pasting | Review | c9 | Medium | General |  |
+| Add "Delete property" option to the table column three-dot menu | Review | c3 | Medium | Board Table -> Three dot menu |  |
+| In the column three-dot menu, give Sort a dropdown: None / Ascending / Descending | Review | c4 | Medium | Board Table -> Three dot menu |  |
+| Verify c3 + c4 column menu: F5, open a board in table view, click a column header's ⋯ menu. Check Delete property removes that column (with a confirm) and that Sort shows the current state as a dropdown reading None / Ascending / Descending. This shipped without ever being run in the app. | Todo | c3-c4-verify | Medium | Board Table -> Three dot menu |  |
+| Board table view bug when moving title  column (Bug) | Todo | c6 | Medium | Board Table |  |
+| board table sometimes clicking on a cell doesnt add in the curser and allow you to change its location in cell (Bug) | Done | c7 | Medium | Board table -> cell |  |
+| When typing -> <- Should actually put arrow character (like in notion), and check which combinations should also allow this | Done | c5 | Low | General |  |
+| Board table grouping visual bugs- the color doesnt fill the whole cell | Done | c12 | High | Board table grouping |  |
+| Board table grouping - allow dragging whole group and reorder groups, or organize by sorting order | Todo | c13 | Medium | Board table grouping |  |
+| Main three dots menu duplicate should have two options- save in workspace, or download (saved in your download) | Todo | c14 | Medium | Main three dots menu |  |
+| Export pdf doesnt work, probably html too. | Review | c15 | High | Main three dots menu |  |
+| Verify c15 export: reload the F5 window, open demo-tester.md, then ⋯ → Export → Export to PDF (and Export to HTML). Check images actually show (no broken placeholders) and the board reads cleanly with no + New card / ⋯ / drag-handle clutter and no duplicated text. | Todo | c15-verify | High | Main three dots menu |  |
+| Board table cells - the content of status clipped out of their cells when you are scaling down the window | Done | c16 | Medium | Board table -> cell |  |
+| ID doesnt added automatically whe you unhide it. maybe should be read only | Done | c17 | Urgent!! | Board table |  |
+| Board table remove stroke on left dragger edge cell | Todo | c18 | Low | Board table |  |
+| Status is broken on boards (spotted on table view). doesnt allow you to change order, when you add new it was synched with another status- changing it would change the other one. plus on the main three dot menu- editing it from there is blocked altogether | Done | c19 | High | Boards |  |
+| Filter on Boards- allow to show / hide specific items by status / tag etc | Done | c20 | Low | Boards |  |
+| Handle pasting images from clipboard. can we drop the image in a folder in the workspace? ask the user? need to brainstorm | Done | c21 | High | Images |  |
+| Allow images in table cells on board list. it can be a view of a link in mid text or something? brainstorm on this | Done | c22 | High | Images |  |
+| Copy unstyled (refine the naming) - when a user copied text he got this | Review | c23 | Medium | General |  |
+| Diff viewer like in vs code. | Done | c24 | Medium | General |  |
+| in description panel there's no text blinking typing indicator sometimes when you click somewhere to type | Done | c25 | Medium | Board side panel |  |
+| Verify c25 description panel: F5, open a card's side panel. (1) The empty description should show ONE hint - "Add a description to this card" - never that stacked on top of "Start writing, or press / for commands"; hover the blank area below it too. (2) Clicking below the description should still add a block. (3) Toggle read-only ON then OFF, reopen a card, and confirm you get a blinking cursor and that typing actually sticks after the unlock. | Done | c25-verify | Medium | Board side panel |  |
+| RTL not working well usecase | Todo | c26 | High | General |  |
+| text styles doesnt work in board views | Done | c27 | Urgent!! | Boards |  |
+| Editor reports "unsaved changes" when nothing was edited, so an external / other-tab change pops a conflict banner you didn't cause. And when the two changes don't actually collide, it should merge silently instead of asking. | Done | c28 | High | Boards / Save |  |
+| When the "changed outside the editor" conflict banner appears, show WHAT changed (a diff of the rows/lines that differ) so you can choose Reload vs Keep my version with context, instead of blind. Ties into c24 (diff viewer). | Done | c29 | High | Conflict banner |  |
+| Gap B — a differing external change can silently revert just-made edits before they persist. Currently only instrumented (a console warning); the real fix needs the host to signal "edit in flight" so the webview can surface a conflict instead of applying. | Done | c30 | High | Boards / Save |  |
+| Convert table into board teable doesnt work | Done | c31 | High |  |  |
+| Regular table dissappeard from the + and tunr into menu | Done | c32 | Urgent!! |  |  |
+| Turn into with AI is not in the Turn into menu | Done | c33 | Urgent!! |  |  |
+| fix all the menus drill downs  (and regular menus) that get cropped because they are out of the screen, and make sure this doesnt happen again in this project. it should be smart way to check it and position the menu in a comfortable way. if needed show me all instances of this to check them | Done | c34 | Urgent!! |  |  |
+| Search doesnt work. i tried searching "type" in this page- showed me nothing | Done | c35 | Urgent!! |  |  |
+| on table board allow clicking on the dragger for row actions | Todo | c36 | Medium |  |  |
+| Bug! Saving says "Saved" but the file is wiped to empty (0 bytes) on disk — the whole board can vanish | Done | c37 | Urgent!! | Boards / Save |  |
+| On the image bubble menu, add another items with 2 options- 1. find file on finder. 2. copy path. it pops these options to choose- make it make sense | Done | c38 | High |  | Gilad |
+| Redesign column menu for the same look and feel, icons, and grouping as the other menus. allow filtering shortcut (that opens the regular filter) | Done | c39 | Medium | Board table |  |
+| Change icons of these areas | Todo | c40 | Low |  |  |
+| the save callout saying something was saved someplace else, where its not. both was me- i was changing something in the description | Done | c41 | High |  |  |
+| Block dragger, plus, and empty state - make it more like notion, right now the dragger icon and the plus are too small in its space, and relation to the hover background space. also missing the empty state placeholder sentense that explain what you can do | Done | c42 | Medium |  |  |
+| Menu list just like in notion - more compact menu lines and with icons with no borders- less padding, and footer (the footer text should be with smaller text like caption and not like notion) | Done | c43 | Medium |  |  |
+| Read-only mode was silently ON without me ever turning it on, and it broke the whole app — no blinking cursor / can't click-to-type in card descriptions, kanban titles, and tables. Board cells still edited (they bypass read-only), which hid the fact I was locked. Find why read-only turns on by itself / make it impossible to get stuck, and show a clear, obvious indicator when read-only is active. | Done | c44 | Urgent!! | Read-only |  |
+| Read-only needs a REAL on/off toggle (a switch like elsewhere in the app), not the confusing blue "active highlight" on the button that no one understands. | Done | c45 | High | Read-only / Settings menu |  |
+| Add a Notion-style row handle to regular markdown tables (hover gutter + grip), with drag-to-reorder and a row-actions menu — the affordance c36 adds to board tables, but for plain tables (which today have no dragger at all). | Done | c46 | Medium | Tables |  |
+| Board table cells stay editable even when read-only is ON — they re-enable contenteditable on click and commit through a path that bypasses the editor's read-only state. This masked c44 (you could still edit cells while the whole doc was "locked", hiding that read-only was on). Make board cell editing respect read-only so a locked doc is truly locked everywhere. | Done | c47 | High | Read-only / Board table |  |
+| DATA-LOSS incident (2026-06-20): opening/saving the board silently reverted the WHOLE of TODO.md back to the last git commit — rows c40–c47 and the Done statuses on c34/c37 were wiped, recoverable only from the chat transcript. Same family as c37. Proposed fix: (1) treat any board save that DROPS rows or shrinks the doc as suspect — refuse it / require an explicit delete; (2) auto-snapshot the file before every board write; (3) on load, never let a stale in-memory model silently overwrite newer content on disk. Bump c37 to the top — this is the highest-impact open bug. | Review | c48 | Urgent!! | Boards / Save |  |
+| clicking on dragger should have "turn into" in every one of the block type- and its missing for a lot of them | Done | c49 | Urgent!! |  |  |
+| two empty states one upon each other in description (is it happening in other places?) | Done | c50 | High |  |  |
+| Clicking below EVERYTHING in a doc wont suggest adding a new block, it should be selectable and if I click it, its added | Done | c51 | Urgent!! |  |  |
+| Unify the board table's draggers with the regular table's new c46 handles — give the board table the same look & behaviour: Notion-style edge strokes that promote to an emerging ⠿ grip on hover, drag-to-reorder, and the blue outline-box selection (cell / row / column). Today the board table still uses the older dots-in-the-gutter grips. | Todo | c52 | Medium | Board table / Tables |  |
+| navigating down with the keyboard doesnt scroll the pop | Review | c53 | Medium |  |  |
+| Verify c53 menu scroll: F5, open a doc, press ⌘/ to open the block picker, then hold ↓ from the top. The list should scroll to follow the highlight and the selected row should never hide behind the footer. Also check the ⠿ drag-handle menu and its Turn into ▸ flyout. | Todo | c53-verify | Medium | Block picker |  |
+| Diff is still broken, when add new section, didnt see it as diff. also missing the navigation map like in vscode | Done | c54 | High |  |  |
+| Diff map: paint the structure-map rail with red/green change markers vs the last commit (like VS Code's minimap diff overview), click a change to jump to it | Done | c55 | Medium | Structure map / Diff |  |
+| Clicking the diff toggle marks the file as "modified" (unclear what actually changed). Happens only when clicking it in the RIGHT pane — clicking in the left pane does NOT make the file modified. | Done | c56 | High | Diff |  |
+| Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57 | High | Diff |  |
+| Diff viewer should use my own rendered editor, not VS Code's default plain-text diff. See what changed in the rich rendered view (formatted text, boards, callouts) instead of raw markdown side by side. | Done | c57-2 | High | Diff |  |
+| Search in Code view doesn't scroll to the match it found | Review | c58 | Medium | Search / Code view | Gilad |
+| Verify c58 search scroll: F5, open a long file, switch to Code view, ⌘F and search for a word far down the page. The view should jump to the match, not just update the 1/N counter. Check Preview view still scrolls to matches too. | Todo | c58-verify | Medium | Search / Code view | Gilad |
+| Verify c9 description preview: F5, open TODO.md, paste something rich into a card's description in the side panel (a code block, a list, or copied web content), then look at that row's Description cell in the table view and the card in kanban. Should read as clean text with no code fences, table pipes, or raw HTML tags. | Todo | c9-verify | Medium | Boards / Description |  |
+| Duplicating a board gives the copy the SAME id as the original, so the app warns they are the same board. Two problems: (1) board ids are not random/unique - they are short and predictable, so two boards can collide on their own; (2) duplicate copies the id verbatim instead of minting a fresh one (check card ids too). Boards that share an id risk sharing state or matching the wrong card bodies. | Review | c59 | High | Boards / Duplicate |  |
+| Verify c59 board ids: F5, then in one file (a) select a board and copy-paste it, (b) insert two new boards from the picker, (c) use the dragger Duplicate. Switch to Code view and confirm every board:start has a DIFFERENT id. Then add a column to one kanban board and check the focus/scroll lands on that board, not another one. Also drag a board to reorder it and confirm its id does NOT change, then Option-drag one (hold Option only after the drag has started - the realistic way) and confirm the copy DOES get a new id. Worth checking whether a board can be dragged by the handle at all, since boards are deliberately not draggable. | Todo | c59-verify | High | Boards / Duplicate |  |
 
 <!-- board:body id="c8" -->
 
@@ -38,7 +83,7 @@ The dragger menu actions are missing for certain block types — fix so "Turn in
 
 <!-- board:body id="c9" -->
 
-when i pasted into desctiption i got some code in the table view (in the panel view its was fine)
+when i pasted into desctiption i got some code in the table view (in the panel view itself its was fine)
 
 <!-- board:body id="c3" -->
 
@@ -48,6 +93,118 @@ The column header three-dot menu has Rename, Sort, Group by, Reset width, and Hi
 
 In the column header three-dot menu, replace the separate sort actions with a Sort dropdown input offering three choices: None, Ascending, Descending.
 
+<!-- board:body id="c23" -->
+
+When a user copied text from the page they got this (unstyled / wrong styling — refine the naming):
+
+![copied-text screenshot](TODO.assets/image.png)
+
+<!-- board:body id="c24" -->
+
+comments from users: like a built-in diff, for example to see what changed when I change things (I marked the tab so you can see it) — this of course needs git for it. You also have the minimap idea.
+
+> ⚠️ Reconstructed text + best-guess image (verify / re-paste from TODO.assets/).
+
+![diff idea screenshot](TODO.assets/image-2.png)
+
+<!-- board:body id="c26" -->
+
+RTL use-case where Hebrew/English mixing doesn't work well. (Hebrew note, reconstructed — verify): "good morning 😊 here's a use-case where the Hebrew/English doesn't work right… you have here the two Anthropic options — try enabling 'automatic' (recommended)."
+
+> ⚠️ Reconstructed text + best-guess image (verify / re-paste from TODO.assets/).
+
+![RTL screenshot](TODO.assets/image-3.png)
+
+<!-- board:body id="c27" -->
+
+Text styles (bold/italic/color etc.) don't apply correctly inside board views.
+
+> ⚠️ Best-guess image (verify / re-paste from TODO.assets/).
+
+![text-styles screenshot](TODO.assets/image-4.png)
+
+<!-- board:body id="c28" -->
+
+Two related issues seen while testing the save fix:
+1. **Phantom dirty** — opening / receiving an external update can leave the editor thinking it has unsaved changes even when the user typed nothing, so a change from another tab triggers the conflict banner unnecessarily. (No `appendTransaction` auto-transform found yet — cause still open.)
+2. **Smarter conflict** — when the external change and the local change don't actually overlap (different rows/lines), merge them silently instead of prompting. Errs toward keeping both, never dropping.
+
+Related: the save-says-"Saved"-but-not-on-disk fix (Gap A) — see docs/superpowers/plans/2026-06-16-save-says-saved-but-not-on-disk-c26.md
+
+<!-- board:body id="c29" -->
+
+When the "changed outside the editor" conflict banner appears, show a diff of what differs (which rows/lines) so the Reload-vs-Keep choice isn't blind. Ties into c24 (diff viewer).
+
+<!-- board:body id="c30" -->
+
+The narrow silent-revert: when the editor's content equals what it last sent (so it looks "in sync"), an inbound external `update` that differs gets applied, discarding edits that were sent but not yet persisted. `decideExternalUpdate` only flags a conflict for *unsent* edits, not sent-but-unconfirmed ones. Shipped a `console.warn` at the apply path to catch it live; a real fix needs the extension to tell the webview an edit is in flight (un-persisted) so it can surface a conflict instead of applying. See docs/superpowers/plans/2026-06-16-save-says-saved-but-not-on-disk-c26.md (Gap B).
+
+**What to review:**
+1. **Reproduce it** — in a git repo, edit the board, then have another tab/process change the *same* file at the moment the editor is "in sync" (its content == last-sent). Open the webview dev console (filter `md-editor-plus`) and watch for `possible silent revert — Gap B`.
+2. **Confirm the harm** — does the editor's content actually get overwritten / the just-made edit lost, or does auto-save save it first? (Establish whether it's real data loss or only a theoretical window now that the save + idempotent fixes shipped.)
+3. **Check the warning fires** at the apply path in `src/webview/index.ts` (the Gap B `console.warn`).
+4. **Decide the fix** — host signals "edit in flight (un-persisted)" so `decideExternalUpdate` returns `conflict` for sent-but-unconfirmed edits, *without* breaking legitimate external-sync (the `syncGuard.test.ts` case that expects `apply` when truly in sync with no pending edits must stay green).
+5. **Frequency** — judge whether this is worth a full fix or stays a logged tripwire (it's narrow + auto-save makes the window small).
+
+<!-- board:body id="c37" -->
+
+Hit live on 2026-06-17 while adding c35: **TODO.md dropped to 0 bytes on disk** while the editor still displayed the full board. Cmd+S reported success ("Saved"), but the file stayed empty — every card would have been lost without git + screenshot recovery. The on-disk file was also *behind* git in a way that suggests the wipe wasn't a one-off.
+
+Almost certainly the same save/sync family as c8, c26, c28, c30: the editor signals "Saved" but the bytes never reach disk, and in this case an **empty buffer overwrote a non-empty file**.
+
+**Fix direction:**
+- Never write an empty / blank buffer over a non-empty file without an explicit confirm — treat "serialized output is empty but the doc is non-empty" as a bug, abort the save.
+- After a save, verify the byte count actually changed on disk before reporting "Saved" (ties into the c8 save-indicator work).
+- Reproduce: open TODO.md in the editor, add a row, watch disk byte count during/after save.
+
+<!-- board:body id="c39" -->
+
+![](./TODO.assets/image-8.webp)
+
+<!-- board:body id="c41" -->
+
+![](./TODO.assets/image-9.png)
+
+<!-- board:body id="c42" -->
+
+![](./TODO.assets/image-2.png)
+
+<!-- board:body id="c43" -->
+
+![](./TODO.assets/image-5.png)
+
+<!-- board:body id="c50" -->
+
+![](./TODO.assets/image-6.png)
+
+<!-- board:body id="c53" -->
+
+![](./TODO.assets/image-8.png)![](./TODO.assets/image-8-2.webp)
+
+<!-- board:body id="c56" -->
+
+Reported by a friend testing the editor (original Hebrew):
+
+> ברגע שאני לוחץ על ה diff אז הקובץ הופך להיות modified (לא יודע מה השינוי בפועל) זה קורה רק אם אני לוחץ על זה בפאנל הימני, אם בשמאלי זה לא הופך את הקובץ ל modified.
+
+Translation: clicking the diff (↔) toggle turns the file into "modified" — and it's not clear what actually changed. It only happens when the toggle is clicked in the **right** pane; clicking it in the **left** pane does not mark the file modified.
+
+Likely the same phantom-dirty / save-sync family as c28 (editor reports unsaved changes when nothing was edited): merely opening the diff view shouldn't dirty the buffer. Investigate why the right-pane diff toggle pushes a transaction / edit while the left-pane one doesn't.
+
+<!-- board:body id="c58" -->
+
+Reported by Gilad (original Hebrew):
+
+> כשאני עושה חיפוש בקוד וויו הוא לא עושה לי סקרול למקום שבו הוא מצא את התוצאה
+
+Translation: when searching in Code view, the match counter updates (e.g. "1/2") but the editor doesn't scroll the viewport to where the match actually is.
+
 <!-- board:end -->
 
-aasd
+| Column 1 | Column 2 | Column 3 |
+| --- | --- | --- |
+| Test |  |  |
+|  |  |  |
+|  |  |  |
+
+testing

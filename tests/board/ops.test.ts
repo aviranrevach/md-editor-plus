@@ -174,6 +174,80 @@ describe('boardOps.hideFieldInView — auto-clear sort/group', () => {
   });
 });
 
+describe('boardOps.deleteCard', () => {
+  it('removes the card with the given id', () => {
+    const b = makeBoard();
+    ops.deleteCard(b, 'c1');
+    expect(b.cards.map(c => c.id)).toEqual(['c2']);
+  });
+  it('is a no-op for an unknown id', () => {
+    const b = makeBoard();
+    ops.deleteCard(b, 'nope');
+    expect(b.cards).toHaveLength(2);
+  });
+});
+
+describe('boardOps.duplicateCard', () => {
+  it('inserts a clone directly after the source with a fresh id', () => {
+    const b = makeBoard();
+    const newId = ops.duplicateCard(b, 'c1');
+    expect(newId).not.toBe('c1');
+    expect(b.cards.map(c => c.id)).toEqual(['c1', newId, 'c2']);
+  });
+  it('deep-copies values (incl. id) and body without aliasing', () => {
+    const b = makeBoard();
+    b.cards[0].body = 'hello';
+    const newId = ops.duplicateCard(b, 'c1');
+    const clone = b.cards.find(c => c.id === newId)!;
+    expect(clone.values).toEqual({ ...b.cards[0].values, id: newId });
+    expect(clone.values).not.toBe(b.cards[0].values);
+    expect(clone.body).toBe('hello');
+    clone.values.Title = 'changed';
+    expect(b.cards[0].values.Title).toBe('A'); // original untouched
+  });
+});
+
+describe('boardOps.insertCardAt', () => {
+  it('inserts a blank card before the anchor and returns its id', () => {
+    const b = makeBoard();
+    const id = ops.insertCardAt(b, 'c2', {});
+    expect(b.cards.map(c => c.id)).toEqual(['c1', id, 'c2']);
+  });
+  it('appends at the end when beforeId is null', () => {
+    const b = makeBoard();
+    const id = ops.insertCardAt(b, null, {});
+    expect(b.cards[b.cards.length - 1].id).toBe(id);
+  });
+  it('applies presets to the new card', () => {
+    const b = makeBoard();
+    const id = ops.insertCardAt(b, 'c1', { Status: 'Doing' });
+    expect(b.cards.find(c => c.id === id)!.values.Status).toBe('Doing');
+  });
+});
+
+describe('boardOps.moveCardToGroup', () => {
+  it('sets the group field and moves the card before the anchor', () => {
+    const b = makeBoard(); // c1 Status=Todo, c2 Status=Doing
+    ops.moveCardToGroup(b, 'c1', 'Status', 'Doing', 'c2');
+    const c1 = b.cards.find(c => c.id === 'c1')!;
+    expect(c1.values.Status).toBe('Doing');
+    expect(b.cards.map(c => c.id)).toEqual(['c1', 'c2']); // c1 placed before c2
+  });
+  it('appends within the group when beforeId is null', () => {
+    const b = makeBoard();
+    ops.moveCardToGroup(b, 'c1', 'Status', 'Doing', null);
+    expect(b.cards.map(c => c.id)).toEqual(['c2', 'c1']);
+    expect(b.cards.find(c => c.id === 'c1')!.values.Status).toBe('Doing');
+  });
+  it('does not alias the original values object', () => {
+    const b = makeBoard();
+    const before = b.cards.find(c => c.id === 'c1')!.values;
+    ops.moveCardToGroup(b, 'c1', 'Status', 'Doing', null);
+    const after = b.cards.find(c => c.id === 'c1')!.values;
+    expect(after).not.toBe(before);
+  });
+});
+
 describe('addCard id scheme (c17)', () => {
   function board(ids: string[]): Board {
     return {

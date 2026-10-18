@@ -3,6 +3,20 @@
 Running list of work explicitly deferred from shipped or designed features.
 Each item names the spec it was deferred from so the context isn't lost.
 
+## Two-column "split" dragger menu (deferred from c43)
+
+Make the dragger/action menu match Notion's two-column layout: the action list
+(Turn into, Color, Duplicate, Delete, …) on the left, and the **Turn-into target
+list shown beside it on the right** — instead of today's drill-down. Aviran's
+note: in Notion **"Turn into" is a single button** in the action column that
+reveals the target column next to it (see his reference screenshots). Structural
+change, not a restyle — own branch + its own brainstorm. The `+` / slash menu
+stays a single compact column (already shipped in c43); only the dragger menu splits.
+
+Also deferred from c43: footer is pinned-vs-scrolls — currently the footer scrolls
+with the list when the menu is height-capped; pinning it (Notion-style) would mean
+scrolling only `.block-picker-list` while the footer stays fixed.
+
 Add new entries at the top of each section.
 
 ---

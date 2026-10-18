@@ -15,6 +15,7 @@ import {
   embedImageFromClipboard,
   revealImage,
   readImageBytes,
+  copyImagePath,
 } from './imageUpload';
 import { sanitizeImageFileName, extensionForMime } from '../imageAssets';
 import { IMAGE_SIZE_PRESETS } from './imageNodeView';
@@ -29,6 +30,8 @@ const ICON = {
   trash:     `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216 48h-40v-8a24 24 0 0 0-24-24h-48a24 24 0 0 0-24 24v8H40a8 8 0 0 0 0 16h8v144a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16V64h8a8 8 0 0 0 0-16ZM96 40a8 8 0 0 1 8-8h48a8 8 0 0 1 8 8v8H96Zm16 152a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Zm48 0a8 8 0 0 1-16 0v-72a8 8 0 0 1 16 0Z"/></svg>`,
   // Corners-pulling-in = compress/minimize.
   compress:  `<svg width="20" height="20" viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"><polyline points="100,44 100,100 44,100"/><polyline points="156,44 156,100 212,100"/><polyline points="100,212 100,156 44,156"/><polyline points="156,212 156,156 212,156"/></svg>`,
+  // Overlapping pages = copy.
+  copy:      `<svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>`,
 } as const;
 
 function sizeButtonsHtml(): string {
@@ -42,22 +45,31 @@ function buildEl(): HTMLElement {
   const el = document.createElement('div');
   el.className = 'bubble-menu';
   el.innerHTML = `
-    <div class="bubble-row">
-      <button class="bm-btn" data-action="replace" data-tip="Replace image">${ICON.swap}</button>
-      <button class="bm-btn" data-action="compress" data-tip="Compress (smaller file)">${ICON.compress}</button>
-      <button class="bm-btn" data-action="reveal" data-tip="Reveal in Finder">${ICON.folder}</button>
-      <button class="bm-btn" data-action="remove" data-tip="Remove image">${ICON.trash}</button>
-    </div>
-    <div class="bubble-row">
-      ${sizeButtonsHtml()}
-    </div>
-    <div class="bubble-into hidden" id="img-replace">
-      <div class="bubble-into-title">Replace with</div>
-      <div class="bubble-into-list">
-        <button class="bm-into-item" data-replace="upload"><span class="bm-into-icon">${ICON.upload}</span><span class="bm-into-label">Upload from computer</span></button>
-        <button class="bm-into-item" data-replace="browse"><span class="bm-into-icon">${ICON.folder}</span><span class="bm-into-label">Browse project</span></button>
-        <button class="bm-into-item" data-replace="clipboard"><span class="bm-into-icon">${ICON.clipboard}</span><span class="bm-into-label">From clipboard</span></button>
+    <div class="bm-default">
+      <div class="bubble-row">
+        <button class="bm-btn" data-action="replace" data-tip="Replace image">${ICON.swap}</button>
+        <button class="bm-btn" data-action="compress" data-tip="Compress (smaller file)">${ICON.compress}</button>
+        <button class="bm-btn" data-action="file" data-tip="Image file">${ICON.folder}</button>
+        <button class="bm-btn" data-action="remove" data-tip="Remove image">${ICON.trash}</button>
       </div>
+      <div class="bubble-row">
+        ${sizeButtonsHtml()}
+      </div>
+      <div class="bubble-into hidden" id="img-replace">
+        <div class="bubble-into-title">Replace with</div>
+        <div class="bubble-into-list">
+          <button class="bm-into-item" data-replace="upload"><span class="bm-into-icon">${ICON.upload}</span><span class="bm-into-label">Upload from computer</span></button>
+          <button class="bm-into-item" data-replace="browse"><span class="bm-into-icon">${ICON.folder}</span><span class="bm-into-label">Browse project</span></button>
+          <button class="bm-into-item" data-replace="clipboard"><span class="bm-into-icon">${ICON.clipboard}</span><span class="bm-into-label">From clipboard</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="bm-file-view hidden">
+      <button class="block-picker-back" data-action="file-back">
+        <span class="block-picker-back-icon">‹</span><span class="block-picker-back-label">Image file</span>
+      </button>
+      <button class="bm-into-item" data-file="reveal"><span class="bm-into-icon">${ICON.folder}</span><span class="bm-into-label">Reveal in Finder</span></button>
+      <button class="bm-into-item" data-file="copy"><span class="bm-into-icon">${ICON.copy}</span><span class="bm-into-label">Copy path</span></button>
     </div>
   `;
   document.body.appendChild(el);
@@ -75,6 +87,8 @@ export function createImageBubbleMenu(editor: Editor): void {
   const replacePanel = el.querySelector<HTMLElement>('#img-replace')!;
   const replaceBtn = el.querySelector<HTMLElement>('[data-action="replace"]')!;
   const compressBtn = el.querySelector<HTMLElement>('[data-action="compress"]')!;
+  const defaultView = el.querySelector<HTMLElement>('.bm-default')!;
+  const fileView = el.querySelector<HTMLElement>('.bm-file-view')!;
 
   // Cache measured file sizes by src so re-selecting an image doesn't refetch.
   const sizeCache = new Map<string, number>();
@@ -121,6 +135,20 @@ export function createImageBubbleMenu(editor: Editor): void {
   function closeReplace(): void {
     replacePanel.classList.add('hidden');
     replaceBtn.classList.remove('active');
+  }
+
+  // Show the normal icon menu (also collapses the Replace panel + File view).
+  function showDefault(): void {
+    fileView.classList.add('hidden');
+    defaultView.classList.remove('hidden');
+    closeReplace();
+  }
+
+  // Swap the menu in place for the File drill-down (mutually exclusive with Replace).
+  function showFileView(): void {
+    closeReplace();
+    defaultView.classList.add('hidden');
+    fileView.classList.remove('hidden');
   }
 
   function setSize(value: string): void {
@@ -195,6 +223,14 @@ export function createImageBubbleMenu(editor: Editor): void {
     void revealImage(src);
   }
 
+  async function copyPath(): Promise<void> {
+    const pos = selectedImagePos();
+    if (pos == null) return;
+    const src = (editor.state.doc.nodeAt(pos)?.attrs.src as string) || '';
+    if (!src || /^(?:https?:|data:)/i.test(src)) return; // local assets only
+    await copyImagePath(src);
+  }
+
   function remove(): void {
     if (selectedImagePos() == null) return;
     editor.chain().focus().deleteSelection().run();
@@ -226,6 +262,15 @@ export function createImageBubbleMenu(editor: Editor): void {
       return;
     }
 
+    const fileItem = target.closest<HTMLElement>('[data-file]');
+    if (fileItem) {
+      e.stopPropagation();
+      if (fileItem.dataset.file === 'reveal') reveal();
+      else if (fileItem.dataset.file === 'copy') void copyPath();
+      showDefault();
+      return;
+    }
+
     const sizeBtn = target.closest<HTMLElement>('[data-size]');
     if (sizeBtn) {
       e.stopPropagation();
@@ -244,15 +289,16 @@ export function createImageBubbleMenu(editor: Editor): void {
         else { replacePanel.classList.remove('hidden'); replaceBtn.classList.add('active'); }
         break;
       }
-      case 'compress': closeReplace(); void compress(); break;
-      case 'reveal':   closeReplace(); reveal(); break;
-      case 'remove':   closeReplace(); remove(); break;
+      case 'compress':  closeReplace(); void compress(); break;
+      case 'file':      showFileView(); break;
+      case 'file-back': showDefault(); break;
+      case 'remove':    closeReplace(); remove(); break;
     }
   });
 
   // Reset the replace panel on deselect; refresh the size tooltip on (re)select.
   editor.on('transaction', () => {
-    if (selectedImagePos() == null) { closeReplace(); tipSrc = ''; }
+    if (selectedImagePos() == null) { showDefault(); tipSrc = ''; }
     else void refreshCompressTip();
   });
 }

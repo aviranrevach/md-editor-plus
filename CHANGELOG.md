@@ -6,12 +6,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-01
+
+### Added
+
+- **Notion-style math equations** — `/math`, `/latex`, `/equation`, and `/公式` now surface **Block equation**, **Inline equation**, and **Block equation · Turn into** commands with a rendered KaTeX preview beside the picker. Inline insertion works at the cursor or from selected text; conversion preserves the current block text as LaTeX. Equations also support `$$...$$`, `⌘/Ctrl+Shift+E`, and the bubble menu's **√x** action; render locally with KaTeX; support `$...$`, `$$...$$`, `\(...\)`, `\[...\]`, and mhchem `\ce` / `\pu`; and round-trip to Markdown without becoming images or HTML. Click-to-edit provides live preview, source copy, arrow-key exit, and inline-to-block conversion. Formula source is included in search and copy; rendered math also works in read-only pages, boards, rendered diffs, and standalone HTML/PDF exports.
+- **Copy & Copy as plain text (c23)** — the selection toolbar can copy your selection with formatting intact (**Copy**) or as clean unformatted text (**Copy as plain text**), fixing selections that used to paste in with the wrong styling. Both live in the ⋯ menu (see below). (c23)
+- **Delete a property from the column menu (c3)** — the board table's column **⋯** menu gained **Delete property**, so a column can be removed from where you're already looking at it instead of only from the Properties popover. It drops the column and its values on every card, and asks for confirmation first when cards actually hold data (naming how many). Unavailable for the built-in Title, Status and Description fields. (c3)
+
+### Changed
+
+- **Sort is now a dropdown in the column menu (c4)** — the column **⋯** menu's *Sort* row shows the column's current sort at a glance (**None**, **Ascending**, **Descending**) and its flyout offers those same three choices with a ✓ on the active one. Previously it read *Ascending · Descending · Clear sort* with no indication of what was in effect, so you had to sort and watch the table to find out. Picking *None* clears the sort — and on a column that isn't the sorted one it now correctly does nothing, instead of clearing the sort another column owned. (c4)
+
+- **Slimmer selection toolbar** — the floating text toolbar is now two tidy rows: character formatting on top (Bold, Italic, Underline, Strikethrough, Inline code), and Link, Text color, Highlight, Emoji plus a **⋯** menu below. The standalone AI button and the two Copy buttons moved into that **⋯** menu (**Turn into**, **Turn into using AI**, **Copy**, **Copy as plain text**), so the bar covers less of your text.
+
+### Fixed
+
+- **Pasting into a card description no longer shows raw code in board views (c9)** — a description is edited in the side panel with the *full* block editor, so it can hold headings, lists, tables, fenced code and pasted rich text. The table view's **Description** column and the kanban card preview only understood *inline* Markdown, so every block construct was printed as literal syntax — a pasted code block showed its ` ``` ` fences, a table showed its `|` pipes, a list showed its bullets. It looked correct in the panel and wrong on the board. Both previews now flatten the block layer first: a code block reads as `code`, a table as its cell values, headings and list markers drop away, and lines join with ` • `. Inline styling (bold, italic, links, color, thumbnails) still renders as before. (c9)
+- **Resized images and pasted links render in board previews (c9)** — a resized image is stored as `<img src="…" width="N">` and a pasted link can keep its `<a href="…">` tag; board cells printed both as raw tags. They now render as a thumbnail and a real link.
+- **Search scroll in Code view (c58)** — searching in Code view updated the match counter but never scrolled to the match. Its code block could silently become its own (never-scrolling) scroll container, and the jump ran before the line-number gutter finished redrawing. Find now scrolls to the match in Code view. (c58)
+- **Arrowing through a long menu now scrolls it (c53)** — in the block picker (`+` / `⌘/` / the drag-handle actions and its *Turn into ▸* flyout), holding ↓ moved the highlight but never scrolled the list, so the selected row walked off the bottom and slid behind the sticky footer — you were navigating blind. The menu now follows the highlight, keeping the active row clear of the footer, and scrolls only when the row is genuinely out of view. (c53)
+- **Card description: no missing cursor, and one empty-state hint instead of two (c25)** — two problems in the card side panel's description. **The cursor:** read-only was read once when the panel opened and then re-applied on every re-render (any property / status / tag edit re-renders it), so a read-only toggle after opening was never noticed — the description kept getting re-locked and clicking it gave no blinking cursor and no typing. Worse, a panel opened while locked kept throwaway save callbacks, so after unlocking you could type and every keystroke was silently discarded. The panel now reads the live read-only state on every render and checks it again on each save. **The hint:** the empty description showed *both* "Add a description to this card…" and "Start writing, or press / for commands" printed over each other. The second came from the click-below-to-add-a-block hint added in c51, which the earlier c50 fix didn't cover. Clicking below the description still adds a block; only the duplicate hint is gone. (c25)
+- **A pasted or inserted board can no longer steal another board's identity (c59)** — every board carries an `id` on its `board:start` marker, and two boards sharing one make the app treat them as the same board: focus, scroll and measure work aimed at one could land on the other. Copying a board and pasting it reproduced its id verbatim, and inserting a board from the picker rolled a random id without checking the ids already in the file. A pasted board that collides now gets a fresh id (its content untouched), inserting mints against the ids already present, and the kanban "add column" step targets its *own* board directly instead of looking one up by id. The **Duplicate** action on the drag handle already re-minted correctly and is unchanged. (c59)
+- **Status options no longer get "linked" — and you can reorder them (c19)** — editing a board status used to be able to silently change a *different* status with the same name, there was no way to reorder statuses, and the behavior differed by entry point. Three fixes, all at the shared options editor so every entry point (the table column header **and** the ⋯ → Properties → Edit options menu) and every field kind (the built-in **Status** and custom status fields) get them at once: (1) two options on a field can never share a name — renaming onto an existing name is rejected with a brief shake instead of merging them; (2) **drag a status by its grip to reorder it** — each option row shows an always-visible ⠿ grip (matching the table row grip); a blue drop-line shows where it lands; for the built-in Status this also sets the kanban column order; (3) the Properties-menu "Edit options" path is confirmed working end-to-end, including the new-field "States" editor, which now enforces the same uniqueness + reorder rules. (c19)
+- **Floating popovers/menus no longer jump to the top-left corner** — when a popover's anchor was removed from the page while the popover was open (e.g. adding a status option re-renders the board and replaces the column header it was anchored to), a size change could re-measure the now-detached anchor as position `(0,0)` and fling the popover to the corner. Placement now keeps the current position when the anchor is gone, protecting every popover and menu that uses the shared positioning helper. (c19)
+- **No more false "changed outside the editor" banner while editing a card description (c41)** — editing a board card's description could pop the conflict banner claiming the file was changed elsewhere, when *both* changes were your own. The card-description edit takes a long, double-debounced path (detached editor → board → main editor), so the host's echo of an *earlier* keystroke could arrive late and out of order — after the editor had already moved on — and get mistaken for an external write. The webview now remembers the **last several versions it sent** (not just the most recent one) and recognizes a stale, reordered echo as its own, deduping it instead of raising a conflict. Genuinely external changes still surface the banner. (c41)
+
+### Developer
+
+- The column menu reuses the Properties panel's `deleteFieldWithConfirm`, and `deleteFieldFromBoard` now routes through `boardOps.deleteField` — so a deleted field is also scrubbed from every view (columns, hidden, sort, groupBy, widths) on *both* entry points, instead of leaving dangling references behind on the Properties path. `menu.ts` renders an item's `trailing` element before the submenu caret so a value hint reads "Sort  Ascending ›" (10 tests in `boardColumnMenu.test.ts`).
+- New `boardBodyPreview.ts` — a pure `flattenMarkdownLines()` / `flattenMarkdownToInline()` shared by the table Description column and the kanban card preview, so both views agree on how a body reads as one line (38 tests).
+- `menuPosition.ts` gains `computeListScrollTop()` (pure, 14 tests) + `scrollRowIntoView()` for keyboard-nav scrolling — it already owned the height cap and `.is-scroll` that create the scroll container. It moves `scrollTop` rather than calling `scrollIntoView()`, which can scroll the page and trip the popover registry's window-scroll dismissal, closing the menu being navigated. The c34 guardrail now also asserts menus don't hand-roll this.
+- `boardInlineRender.ts` hardens rendered links: only `http`, `https`, `mailto` and `tel` schemes (plus relative paths and anchors) become a live `href` — `javascript:` and `data:` URLs are dropped while the link text still renders.
+- Board id de-duplication (c59) runs in the board node's `transformPasted` — clipboard and drop only, never on load, so opening a file that already contains a collision can't dirty it (the c28/c56 phantom-dirty family). Reordering a board by dragging keeps its id; an Option-drag (Ctrl elsewhere) is a real duplicate and gets a fresh one. That copy-vs-move test reads the modifier off the **drop** event, matching what ProseMirror itself does — `view.dragging.move` is frozen at dragstart and is stale the moment you press Option mid-drag, which is how option-dragging actually happens. New `boardIdOf()` / `replaceBoardId()` in `boardModel.ts` swap the id surgically instead of a parse → serialize round-trip that would renormalize the region. The block-format reference now tells AI authors the board id must be unique — regenerate an installed blocks skill (⋯ → **Create blocks skill…**) to pick that up, since the shipped copy hardcoded `b1`. 26 new tests.
+
+## [0.9.1] - 2026-07-01
+
+### Changed
+
+- **Exports are now self-contained (c15)** — **Export to HTML** and **Export to PDF** now embed every local image directly in the file as a `data:` URI. The exported file is fully portable — images show even when it's moved, emailed, or opened outside your workspace. Previously images pointed at internal editor URLs that only resolved inside VS Code, so a standalone export showed blank/broken images.
+
+### Fixed
+
+- **Export to PDF now works when a browser is already open (c15)** — PDF export shells out to headless Chrome/Edge, which on modern browsers shares your everyday profile. If that browser was already running, the profile was locked and the export silently produced nothing. It now renders in a private throwaway profile, so the PDF is created whether or not your browser is open. (c15)
+- **Boards export cleanly (c15)** — exporting a board-heavy document used to dump all the interactive chrome into the static file: the view switcher, `+ New card` / `+ Add row` buttons, `⋯` menus, drag handles, and hidden layout mirrors that duplicated card and column text as loose runs. Exports now strip that chrome and keep the board's active view (kanban stays kanban, table stays table) with its real content — status/tag pills, card text, everything. (c15)
+
+### Developer
+
+- The `.vsix` package no longer bundles the `.worktrees/` dev folder — added it to `.vscodeignore`. The packaged extension dropped from 378 files (10.67 MB) to 29 files (4.71 MB).
+
+## [0.9.0] - 2026-07-01
+
+### Added
+
+- **Rendered two-pane diff (c57)** — the diff view now renders both sides through the
+  editor — formatted text, callouts, boards, images — instead of VS Code's
+  plain-text diff. Changed blocks are tinted, paired blocks align with filler
+  gaps, and a change rail jumps between edits.
+
+### Changed
+
+- The diff (↔) toolbar action now opens the rendered two-pane diff in a panel
+  beside the editor, replacing the native text diff.
+
+### Fixed
+
+- **Diff-map rail now shows real changes (c55 fix)** — the structure-map change rail was marking *every* block as "added" (green) on every document, even with no changes since your last commit, and it never showed modified or removed. Its base side was computed by re-parsing the committed text the wrong way and silently came up empty, so everything read as new. It now renders the base through the editor's real load path and compares correctly — added (green), modified (amber), removed (red), and nothing at all when a file genuinely matches its last commit. (c55)
+- **Catastrophic saves are now refused, not written (c48)** — a last line of defense for the save data-loss family. A save that would replace your real content with **nothing**, or make an entire **board vanish** (the c37 fragment signature), is now **refused at the write path** instead of being silently written to disk while the editor claims "Saved" — the untouched content snaps straight back into the editor so nothing diverges. Only these never-legitimate writes are blocked; ordinary edits, row deletions, and shrinking a doc are untouched. The rarer "reverted on open" path stays instrumented (it needs a live repro before a root-cause fix). (c48)
+- **"Turn into" (and Delete / Duplicate) on the dragger for every block type (c49)** — clicking a block's **⠿ dragger** now opens the full action menu — **Turn into · Duplicate · Delete** — for *all* block types, including boards, images, diagrams, dividers, and toggles. The menu used to silently fall back to "insert a new block" over those (atomic) blocks because it couldn't locate the block under the handle; it now finds the block reliably. (c49)
+- **Board cells respect read-only (c47)** — turning **read-only** on now truly locks the whole board. Previously a board's text cells and column headers stayed editable after the toggle (their edit listeners went stale), which let you keep editing a "locked" doc and masked c44. Cell and header editing now check read-only **live** and refuse to enter edit mode, and the board re-renders the instant you flip the switch — both ways — so its add-row / edit affordances always match the lock state. (c47)
+- **Toggles stay intact across saves** — a collapsible toggle no longer duplicates its title text (`ToggleToggleToggle…`) or doubles a following horizontal rule (`---`) every time the file is saved. The toggle's summary is now kept out of its body when parsed, and a blank line is emitted after the block so a trailing `---` isn't absorbed into it.
+- **Opening the diff no longer marks the file "modified" (c56)** — clicking **Show Diff** (the ↔ toggle) used to flip a clean file to *modified* without you changing anything — and only from one pane when the file was open in two, since each pane serialized its own model slightly differently. The diff was writing the webview's current text back into the document just to capture unsaved edits. It no longer does: the diff is a read-only preview that takes the webview's live text straight into its "current" side, so unsaved sections still show (the c54 behavior) but your document is never touched. (c56)
+
+## [0.8.0] - 2026-06-25
+
+### Added
+
+- **Diff map — change marks on the structure rail (c55)** — the structure-map rail now paints a VS Code-minimap-style overview of what's changed since your last commit: **green** for added blocks, **amber** (`#F5A623`) for modified, **red** for removed (a short stub at the seam). Each mark sits at its block's real rendered position — **click one to jump** there (a removed-block mark jumps to where it was), **hover** for "Added / Modified / Removed". Marks recompute as you type and after each save, recolor per theme, show only when there are changes vs your last commit, and hide in Code view with the rest of the rail. For files not in git, they fall back to comparing against the on-disk / session version. (c55)
+- **Structure map — navigation rail (c54)** — a slim rail down the right edge of the editor showing a **tick for every heading** (wider/bolder for H1, fainter for H3) plus a **translucent box** marking your current viewport. **Click a tick** to jump to that heading, **drag the box** to scroll, **hover a tick** for its text. Toggle it from the new toolbar button (next to Outline); your on/off choice persists like the other view settings. It reuses the document outline (so it never re-scans the page), recolors to match every theme, and tucks away automatically in Code view. (c54)
+- **Formatting toolbar inside board cells (c52)** — selecting a word while editing a board **text cell** (or a text property in the **side panel**) now pops a small formatting toolbar, the board's counterpart to the document bubble menu. It offers **Bold · Italic · Strikethrough · Inline code · Highlight · Link · Text color** — each wraps your selection in the matching markdown, which renders as styled text the moment you click away (building on the c27 inline-style rendering). **Link** drops a `[text](url)` with the `url` ready to type over, right in the cell — no popup. Every action keeps your cursor in the cell, so the edit is never interrupted. Structural labels (column / board / field names) and the plain-input kanban card title are intentionally left out, so styling can never corrupt a column's identity. (c52)
+
+### Fixed
+
+- **Full diff now catches unsaved edits and renders as a real diff (c54)** — two fixes to **Show Diff**. First, edits you just typed are flushed into the document before the diff opens, so a brand-new section is no longer invisible in the comparison. Second, both sides of the diff now open in VS Code's **native text-diff editor** (red/green line markers) instead of two rendered MD Editor Plus webviews — the panes used to claim the `*.md` custom editor, which showed no diff highlighting and broke the base-side image (a text diff shows the raw markdown instead). (c54)
+- **Single description placeholder in the card panel (c50)** — opening a board card with an empty description no longer shows two overlapping placeholder hints. The panel now displays only its own "Add a description to this card…" prompt; the generic editor hint is suppressed inside the card panel. (c50)
+
+## [0.7.1] - 2026-06-20
+
+### Added
+
+- **Per-column Filter shortcut + tidier column menu (c39)** — a board column's **⋯ menu** now leads with **Filter** (on status / tag columns), which opens a small **mini-filter** for just that column: the field's value chips, a **Clear** that resets only that field, and an **All filters…** link down to the full filter panel. Toggling a chip hides cards live and keeps the toolbar filter's count badge in sync — it edits the same session filter. The menu was also reorganized so the "shape what you see" actions sit together up top — **Filter · Group by this · Sort** (the three sort options now tuck into a single **Sort ▸** flyout) — with **Rename · Edit options · Reset column width · Hide column** below a divider. (c39)
+- **Row & column handles + cell selection for regular tables (c46)** — plain markdown tables now have Notion-style edge handles. **Hover a cell** → a thin stroke marks its **row** (left edge) and **column** (top edge); drift toward an edge (a forgiving zone — no precision needed) and a **⠿ grip emerges**. **Click** the grip to select the whole row/column and open its menu — rows: **Insert row above / below**, **Duplicate row**, **Delete row**; columns: **Insert column left / right**, **Duplicate column**, **Delete column** — or **drag** a stroke to reorder. Hovering a row highlights just that **row** (not the whole table). Tables also gained a real **selection state** drawn as a **blue outline box** on the edges (like the board, never a fill): the cell you click, a selected row/column, or a **drag across cells / shift-click** range. The header row stays first (its menu only offers **Insert row below**; it can't be dragged or deleted), and a table always keeps at least one column. Handles only show when the document is editable and never appear on board tables (which have their own). The margin block handle still moves the whole table. (c46)
+- **Click below the page to add a block (c51)** — clicking the empty space beneath the last block now lands your cursor in a new paragraph, so you can always keep typing at the bottom of a doc. Previously this was a no-op whenever the document ended in a block with no place for the caret (a board, code block, image, or table). **Hovering** that area first previews a faint "Start writing, or press / for commands" hint so it reads as clickable before you click. If the doc already ends in an empty paragraph, the click just focuses it instead of stacking another. In **read-only** docs nothing is shown and nothing is added — and the empty-state hint no longer appears there either, since you can't write. (c51)
+
+### Fixed
+
+- **Text styles now show inside board views (c27)** — bold, italic, strikethrough, inline `code`, ==highlight==, links and text color now render properly across the board: **table cells**, the **Description** column, and **kanban cards** (title, body preview, and field chips). Previously a cell containing `**bold**` or a colored word showed the raw markdown characters instead of the styled text. Editing a cell still works on the plain markdown, so nothing about how your text is stored changes — only how it's displayed. (c27)
+
+## [0.7.0] - 2026-06-20
+
+### Added
+
+- **Empty-state hint and plain `/` trigger (c42)** — empty blocks now show a hint: "Start writing, or press / for commands". Typing `/` on an empty block opens the block picker; `⌘/` continues to work everywhere.
+- **Board table row actions (c36)** — hover a row and **click the ⠿ grip** to open a row menu: **Open in side panel**, **Duplicate**, **Insert row above / below**, and **Delete row**. Dragging the grip still reorders, and in a grouped table **dragging a row into another group now re-assigns its group field** (like moving a kanban card between columns). The grip stays clickable even when the table is sorted — only the Insert options hide, since position is computed there. (c36)
+
+### Changed
+
+- **Notion-style block handle (c42)** — the gutter `⠿` handle is now a larger SVG ＋ and a 6-dot drag grip, each with a soft rounded background that appears on hover only, aligned to each block's first line.
+- **Block picker looks like Notion now (c43)** — the `+` / slash menu got a visual pass: **flat borderless icons** (no more boxed icon tiles), **tighter rows** with less padding, and calm **sentence-case section labels**. Each row shows its **markdown shortcut** on the right (`#`, `##`, `-`, `1.`, …), and a small **caption-sized footer** spells out the keys — `↑↓ Navigate · ↵ Select · esc Close` (and `esc Back` inside a drill-down). Same behavior, friendlier look. (c43)
+- **Turn into opens a side panel, Notion-style** — in the `⠿` block action menu, **Turn into** is now a single button that reveals its convert targets (and the **✨ Using AI** section) in a **flyout panel beside the menu** instead of replacing the list in place. Hover it or press `→` to open the panel; `←` / `esc` steps back; `↑↓` move within whichever panel you're in, and the footer hint flips to `esc Back` while you're in the targets. Typing still collapses everything into one flat filtered list. The panel flips to the left when there's no room on the right.
+- **Menus now share one component** — every click-anchored menu (tags picker, the + / slash menu and its drill-downs, board table & kanban column menus, status dropdowns, the Properties / field-action / add-property menus, the status-options editor, the callout menu, the board view switcher, the filter panel, the image manager) is built on a single shared `Popover` primitive and `Menu` builder. Behavior is now consistent everywhere: open/close, outside-click **and Escape** dismissal, only one menu open at a time, drill-downs, and the edge-aware positioning + scrollbar from before. Internal refactor — no change to what menus do, only how they're built. (Popover component)
+- **Read-only is now a real toggle** — the "Read only" control in the ⋯ menu is a proper on/off switch (like the other settings), not a button with a hard-to-read blue highlight. (c45)
+
+### Fixed
+
+- **Menus no longer crop off-screen** — every popover, dropdown, and drill-down (the + / slash menu and its **Turn into** drill-downs, the board table & kanban **column menus**, the **tags picker**, status dropdowns, the **Properties** and add-property menus, the date picker, the callout menu, the board **view switcher**, the **Filter** panel, the **display / appearance** panel, and the link popover) now positions through one shared helper. A menu opened near a screen edge **flips** to the other side, **nudges** itself fully on-screen, and **never covers the button that opened it**. A menu taller than the space available caps its height and scrolls inside instead of running off the bottom. (c34)
+- **One consistent menu scrollbar** — menus that scroll now use a single hidden-until-hover scrollbar (matching the board columns), and a scrollbar only appears when the menu's content genuinely overflows — no more phantom scrollbar when everything already fits. (c34)
+- **Read-only can no longer get silently stuck** — it used to be a global setting that, once on, locked every file in every window until you found and unflipped it (with no indication, which made the editor feel broken). Now read-only never persists: every file opens editable, and you opt in per session. When it *is* on, a 🔒 "Read only" pill shows in the toolbar (click to unlock), and trying to type pops a "This file is read-only — Enable editing?" notification. (c44)
+
+## [0.6.0] - 2026-06-18
+
+### Added
+
+- **Plain table block** — a simple Markdown table is back as its own block in the **+ / slash menu** and the dragger **Turn into** menu, listed under **Lists** alongside the board blocks. Inserting it drops a 3×3 grid with a header row; it round-trips as standard `| col | col |` Markdown. Distinct from **Board: Table** (the database-style board), so typing `table` in the picker now surfaces both. (c32)
+- **Turn a table into a board** — **Turn into → Board: Table** converts a plain Markdown table into a board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the existing view toggle. (c31)
+- **AI transforms in the dragger Turn-into** — the ⠿ block-handle **Turn into** menu now has a **✨ Using AI** section (Ask AI…, Board: Kanban, Mermaid diagram, Summary, Action items, Outline, Timeline), mirroring the text-selection bubble menu. Targets that already have a deterministic converter (Table, Board: Table) aren't duplicated under AI. (c33)
+- **Image file actions** — the image menu's folder control is now a drill-down offering **Reveal in Finder** and **Copy path** (the path is copied through the host clipboard via a webview bridge). (c38)
+
+### Fixed
+
+- **Save could wipe the file to a fragment** — the card-description editor is now isolated so a save can no longer truncate the whole file down to a single card's content. (c37)
+
 ## [0.5.5] - 2026-06-17
 
 ### Added
 
 - **Image controls** — click any image in the document body to reveal a small menu styled like the text bubble menu (one row of actions, one row of sizes): drag the **resize grips** on the image's left/right edges (or pick S / M / L / Full) to resize, **Replace** to swap it via the drill-down picker (upload / browse / clipboard), **Compress** to re-encode it locally (canvas pass, no server round-trip; never writes a larger file — its tooltip shows the current file size and, after compressing, the saving, e.g. `1.2 MB → 410 KB`), **Reveal in Finder** to open the containing folder, and **Remove** to delete the node. Resized images are stored as a standard HTML `<img src="…" width="…">` so they render at the right size everywhere the file is read (GitHub, Obsidian, VS Code preview, other editors); images that have never been resized continue to round-trip as plain `![](src)` Markdown. The board image manager (table and kanban image cells) also gained per-thumbnail **Compress** and **Reveal in Finder** actions. (Image bytes are read through the extension, since the webview's content-security policy blocks `fetch()` of local files.)
-
 - **Smart typography everywhere you type** — type `->` / `<-` and they turn into `→` / `←` as you go (plus `<->` → `↔`, `=>` → `⇒`, `--` → `—`, `...` → `…`, and `(c)` / `(r)` / `(tm)` → `©` / `®` / `™`), Notion-style. Previously this only fired in the rich-text body; it now also works in **board table cells, the Title column, card titles, the "new card" input, and column/field rename**. Code spans and code blocks are left untouched, and the whole thing honours the Visual-settings toggle. Arrows in board cells also render in the correct text font now (they were falling through to a heavier symbol-font fallback, so a `→` in a table looked like a mismatched icon next to one in the body).
 - **Add image — four ways in** — the **Image** block now drills down inside the block picker (like Callout) instead of doing nothing: **Upload from computer** (copied into a per-note `<note>.assets/` folder next to your file), **Browse project** (native file picker showing real folders, referenced in place — no duplicate copy), **Embed link** (an in-window field for a URL or project path), and **Embed from clipboard** (use the image link already on your clipboard). Uploaded files get a clean relative link (`![](./Note.assets/photo.png)`), so your Markdown stays portable and the image survives closing and reopening the file. Filenames are kept readable, with a `-2` suffix only when there's a name clash. _(Known issue: "Embed link" isn't inserting reliably in the editor yet — tracked in the backlog.)_
 - **Paste images into the body** — paste an image from the clipboard (⌘V / Ctrl+V) anywhere in the document and it's saved into the per-note `<note>.assets/` folder and inserted inline, named `pasted-YYYY-MM-DD.<ext>`. _(Dragging an image file in from Finder is a known limitation: VS Code's workbench opens the dropped file in a tab before the editor can catch it — use paste, or the Image block's Upload, for now.)_
@@ -54,7 +184,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Broader trigger wording for the generated blocks skill** — the `SKILL.md` description now lists the synonyms people actually type (project/task/sprint board, database view, flowchart/graph, the specific callout names, expandable/collapsible) so the user's AI recognizes a match more reliably, while staying anchored to "MD Editor Plus" + Markdown files so the app-specific board format never hijacks generic markdown.
-
 - **Find in page (⌘F / Ctrl+F)** — a Notion-style find bar for the editor. VS Code's native find can't reach inside a custom-editor webview, so this is a built-in search over the document. Highlights every match with a live `3 / 12` count, <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd> (or ↑ ↓) navigates, <kbd>Esc</kbd> closes. Also reachable from the `⋯` menu as **Find in page**.
   - **Searches the document model, not the DOM**, via a ProseMirror decoration plugin — so it finds text inside a *collapsed* toggle, then auto-expands the toggle and scrolls the match into view. Decorations never touch content, so highlighting can't dirty the file.
   - **Works in both views** — Preview and Code. Switching views while the bar is open moves the search to the now-active editor.
@@ -68,10 +197,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.2] - 2026-06-02
 
-### Fixed
-
-- **Critical: board card data lost on file reopen** — boards in markdown files round-tripped through the editor were silently losing every card on the second open. Root cause: `preprocessMarkdownBoards` wrapped the board region in `<div data-board source="...">` without escaping newlines inside the attribute. markdown-it (used by tiptap-markdown) saw the multi-line attribute, terminated the HTML block at the blank line inside it, parsed the markdown table as a sibling, and the browser then dropped the entire malformed `<div>` from the DOM. With no `<div data-board>` in the DOM, TipTap had nothing to attach the source to, the board rendered empty, and the next autosave overwrote the file with the empty state. Fixed by escaping `\n` → `&#10;` in `htmlEscape` so the source attribute is single-line — markdown-it now sees a complete `<div>` and the browser parses it cleanly. `getAttribute('source')` decodes `&#10;` back to `\n`, so `parseBoardSource` sees the same string it always did.
-
 ### Added
 
 - **Turn selection into… (using AI)** — select a run of blocks and the ✨ AI button in the bubble menu (or the **Using AI** group in *Turn into*) builds a ready-to-paste prompt for a **file-aware AI** (Claude Code, Cursor, the VS Code AI). The prompt carries the file path, the selection's location (line + text anchors), and the app's *exact* block grammar so the AI's output round-trips into a real board/table/diagram. **No network, no API keys — the prompt travels through the clipboard, nothing else.**
@@ -81,9 +206,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Hardened against agents that reply "done" without acting — the prompt asks them to either edit the file or output the block, never just acknowledge.
   - A small panel previews the exact prompt (read-only) with a 3-step "what to do next", and copies it to the clipboard.
 - **Delete blocks** — remove any block from the **⠿ dragger menu** ("Delete"), a board from its **⋯ menu** ("Delete board"), a Mermaid diagram from its **⋯ menu** ("Delete"), or select a board and press **Delete / Backspace** (click the board's chrome to select it; it shows a selected outline).
-
 - **Create blocks skill** — a ⋯-menu action ("Create blocks skill…") that generates a reusable **Claude Skill** (`SKILL.md`) documenting the exact grammar for this app's blocks (Kanban/Table boards, Mermaid, Callouts, Toggles). Tick which blocks to include, then **Install in project** (`.claude/skills/`), **Install globally** (`~/.claude/skills/`), or **Download**. The grammar is shared with the ✨ AI prompts via a single source of truth, and the board examples are proven to round-trip through the parser. No network — local file write only.
 - **End-to-end pipeline regression test** ([tests/board/pipeline.test.ts](tests/board/pipeline.test.ts)) — runs the full chain `preprocess → markdown-it → DOMParser → parseBoardSource` and asserts every card survives. Covers single board, multi-word column names ("Up Next", "In Progress"), two boards in one file, and boards with `board:body` blocks attached. Locks the fix in.
+
+### Fixed
+
+- **Critical: board card data lost on file reopen** — boards in markdown files round-tripped through the editor were silently losing every card on the second open. Root cause: `preprocessMarkdownBoards` wrapped the board region in `<div data-board source="...">` without escaping newlines inside the attribute. markdown-it (used by tiptap-markdown) saw the multi-line attribute, terminated the HTML block at the blank line inside it, parsed the markdown table as a sibling, and the browser then dropped the entire malformed `<div>` from the DOM. With no `<div data-board>` in the DOM, TipTap had nothing to attach the source to, the board rendered empty, and the next autosave overwrote the file with the empty state. Fixed by escaping `\n` → `&#10;` in `htmlEscape` so the source attribute is single-line — markdown-it now sees a complete `<div>` and the browser parses it cleanly. `getAttribute('source')` decodes `&#10;` back to `\n`, so `parseBoardSource` sees the same string it always did.
 
 ### Developer
 
@@ -194,3 +322,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Settings (`mdEditorPlus.*`)
 - `theme`, `font`, `textSize`, `pageWidth`, `fullWidth`
 - `alwaysDarkCode`, `alwaysDarkSource`, `sourceFullWidth`, `shortenCodeSnippets`
+
+[Unreleased]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.5...v0.6.0
+[0.5.5]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.4...v0.5.5
+[0.5.4]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.3...v0.5.4
+[0.5.3]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.2...v0.5.3
+[0.5.2]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.2.0...v0.5.0
+[0.2.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/aviranrevach/md-editor-plus/releases/tag/v0.1.0

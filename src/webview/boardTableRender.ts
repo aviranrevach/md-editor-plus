@@ -13,41 +13,28 @@
 
 import type { Board, Card, ViewDef, FieldDef, ColorToken } from './boardModel';
 import { getStatusOptions, autoColorPublic, mintCardId } from './boardModel';
+import { applyFilter } from './boardFilter';
+import { openColumnFilter } from './boardFilterPanel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
 import { buildChip } from './boardSidePanel';
-import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard } from './boardOps';
+import { setViewSort, setViewGroup, setViewWidth, setViewColumns, hideFieldInView, addCard, moveCard, moveCardToGroup, deleteCard, duplicateCard, insertCardAt } from './boardOps';
 import { startDrag, dropIndicator } from './boardDragShared';
 import { attachSmartTypography } from './extensions/smartTypography';
 import { openStatusOptionsEditor } from './boardStatusOptions';
+import { deleteFieldWithConfirm } from './boardProperties';
 import { openTagsPicker } from './boardTagsPicker';
 import { resolveImageSrc } from './mediaResolve';
+import { renderInlineMarkdown } from './boardInlineRender';
+import { flattenMarkdownToInline } from './boardBodyPreview';
 import { parseImageLinks } from './boardImageLinks';
 import { openBoardImageManager } from './boardImagePicker';
 import { saveImageBytes } from './imageUpload';
 import { imageFilesFrom } from './extensions/imagePasteDrop';
+import { createMenu } from './menu';
+import type { Menu, MenuSection } from './menu';
+import { createPopover } from './popover';
 
 interface Group { key: string; cards: Card[]; }
-
-// Render a string into `host`, turning ![alt](src) links into small inline
-// thumbnails and leaving the rest as text. Returns true if any image rendered.
-function renderInlineWithImages(host: HTMLElement, value: string): boolean {
-  const re = /!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))*)\)/g;
-  let last = 0;
-  let found = false;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(value)) !== null) {
-    if (m.index > last) host.appendChild(document.createTextNode(value.slice(last, m.index)));
-    const img = document.createElement('img');
-    img.className = 'bd-inline-thumb';
-    img.src = resolveImageSrc(m[2].trim());
-    img.alt = m[1];
-    host.appendChild(img);
-    found = true;
-    last = m.index + m[0].length;
-  }
-  if (last < value.length) host.appendChild(document.createTextNode(value.slice(last)));
-  return found;
-}
 
 // Fill an editable cell with `value`, wrapping each ![](…) link in a colored
 // token so image references stay visually distinct WHILE editing (not just right
@@ -126,6 +113,7 @@ function cssEscape(s: string): string {
 }
 
 function beginHeaderRename(label: HTMLElement, fieldName: string, ctx: BoardRendererCtx): void {
+  if (ctx.isReadonly()) return; // c47: a locked doc never enters edit mode
   if (label.getAttribute('contenteditable') === 'true') return;
   const original = label.textContent ?? fieldName;
   label.setAttribute('contenteditable', 'true');
@@ -205,47 +193,51 @@ function startRowDrag(
   card: Card,
   group: Group,
   ctx: BoardRendererCtx,
+  groups: Group[],
+  groupBy: string | undefined,
 ): () => void {
   const ind = dropIndicator();
   ind.style.position = 'fixed';
   document.body.appendChild(ind);
   let dropBeforeId: string | null = null;
-  let isReject = false;
+  let dropGroupKey: string | null = null;   // null = same group (reorder only)
   let hasValidDrop = false;
   return startDrag(e, {
     onMove: (ev) => {
       const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('tr.bd-table-row') as HTMLElement | null;
-      if (!target) { ind.hide(); return; }
+      if (!target) { ind.hide(); hasValidDrop = false; return; }
       const targetCardId = target.dataset.cardId!;
-      const targetCard = group.cards.find(c => c.id === targetCardId);
-      if (!targetCard) {
-        isReject = true;
-        hasValidDrop = false;
-        ind.classList.add('bd-drop-line-reject');
-        const r = target.getBoundingClientRect();
-        ind.show(r.left, r.top, r.width, 2);
-        return;
-      }
-      isReject = false;
+      const targetGroup = groups.find(g => g.cards.some(c => c.id === targetCardId));
+      if (!targetGroup) { ind.hide(); hasValidDrop = false; return; }
       hasValidDrop = true;
       ind.classList.remove('bd-drop-line-reject');
       const r = target.getBoundingClientRect();
       const above = ev.clientY < r.top + r.height / 2;
       const y = above ? r.top : r.bottom;
       ind.show(r.left, y - 1, r.width, 2);
-      dropBeforeId = above ? targetCardId : (group.cards[group.cards.indexOf(targetCard) + 1]?.id ?? null);
+      const idxInGroup = targetGroup.cards.findIndex(c => c.id === targetCardId);
+      dropBeforeId = above ? targetCardId : (targetGroup.cards[idxInGroup + 1]?.id ?? null);
+      // Cross-group only matters when the view is grouped and the target
+      // group differs from the card's source group.
+      dropGroupKey = (groupBy && targetGroup.key !== group.key) ? targetGroup.key : null;
     },
     onDrop: () => {
       ind.remove();
       suppressNextClick();
-      if (hasValidDrop && !isReject) {
-        const cur = ctx.getBoard();
-        const b2: Board = { ...cur, cards: [...cur.cards] };
+      if (!hasValidDrop) return;
+      const cur = ctx.getBoard();
+      const b2: Board = { ...cur, cards: [...cur.cards] };
+      if (dropGroupKey !== null && groupBy) {
+        moveCardToGroup(b2, card.id, groupBy, groupKeyToValue(dropGroupKey), dropBeforeId);
+      } else {
         moveCard(b2, card.id, dropBeforeId);
-        ctx.mutate(b2);
       }
+      ctx.mutate(b2);
     },
     onCancel: () => ind.remove(),
+    // Primarily a click target — only treat clear movement as a drag so a
+    // normal click (with a little pointer drift) opens the menu instead.
+    thresholdPx: 8,
   });
 }
 
@@ -461,7 +453,7 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
 
     // tbody — grouped rendering
     const tbody = document.createElement('tbody');
-    const sortedCards = applySort(b.cards, v, b);
+    const sortedCards = applySort(applyFilter(b.cards, ctx.getFilter(), b), v, b);
     const groups = applyGroup(sortedCards, v, b);
     lastGroups = groups;
     for (const g of groups) {
@@ -553,20 +545,26 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
           const grip = document.createElement('span');
           grip.className = 'bd-row-grip';
           if (v.sort) {
-            // Row reorder is disabled when the table is sort-ordered (the user's
-            // sort would just snap back on the next render). Show the grip in a
-            // disabled state with an explanatory tooltip rather than hiding it,
-            // so the affordance stays discoverable.
-            grip.classList.add('bd-row-grip-disabled');
-            grip.title = 'Clear sort to reorder rows';
+            // Sorted: order is computed, so dragging to reorder is meaningless — no
+            // drag affordance. The grip stays clickable for the row-actions menu.
+            grip.title = 'Row actions';
           } else {
             grip.setAttribute('data-board-drag', '');
-            grip.title = 'Drag to reorder row';
+            grip.title = 'Drag to reorder · click for actions';
           }
           grip.innerHTML = `<svg viewBox="0 0 8 14" width="8" height="14"><circle cx="2" cy="3" r="1"/><circle cx="6" cy="3" r="1"/><circle cx="2" cy="7" r="1"/><circle cx="6" cy="7" r="1"/><circle cx="2" cy="11" r="1"/><circle cx="6" cy="11" r="1"/></svg>`;
+          // Open the row menu on the browser-native click (matches the block
+          // handle and column-menu pattern — robust against the small pointer
+          // drift that a hand-rolled mouseup threshold would misread as a drag).
+          // After a real drag, onDrop calls suppressNextClick() so this click is
+          // swallowed and the menu does not open.
+          const gripCard = card;
+          grip.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            openRowMenu(grip, gripCard, ctx);
+          });
           gutter.appendChild(grip);
-          // mousedown is wired via the document-level delegated listener; the
-          // listener checks `data-board-drag` so disabled grips don't trigger.
         }
         tr.appendChild(gutter);
         for (const f of visibleFields) {
@@ -769,17 +767,20 @@ export function mountTable(ctx: BoardRendererCtx): BoardRendererOps {
       const b = ctx.getBoard();
       const card = b.cards.find(c => c.id === cardId);
       if (!card) return;
-      // Find the group this card belongs to (matches the rendered grouping).
-      // NOTE: when grouped by a tag, a multi-tag card appears in several buckets;
-      // this resolves to the FIRST matching bucket, so dragging it from another of
-      // its buckets reorders relative to the first. moveCard works on the global
-      // cards array by id (no duplication/loss) — this is a known, accepted limit.
-      const group = lastGroups.find(g => g.cards.some(c => c.id === cardId)) ?? { key: '', cards: [card] };
       e.preventDefault();
       e.stopPropagation();
-      tr?.classList.add('bd-tr-dragging');
-      cancelRowDrag = startRowDrag(e, card, group, ctx);
-      document.addEventListener('mouseup', () => tr?.classList.remove('bd-tr-dragging'), { once: true });
+      // The menu is opened by the grip's native `click` listener (see render).
+      // Here we only handle dragging. When the table is sorted the grip has no
+      // `data-board-drag`, so we start no drag and let the click open the menu.
+      if (gripEl.hasAttribute('data-board-drag')) {
+        const v = b.views.find(x => x.name === 'table');
+        // First matching bucket (a multi-tag card can appear in several); moveCard
+        // works by id on the global array so there's no duplication/loss.
+        const group = lastGroups.find(g => g.cards.some(c => c.id === cardId)) ?? { key: '', cards: [card] };
+        tr?.classList.add('bd-tr-dragging');
+        cancelRowDrag = startRowDrag(e, card, group, ctx, lastGroups, v?.groupBy);
+        document.addEventListener('mouseup', () => tr?.classList.remove('bd-tr-dragging'), { once: true });
+      }
       return;
     }
   }
@@ -840,6 +841,14 @@ function groupColor(b: Board, field: string, key: string): ColorToken | null {
   return null;
 }
 
+/** Map a rendered group key back to the stored field value. The empty/
+ *  catch-all buckets render as '—' (generic/tags) or 'Uncategorized'
+ *  (status); both mean "no value". Mirrors the add-row preset at the
+ *  group header. */
+function groupKeyToValue(key: string): string {
+  return (key === '—' || key === 'Uncategorized') ? '' : key;
+}
+
 function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
   if (!v.groupBy) return [{ key: '', cards }];
   const field = v.groupBy;
@@ -884,133 +893,240 @@ function applyGroup(cards: Card[], v: ViewDef, b: Board): Group[] {
   return Array.from(bucket.keys()).sort(alpha).map(k => ({ key: k, cards: bucket.get(k) ?? [] }));
 }
 
-let currentColumnMenuOutside: ((e: MouseEvent) => void) | null = null;
+// One reused menu instance for all row grips (matches the column-menu pattern;
+// opening it dismisses any other floating panel via the popover registry).
+// Created lazily on first open so importing this module never touches the DOM
+// (module-level createMenu would crash in non-jsdom test environments).
+let rowMenu: Menu | null = null;
+function getRowMenu(): Menu {
+  if (!rowMenu) rowMenu = createMenu({ className: 'bd-row-menu' });
+  return rowMenu;
+}
+
+// Inline icons (stroke-based, 16px) for the row-actions menu.
+const RM_ICON = {
+  open: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M21 3l-9 9M10 5H5a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5"/></svg>',
+  duplicate: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>',
+  insert: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>',
+};
+
+function openRowMenu(anchor: HTMLElement, card: Card, ctx: BoardRendererCtx): void {
+  const board = ctx.getBoard();
+  const v = board.views.find(x => x.name === 'table');
+  const sorted = !!v?.sort;
+  const groupBy = v?.groupBy;
+  // Preset the group field so inserted rows land in the same group as `card`.
+  const insertPresets: Partial<Record<string, string>> = groupBy
+    ? { [groupBy]: card.values[groupBy] ?? '' }
+    : {};
+
+  const cloneBoard = (): Board => { const cur = ctx.getBoard(); return { ...cur, cards: [...cur.cards] }; };
+
+  const sections: MenuSection[] = [
+    { items: [
+      { icon: RM_ICON.open, label: 'Open in side panel', onSelect: () => ctx.openSidePanel(card.id) },
+    ] },
+    { items: [
+      { icon: RM_ICON.duplicate, label: 'Duplicate', onSelect: () => {
+        const b2 = cloneBoard(); duplicateCard(b2, card.id); ctx.mutate(b2);
+      } },
+      ...(sorted ? [] : [
+        { icon: RM_ICON.insert, label: 'Insert row above', onSelect: () => {
+          const b2 = cloneBoard(); insertCardAt(b2, card.id, insertPresets); ctx.mutate(b2);
+        } },
+        { icon: RM_ICON.insert, label: 'Insert row below', onSelect: () => {
+          const b2 = cloneBoard();
+          // Anchor = the card after the source; null when source is last, which
+          // makes insertCardAt append to the end (correctly "below" the last row).
+          const after = b2.cards[b2.cards.findIndex(c => c.id === card.id) + 1]?.id ?? null;
+          insertCardAt(b2, after, insertPresets); ctx.mutate(b2);
+        } },
+      ]),
+    ] },
+    { items: [
+      { icon: RM_ICON.trash, label: 'Delete row', variant: 'danger', onSelect: () => {
+        const b2 = cloneBoard(); deleteCard(b2, card.id); ctx.mutate(b2);
+      } },
+    ] },
+  ];
+
+  getRowMenu().open(anchor, sections);
+}
+
+// Phosphor Regular 16px icons for the column header menu.
+const COL_MENU_ICONS = {
+  rename: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
+  sortAsc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M152,72a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H160A8,8,0,0,1,152,72Zm8,48h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm-50.34-26.34L96,187.31V40a8,8,0,0,0-16,0V187.31L66.34,173.66a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l24-24A8,8,0,0,0,109.66,173.66Z"/></svg>`,
+  sortDesc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M160,80h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm48,24H160a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm-98.34-90.34L96,107.31V216a8,8,0,0,1-16,0V107.31L66.34,120.97A8,8,0,0,1,55,109.65l24-24a8,8,0,0,1,11.32,0l24,24A8,8,0,0,1,109.66,93.66Z"/></svg>`,
+  sortClear: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a96.12,96.12,0,0,1-93.5,95.94,8,8,0,0,1-.5-16A80.11,80.11,0,0,0,224,128a80,80,0,0,0-140.45-52.45L96.4,88.4a8,8,0,0,1-5.66,13.66H40A8,8,0,0,1,32,94V43.3a8,8,0,0,1,13.66-5.66l13.7,13.7A96,96,0,0,1,240,128Z"/></svg>`,
+  group: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></svg>`,
+  resetWidth: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,56V200a8,8,0,0,1-16,0V56a8,8,0,0,1,16,0ZM32,200V56a8,8,0,0,0-16,0V200a8,8,0,0,0,16,0Zm164.69-71.85L168.85,156a4,4,0,0,1-6.85-2.83V136H94v17.17a4,4,0,0,1-6.85,2.83l-27.84-27.85a4,4,0,0,1,0-5.66l27.84-27.85a4,4,0,0,1,6.85,2.83V114h68V102.83a4,4,0,0,1,6.85-2.83l27.84,27.85A4,4,0,0,1,196.69,128.15Z"/></svg>`,
+  hide: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l21.92,24.11a8,8,0,1,0,11.84-10.76Zm46.34,79.42a36,36,0,0,1,49.4,49.4Zm-3.18,90A102.45,102.45,0,0,1,46.71,143C39.62,134.21,32.31,123.5,29,116.74c8.45-17.59,30.93-46.74,72.17-60.18l21.93,24.12a52,52,0,0,0,75.79,71.18l24,26.4A111.55,111.55,0,0,1,128,192a112.46,112.46,0,0,1-30.92-12.27Zm130-31.46a8,8,0,0,1-1.31-11.21c2.66-3.51,17.51-23.81,17.51-32.74,0-8.62-13.79-26.39-21.33-36.06l-.55-.71a112.46,112.46,0,0,0-37.45-32.78,8,8,0,1,1,7.55-14.12,128.39,128.39,0,0,1,42.86,37.43c5.31,6.83,29.92,39.5,29.92,46.24,0,7.5-22.16,40.59-20.94,42.13A8,8,0,0,1,227.08,172.55Z"/></svg>`,
+  editOptions: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
+  filter: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M230.6,49.53A15.81,15.81,0,0,0,216,40H40A16,16,0,0,0,28.19,66.76l.08.09L96,139.17V216a16,16,0,0,0,24.87,13.3l32-21.34A16,16,0,0,0,160,194.66V139.17l67.74-72.32.08-.09A15.8,15.8,0,0,0,230.6,49.53ZM40,56h0Zm106.18,74.58A8,8,0,0,0,144,136v58.66L112,216V136a8,8,0,0,0-2.16-5.47L40,56H216Z"/></svg>`,
+  sort: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M213.66,181.66l-32,32a8,8,0,0,1-11.32,0l-32-32A8,8,0,0,1,144,168h24V96a8,8,0,0,1,16,0v72h24a8,8,0,0,1,5.66,13.66ZM82.34,42.34a8,8,0,0,0-11.32,0l-32,32A8,8,0,0,0,44,88H68v72a8,8,0,0,0,16,0V88h24a8,8,0,0,0,5.66-13.66Z"/></svg>`,
+  trash: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></svg>`,
+};
+
+const SORT_DIR_LABEL = { none: 'None', asc: 'Ascending', desc: 'Descending' } as const;
+
+/** The table view's sort direction for `field`, or null when it isn't the sorted column. */
+function sortDirFor(ctx: BoardRendererCtx, field: string): 'asc' | 'desc' | null {
+  const sort = ctx.getBoard().views.find(x => x.name === 'table')?.sort;
+  return sort?.field === field ? sort.dir : null;
+}
+
+/** Muted right-aligned value text for a menu row that behaves like a dropdown. */
+function menuValueHint(text: string): HTMLElement {
+  const el = document.createElement('span');
+  el.className = 'mp-menu-value';
+  el.textContent = text;
+  return el;
+}
 
 function openColumnMenu(anchor: HTMLElement, f: FieldDef, ctx: BoardRendererCtx, collapsedGroups: Set<string>): void {
-  // Close any existing menu AND remove its stale outside-click listener.
-  if (currentColumnMenuOutside) {
-    document.removeEventListener('mousedown', currentColumnMenuOutside, true);
-    currentColumnMenuOutside = null;
-  }
-  const existing = document.querySelector('.bd-col-menu');
-  existing?.remove();
-  const menu = document.createElement('div');
-  menu.className = 'bd-col-menu';
-  const mkItem = (icon: string, label: string, fn: () => void, opts: { disabled?: boolean } = {}) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'bd-col-menu-item';
-    btn.disabled = !!opts.disabled;
-    btn.innerHTML = `<span class="bd-col-menu-icon">${icon}</span><span class="bd-col-menu-label">${label}</span>`;
-    btn.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
-    if (!opts.disabled) {
-      btn.addEventListener('click', (e) => { e.stopPropagation(); fn(); menu.remove(); document.removeEventListener('mousedown', close, true); currentColumnMenuOutside = null; });
-    }
-    menu.appendChild(btn);
-  };
   // Rename is the FIRST item — most-common reason to open this menu.
   // Shown but disabled for system fields (Title / Status / Description) so
   // users can SEE the action exists, even if they can't use it on these fields.
   const isLockedName = f.name === 'Title' || f.name === 'Status' || f.name === DESCRIPTION_FIELD.name;
-  // Phosphor Bold 16px — viewBox 0 0 256 256, fill currentColor (matches the
-  // project's existing icon style in blockPicker.ts).
-  const ICON = {
-    rename: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
-    sortAsc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M152,72a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H160A8,8,0,0,1,152,72Zm8,48h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm-50.34-26.34L96,187.31V40a8,8,0,0,0-16,0V187.31L66.34,173.66a8,8,0,0,0-11.32,11.32l24,24a8,8,0,0,0,11.32,0l24-24A8,8,0,0,0,109.66,173.66Z"/></svg>`,
-    sortDesc: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M160,80h8a8,8,0,0,0,0-16h-8a8,8,0,0,0,0,16Zm0,40h16a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm0,40h32a8,8,0,0,0,0-16H160a8,8,0,0,0,0,16Zm48,24H160a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16Zm-98.34-90.34L96,107.31V216a8,8,0,0,1-16,0V107.31L66.34,120.97A8,8,0,0,1,55,109.65l24-24a8,8,0,0,1,11.32,0l24,24A8,8,0,0,1,109.66,93.66Z"/></svg>`,
-    sortClear: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a96.12,96.12,0,0,1-93.5,95.94,8,8,0,0,1-.5-16A80.11,80.11,0,0,0,224,128a80,80,0,0,0-140.45-52.45L96.4,88.4a8,8,0,0,1-5.66,13.66H40A8,8,0,0,1,32,94V43.3a8,8,0,0,1,13.66-5.66l13.7,13.7A96,96,0,0,1,240,128Z"/></svg>`,
-    group: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></svg>`,
-    resetWidth: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M240,56V200a8,8,0,0,1-16,0V56a8,8,0,0,1,16,0ZM32,200V56a8,8,0,0,0-16,0V200a8,8,0,0,0,16,0Zm164.69-71.85L168.85,156a4,4,0,0,1-6.85-2.83V136H94v17.17a4,4,0,0,1-6.85,2.83l-27.84-27.85a4,4,0,0,1,0-5.66l27.84-27.85a4,4,0,0,1,6.85,2.83V114h68V102.83a4,4,0,0,1,6.85-2.83l27.84,27.85A4,4,0,0,1,196.69,128.15Z"/></svg>`,
-    hide: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l21.92,24.11a8,8,0,1,0,11.84-10.76Zm46.34,79.42a36,36,0,0,1,49.4,49.4Zm-3.18,90A102.45,102.45,0,0,1,46.71,143C39.62,134.21,32.31,123.5,29,116.74c8.45-17.59,30.93-46.74,72.17-60.18l21.93,24.12a52,52,0,0,0,75.79,71.18l24,26.4A111.55,111.55,0,0,1,128,192a112.46,112.46,0,0,1-30.92-12.27Zm130-31.46a8,8,0,0,1-1.31-11.21c2.66-3.51,17.51-23.81,17.51-32.74,0-8.62-13.79-26.39-21.33-36.06l-.55-.71a112.46,112.46,0,0,0-37.45-32.78,8,8,0,1,1,7.55-14.12,128.39,128.39,0,0,1,42.86,37.43c5.31,6.83,29.92,39.5,29.92,46.24,0,7.5-22.16,40.59-20.94,42.13A8,8,0,0,1,227.08,172.55Z"/></svg>`,
-    editOptions: `<svg width="16" height="16" viewBox="0 0 256 256" fill="currentColor"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31L227.32,96a16,16,0,0,0,0-22.63ZM48,179.31,76.69,208H48ZM92.69,208,48,163.31,134,77.32,178.69,122ZM192,108.69,147.31,64l24-24L216,84.69Z"/></svg>`,
-  };
-  mkItem(ICON.rename, 'Rename', () => {
-    requestHeaderRename(f.name);
-    ctx.mutate({ ...ctx.getBoard() });
-  }, { disabled: isLockedName });
-  if (f.type === 'status' || f.type === 'tags') {
-    mkItem(ICON.editOptions, 'Edit options', () => {
-      openStatusOptionsEditor(anchor, ctx.getBoard, f.name, ctx.mutate);
-    });
-  }
-  mkItem(ICON.sortAsc, 'Sort ascending', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewSort(b2, 'table', { field: f.name, dir: 'asc' });
-    ctx.mutate(b2);
-  });
-  mkItem(ICON.sortDesc, 'Sort descending', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewSort(b2, 'table', { field: f.name, dir: 'desc' });
-    ctx.mutate(b2);
-  });
-  mkItem(ICON.sortClear, 'Clear sort', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewSort(b2, 'table', null);
-    ctx.mutate(b2);
-  });
   const tableGroupBy = ctx.getBoard().views.find(x => x.name === 'table')?.groupBy;
-  if (tableGroupBy === f.name) {
-    mkItem(ICON.group, 'Remove grouping', () => {
-      collapsedGroups.clear();
-      const cur = ctx.getBoard();
-      const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-      setViewGroup(b2, 'table', null);
-      ctx.mutate(b2);
-    });
-  } else {
-    mkItem(ICON.group, 'Group by this', () => {
-      collapsedGroups.clear();
-      const cur = ctx.getBoard();
-      const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-      setViewGroup(b2, 'table', f.name);
-      ctx.mutate(b2);
-    });
-  }
-  mkItem(ICON.resetWidth, 'Reset column width', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    setViewWidth(b2, 'table', f.name, null);
-    ctx.mutate(b2);
-  });
-  mkItem(ICON.hide, 'Hide column', () => {
-    const cur = ctx.getBoard();
-    const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
-    hideFieldInView(b2, 'table', f.name);
-    ctx.mutate(b2);
-  });
-  const r = anchor.getBoundingClientRect();
-  menu.style.position = 'fixed';
-  menu.style.left = `${r.left}px`;
-  menu.style.top  = `${r.bottom + 4}px`;
-  document.body.appendChild(menu);
-  // Edge-aware repositioning: after the menu is sized by the browser, check
-  // for viewport overflow on right and bottom; flip / clamp so it stays
-  // fully visible. The rightmost columns frequently hit this.
-  requestAnimationFrame(() => {
-    const menuRect = menu.getBoundingClientRect();
-    const margin = 8;
-    if (menuRect.right > window.innerWidth - margin) {
-      // Align the menu's RIGHT edge with the anchor's right edge.
-      const left = Math.max(margin, r.right - menuRect.width);
-      menu.style.left = `${left}px`;
-    }
-    if (menuRect.bottom > window.innerHeight - margin) {
-      const top = Math.max(margin, r.top - menuRect.height - 4);
-      menu.style.top = `${top}px`;
-    }
-  });
-  const close = (e: MouseEvent) => {
-    if (!menu.contains(e.target as Node)) {
-      menu.remove();
-      document.removeEventListener('mousedown', close, true);
-      currentColumnMenuOutside = null;
-    }
-  };
-  currentColumnMenuOutside = close;
-  document.addEventListener('mousedown', close, true);
+
+  // Section 1 — "shape what you see": Filter (status/tags only), Group, Sort flyout.
+  const viewItems = [
+    ...(f.type === 'status' || f.type === 'tags' ? [{
+      icon: COL_MENU_ICONS.filter,
+      label: 'Filter',
+      onSelect: () => { openColumnFilter(anchor, ctx, f.name); },
+    }] : []),
+    tableGroupBy === f.name
+      ? {
+          icon: COL_MENU_ICONS.group,
+          label: 'Remove grouping',
+          onSelect: () => {
+            collapsedGroups.clear();
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewGroup(b2, 'table', null);
+            ctx.mutate(b2);
+          },
+        }
+      : {
+          icon: COL_MENU_ICONS.group,
+          label: 'Group by this',
+          onSelect: () => {
+            collapsedGroups.clear();
+            const cur = ctx.getBoard();
+            const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+            setViewGroup(b2, 'table', f.name);
+            ctx.mutate(b2);
+          },
+        },
+    {
+      icon: COL_MENU_ICONS.sort,
+      label: 'Sort',
+      // Reads like a dropdown: the row shows the current choice, the flyout
+      // offers None / Ascending / Descending with a ✓ on the active one (c4).
+      trailing: menuValueHint(SORT_DIR_LABEL[sortDirFor(ctx, f.name) ?? 'none']),
+      submenu: () => {
+        const active = sortDirFor(ctx, f.name);
+        const applySortDir = (dir: 'asc' | 'desc' | null) => {
+          // "None" on a column that isn't the sorted one must not clear the
+          // sort another column owns.
+          if (dir === null && active === null) return;
+          const cur = ctx.getBoard();
+          const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+          setViewSort(b2, 'table', dir ? { field: f.name, dir } : null);
+          ctx.mutate(b2);
+        };
+        return [{ items: [
+          {
+            icon: COL_MENU_ICONS.sortClear,
+            label: SORT_DIR_LABEL.none,
+            checked: active === null,
+            onSelect: () => applySortDir(null),
+          },
+          {
+            icon: COL_MENU_ICONS.sortAsc,
+            label: SORT_DIR_LABEL.asc,
+            checked: active === 'asc',
+            onSelect: () => applySortDir('asc'),
+          },
+          {
+            icon: COL_MENU_ICONS.sortDesc,
+            label: SORT_DIR_LABEL.desc,
+            checked: active === 'desc',
+            onSelect: () => applySortDir('desc'),
+          },
+        ] }];
+      },
+    },
+  ];
+
+  // Section 2 — field / column management.
+  const fieldItems = [
+    {
+      icon: COL_MENU_ICONS.rename,
+      label: 'Rename',
+      disabled: isLockedName,
+      onSelect: () => {
+        requestHeaderRename(f.name);
+        ctx.mutate({ ...ctx.getBoard() });
+      },
+    },
+    ...(f.type === 'status' || f.type === 'tags' ? [{
+      icon: COL_MENU_ICONS.editOptions,
+      label: 'Edit options',
+      onSelect: () => {
+        openStatusOptionsEditor(anchor, ctx.getBoard, f.name, ctx.mutate);
+      },
+    }] : []),
+    {
+      icon: COL_MENU_ICONS.resetWidth,
+      label: 'Reset column width',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        setViewWidth(b2, 'table', f.name, null);
+        ctx.mutate(b2);
+      },
+    },
+    {
+      icon: COL_MENU_ICONS.hide,
+      label: 'Hide column',
+      onSelect: () => {
+        const cur = ctx.getBoard();
+        const b2: Board = { ...cur, views: cur.views.map(v2 => ({ ...v2 })) };
+        hideFieldInView(b2, 'table', f.name);
+        ctx.mutate(b2);
+      },
+    },
+  ];
+
+  // Section 3 — destructive. Same action (and same smart confirm) as the
+  // Properties panel's row menu, so a column can be removed from where the
+  // user is already looking at it (c3).
+  const dangerItems = [
+    {
+      icon: COL_MENU_ICONS.trash,
+      label: 'Delete property',
+      variant: 'danger' as const,
+      disabled: isLockedName,
+      onSelect: () => {
+        // Grouping/sort/width on the deleted field are cleared by
+        // deleteFieldFromBoard; the collapsed-group set is view state, so it
+        // has to be dropped here like the "Remove grouping" path does.
+        if (tableGroupBy === f.name) collapsedGroups.clear();
+        deleteFieldWithConfirm(ctx.getBoard(), f.name, ctx.mutate);
+      },
+    },
+  ];
+
+  createMenu({ className: 'bd-col-menu' }).open(anchor, [
+    { items: viewItems },
+    { items: fieldItems },
+    { items: dangerItems },
+  ]);
 }
 
 function applySort(cards: Card[], v: ViewDef, b: Board): Card[] {
@@ -1068,13 +1184,12 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
   // Click opens the side panel for full markdown editing.
   if (field.name === DESCRIPTION_FIELD.name) {
     const body = (card.body || '').trim();
-    const preview = body.replace(/[\r\n]+/g, ' • ').slice(0, 200);
+    // c9 — the body is full block markdown (headings, lists, tables, fenced
+    // code, pasted HTML). Flatten the block layer first; renderInlineMarkdown
+    // below handles inline marks only and would print block syntax literally.
+    const preview = flattenMarkdownToInline(body, 200);
     if (preview) {
-      if (preview.includes('![')) {
-        renderInlineWithImages(td, preview);
-      } else {
-        td.textContent = preview;
-      }
+      renderInlineMarkdown(td, preview);
     } else {
       const placeholder = document.createElement('span');
       placeholder.className = 'bd-cell-empty';
@@ -1106,11 +1221,7 @@ function renderCell(td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: 
   switch (field.type) {
     case 'text':
     case 'person':
-      if (value.includes('![')) {
-        renderInlineWithImages(td, value);
-      } else {
-        td.textContent = value;
-      }
+      renderInlineMarkdown(td, value);
       if (!ctx.readonly) {
         td.addEventListener('click', () => beginInlineText(td, card, field, ctx));
       }
@@ -1243,20 +1354,15 @@ function startOfToday(): number {
 }
 
 function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
+  const popover = createPopover({ className: 'bd-date-popover' });
   const input = document.createElement('input');
   input.type = 'date';
   input.value = card.values[field.name] ?? '';
   input.className = 'bd-date-input';
-  const r = anchor.getBoundingClientRect();
-  input.style.position = 'fixed';
-  input.style.left = `${r.left}px`;
-  input.style.top  = `${r.top}px`;
-  document.body.appendChild(input);
-  input.focus();
+  popover.el.appendChild(input);
   const commit = () => {
     const v = input.value;
-    input.remove();
-    document.removeEventListener('mousedown', onOutside, true);
+    popover.close();
     if (v !== (card.values[field.name] ?? '')) {
       const cur = ctx.getBoard();
       ctx.mutate({
@@ -1269,36 +1375,24 @@ function openDatePicker(anchor: HTMLElement, card: Card, field: FieldDef, ctx: B
       });
     }
   };
-  const onOutside = (e: MouseEvent) => { if (e.target !== input) commit(); };
   input.addEventListener('change', commit);
-  document.addEventListener('mousedown', onOutside, true);
+  input.addEventListener('blur', commit);
+  popover.open(anchor);
+  input.focus();
 }
 
-let currentStatusOutside: ((e: MouseEvent) => void) | null = null;
-
 function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ctx: BoardRendererCtx): void {
-  document.querySelectorAll('.board-status-dropdown').forEach((n) => n.remove());
-  if (currentStatusOutside) {
-    document.removeEventListener('mousedown', currentStatusOutside, true);
-    currentStatusOutside = null;
-  }
-  const pop = document.createElement('div');
-  pop.className = 'board-status-dropdown';
-
-  function closeOnOutside(e: MouseEvent): void {
-    if (!pop.contains(e.target as Node)) {
-      pop.remove();
-      document.removeEventListener('mousedown', closeOnOutside, true);
-      currentStatusOutside = null;
-    }
-  }
+  // Create a fresh popover each call — the registry (createPopover) closes any
+  // previously-open popover when open() is called, so we don't need a singleton.
+  const popover = createPopover({ className: 'board-status-dropdown' });
 
   for (const col of getStatusOptions(ctx.getBoard(), field.name)) {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'board-status-option';
     item.appendChild(buildChip(col.name, col.color));
-    item.addEventListener('click', (e) => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       const cur = ctx.getBoard();
       ctx.mutate({
@@ -1309,23 +1403,18 @@ function openStatusDropdown(anchor: HTMLElement, card: Card, field: FieldDef, ct
             : c,
         ),
       });
-      pop.remove();
-      document.removeEventListener('mousedown', closeOnOutside, true);
+      popover.close();
     });
-    pop.appendChild(item);
+    popover.el.appendChild(item);
   }
-  const r = anchor.getBoundingClientRect();
-  pop.style.position = 'fixed';
-  pop.style.left = `${r.left}px`;
-  pop.style.top = `${r.bottom + 4}px`;
-  document.body.appendChild(pop);
-  currentStatusOutside = closeOnOutside;
-  document.addEventListener('mousedown', closeOnOutside, true);
+
+  popover.open(anchor);
 }
 
 function beginInlineText(
   td: HTMLTableCellElement, card: Card, field: FieldDef, ctx: BoardRendererCtx,
 ): void {
+  if (ctx.isReadonly()) return; // c47: board cells must respect read-only too
   if (td.getAttribute('contenteditable') === 'true') return;
   // Replace any rendered DOM (which may contain <img> thumbnails) with editable
   // text: plain text plus colored tokens for each ![](…) link, so image refs
@@ -1365,8 +1454,7 @@ function beginInlineText(
       // No change → mutate (and its re-render) won't fire, so restore the
       // rendered display ourselves; otherwise the cell is stuck showing the
       // raw `![](…)` markdown instead of the thumbnail.
-      td.textContent = '';
-      if (next.includes('![')) renderInlineWithImages(td, next); else td.textContent = next;
+      renderInlineMarkdown(td, next);
     }
   };
   const cancel = () => {
@@ -1377,8 +1465,7 @@ function beginInlineText(
     // Restore the rendered display (thumbnails) rather than leaving raw markdown
     // text — commit triggers ctx.mutate which re-renders, but cancel does not.
     const v = card.values[field.name] ?? '';
-    td.textContent = '';
-    if (v.includes('![')) renderInlineWithImages(td, v); else td.textContent = v;
+    renderInlineMarkdown(td, v);
     cleanup();
   };
   const onKey = (e: KeyboardEvent) => {

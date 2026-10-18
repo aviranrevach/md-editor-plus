@@ -15,6 +15,30 @@ export interface ResolveDiffBaseOptions {
   snapshot: string;             // content captured when the editor opened
 }
 
+/**
+ * Synthetic paths for the two diff sides. Both deliberately end in `)` (not a
+ * markdown extension) so the `*.md`/`*.markdown`/… custom editor does NOT claim
+ * them — that is what forces VS Code to render its real text diff instead of two
+ * rendered MD Editor Plus webviews (c54).
+ */
+export function diffSidePaths(fileName: string, baseLabel: string): { leftPath: string; rightPath: string } {
+  return {
+    leftPath: `/${fileName} (${baseLabel})`,
+    rightPath: `/${fileName} (current)`,
+  };
+}
+
+/**
+ * Right-side ("current") content for the diff. Prefer the webview's live markdown
+ * — it may hold freshly-typed, unsaved edits we want to show — and fall back to the
+ * document text only when the webview supplied nothing. Must use `??`, not `||`: an
+ * empty string is a valid current state (the user cleared the doc) and must win over
+ * the document text rather than falling through to it (c56).
+ */
+export function resolveCurrentSide(currentMarkdown: string | undefined, documentText: string): string {
+  return currentMarkdown ?? documentText;
+}
+
 /** Left-side content for the diff: explicit > git HEAD > open-snapshot. */
 export async function resolveDiffBase(opts: ResolveDiffBaseOptions): Promise<DiffBase> {
   if (opts.explicitBase) return opts.explicitBase;

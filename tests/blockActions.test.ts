@@ -1,5 +1,7 @@
 import type { BlockDef } from '../src/webview/blockPicker';
-import { convertibleTargets, searchBlockActions, BLOCK_ACTIONS } from '../src/webview/blockActions';
+import { convertibleTargets, searchBlockActions, BLOCK_ACTIONS, turnIntoFlyoutItems } from '../src/webview/blockActions';
+import { BLOCK_DEFS } from '../src/webview/blockPicker';
+import { AI_TRANSFORMS } from '../src/webview/aiTransforms';
 
 const noop = () => {};
 const DEFS: BlockDef[] = [
@@ -51,5 +53,27 @@ describe('searchBlockActions', () => {
   it('"delete" matches the Delete action', () => {
     const r = searchBlockActions('delete', DEFS);
     expect(r.actions.map(a => a.id)).toEqual(['delete']);
+  });
+});
+
+describe('turnIntoFlyoutItems', () => {
+  it('returns the convertible targets verbatim', () => {
+    const { targets } = turnIntoFlyoutItems(BLOCK_DEFS);
+    expect(targets.map(t => t.id)).toEqual(convertibleTargets(BLOCK_DEFS).map(t => t.id));
+  });
+
+  it('drops AI transforms that duplicate a deterministic target id', () => {
+    const targetIds = new Set(convertibleTargets(BLOCK_DEFS).map(t => t.id));
+    const { aiItems } = turnIntoFlyoutItems(BLOCK_DEFS);
+    expect(aiItems.length).toBeGreaterThan(0);
+    expect(aiItems.every(a => !targetIds.has(a.id))).toBe(true);
+  });
+
+  it('keeps AI transforms that have no deterministic equivalent', () => {
+    const { aiItems } = turnIntoFlyoutItems(BLOCK_DEFS);
+    // AI_TRANSFORMS minus the deterministic dupes
+    const targetIds = new Set(convertibleTargets(BLOCK_DEFS).map(t => t.id));
+    const expected = AI_TRANSFORMS.filter(a => !targetIds.has(a.id)).map(a => a.id);
+    expect(aiItems.map(a => a.id)).toEqual(expected);
   });
 });

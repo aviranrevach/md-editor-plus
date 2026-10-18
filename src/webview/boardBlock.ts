@@ -4,10 +4,13 @@ import { mountKanban } from './boardKanbanRender';
 import { mountTable } from './boardTableRender';
 import { openBoardSidePanel } from './boardSidePanel';
 import { renderChrome, type ChromeHandle } from './boardChrome';
+import type { FilterState } from './boardFilter';
 
 export interface BoardView {
   dom: HTMLElement;
   update(source: string): void;
+  /** Re-sample editability and re-render if read-only flipped (c47). */
+  refreshReadOnly(): void;
 }
 
 /**
@@ -36,6 +39,16 @@ export interface BoardRendererCtx {
   /** Delete the entire board block from the document. */
   requestDelete:  () => void;
   readonly:       boolean;
+  /** Live read-only check (reads editor.isEditable now), for user-action entry
+   *  guards — the cached `readonly` above is only refreshed on re-render, so a
+   *  read-only toggle would otherwise leave stale edit listeners live (c47). */
+  isReadonly:     () => boolean;
+  /** Session-only display filter (never serialized). */
+  getFilter: () => FilterState;
+  /** Replace the filter and re-render the body + chrome (no save/mutate). */
+  setFilter: (next: FilterState) => void;
+  /** Open the global (multi-field) filter funnel for THIS board. Wired by chrome. */
+  openFilterPanel?: () => void;
 }
 
 /** Lifecycle handles returned by a board renderer. */
@@ -93,6 +106,10 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
 
   let board = parseBoardSource(initialSource);
 
+  // Session-only filter — visibility only, never serialized. Lives here so a
+  // change can re-render the body without going through mutate()/save.
+  let filter: FilterState = {};
+
   // Stable body container — renderers paint into this. Chrome lives above it
   // in a separate element so it survives body re-renders (e.g. when a popover
   // inside the chrome triggers mutate()).
@@ -111,6 +128,13 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     }
   }
 
+  // Re-render the body + chrome WITHOUT serializing or saving. Used by the
+  // filter, which is view state, not document state.
+  function rerender(): void {
+    renderer?.update(board);
+    chromeHandle.update(board);
+  }
+
   const ctx: BoardRendererCtx = {
     root:     bodyEl,
     getBoard: () => board,
@@ -118,42 +142,48 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
     openSidePanel: (cardId: string) => {
       const card = board.cards.find((c) => c.id === cardId);
       if (!card) return;
-      const ro = opts.isReadOnly();
+      // Pass read-only as a LIVE getter and guard each commit against it too
+      // (c25). Snapshotting it here baked the state in at open time: a panel
+      // opened while locked kept no-op callbacks forever, so after unlocking you
+      // could type into the description and every keystroke was silently
+      // dropped — and a panel opened while unlocked stayed writable after a
+      // lock. Both callbacks now check the live value instead.
       openBoardSidePanel(
         board,
         card,
-        ro
-          ? () => {}
-          : (nextCard) => {
-              const next: Board = {
-                ...board,
-                cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
-              };
-              mutate(next);
-            },
-        ro,
-        ro ? undefined : (nextBoard) => mutate(nextBoard),
+        (nextCard) => {
+          if (opts.isReadOnly()) return;
+          const next: Board = {
+            ...board,
+            cards: board.cards.map((c) => (c.id === nextCard.id ? nextCard : c)),
+          };
+          mutate(next);
+        },
+        opts.isReadOnly,
+        (nextBoard) => {
+          if (opts.isReadOnly()) return;
+          mutate(nextBoard);
+        },
       );
     },
     requestDelete: () => opts.onDelete?.(),
     readonly: opts.isReadOnly(),
+    isReadonly: opts.isReadOnly,
+    getFilter: () => filter,
+    setFilter: (next: FilterState) => {
+      filter = next;
+      rerender();
+    },
   };
 
   // Chrome (name + ⋯ menu) is built once and prepended to dom before bodyEl.
   // It stays in the DOM across body re-renders so popovers inside the chrome
   // survive mutate() calls.
-  let closeOpenMenu: (() => void) | null = null;
-  function registerMenuClose(cb: () => void): void { closeOpenMenu = cb; }
-  function unregisterMenuClose(): void { closeOpenMenu = null; }
-  void closeOpenMenu; // referenced via closure in renderers that may call registerMenuClose
-
   const chromeHandle: ChromeHandle = renderChrome(
     board,
     mutate,
     opts.isReadOnly(),
     ctx,
-    registerMenuClose,
-    unregisterMenuClose,
   );
   dom.appendChild(chromeHandle.el);
   dom.appendChild(bodyEl);
@@ -179,6 +209,16 @@ export function createBoardView(initialSource: string, opts: BoardViewOptions): 
       } else {
         renderer!.update(board);
       }
+    },
+    refreshReadOnly(): void {
+      const ro = opts.isReadOnly();
+      if (ro === ctx.readonly) return; // editability unchanged — nothing to do
+      ctx.readonly = ro;
+      // Re-render chrome + body so read-only affordances (add-row, inline-edit
+      // listeners, ⋯ menus) match the new state — otherwise a board that was
+      // rendered editable keeps its live edit listeners after locking (c47).
+      chromeHandle.update(board);
+      renderer!.update(board);
     },
   };
 }

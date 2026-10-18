@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { scanBoards } from '../src/webview/boardSearch';
+import { renderInlineMarkdown } from '../src/webview/boardInlineRender';
 
 // Build a minimal board DOM mirroring what the kanban/table renderers emit.
 function makeBoard(): HTMLElement {
@@ -67,5 +68,12 @@ describe('scanBoards', () => {
     const root = makeBoard();
     const m = scanBoards(root, 'Ship')[0];
     expect(m.el.closest('.board-card')).toBeTruthy();
+  });
+
+  it('searches LaTeX source once instead of duplicate KaTeX DOM text', () => {
+    const root = makeBoard();
+    const preview = root.querySelector<HTMLElement>('.board-card-preview')!;
+    renderInlineMarkdown(preview, 'energy $E = mc^2$');
+    expect(scanBoards(root, 'mc^2')).toHaveLength(1);
   });
 });

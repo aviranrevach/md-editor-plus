@@ -1,10 +1,11 @@
 // src/webview/boardSidePanel.ts
 import type { Board, Card, FieldDef, FieldType } from './boardModel';
 import { getStatusOptions, autoColorPublic } from './boardModel';
-import { createEditor } from './editor';
+import { createDetachedEditor, type DetachedEditorHandle } from './editor';
 import { promptNewField, openFieldActionMenu } from './boardProperties';
 import { openTagsPicker } from './boardTagsPicker';
 import { FIELD_TYPE_ICONS, ICON_PLUS, ICON_CLOSE, ICON_CHEVRON_DOWN, ICON_CHECK } from './boardIcons';
+import { placeFloating } from './menuPosition';
 
 let panel: HTMLElement | null = null;
 let currentBoard: Board | null = null;
@@ -12,6 +13,14 @@ let currentCard: Card | null = null;
 let currentOnChange: ((next: Card) => void) | null = null;
 let currentOnBoardChange: ((next: Board) => void) | null = null;
 let currentReadOnly = false;
+// Live read-only source, refreshed into `currentReadOnly` on every render (c25).
+// Callers pass a getter so a read-only toggle after the panel opened is seen.
+let currentReadOnlyGetter: (() => boolean) | null = null;
+// The card description's own editor instance. It is INDEPENDENT of the primary
+// document editor (see createDetachedEditor). Tracked so we can flush + destroy
+// it before rebuilding the panel or closing — leaving it alive would orphan a
+// debounce that fires commitCard with stale content.
+let currentBodyEditor: DetachedEditorHandle | null = null;
 // Name of a field whose label should render as an inline-editable input on
 // the next renderPanel call. Used immediately after "+ Add a property" so
 // the user can rename the just-added field in place (Option D flow).
@@ -50,7 +59,7 @@ export function openBoardSidePanel(
   board: Board,
   card: Card,
   onChange: (next: Card) => void,
-  readOnly: boolean = false,
+  readOnly: boolean | (() => boolean) = false,
   onBoardChange?: (next: Board) => void,
 ): void {
   initBoardSidePanel();
@@ -59,7 +68,10 @@ export function openBoardSidePanel(
   currentCard = card;
   currentOnChange = onChange;
   currentOnBoardChange = onBoardChange ?? null;
-  currentReadOnly = readOnly;
+  // A getter keeps the panel honest across re-renders (c25); a plain boolean is
+  // still accepted and simply never changes.
+  currentReadOnlyGetter = typeof readOnly === 'function' ? readOnly : null;
+  currentReadOnly = typeof readOnly === 'function' ? readOnly() : readOnly;
   renderPanel();
   if (wasOpen) {
     // Already on screen (user clicked another card) — no slide-in needed.
@@ -82,11 +94,16 @@ export function closeBoardSidePanel(): void {
   // fire — e.g., when reduced-motion is on).
   panel.classList.remove('is-open');
   const finish = () => {
+    // Flush the last description keystrokes to the card, then tear the editor
+    // down so its debounce can't fire later against a closed panel.
+    currentBodyEditor?.destroy();
+    currentBodyEditor = null;
     currentBoard = null;
     currentCard = null;
     currentOnChange = null;
     currentOnBoardChange = null;
     currentReadOnly = false;
+    currentReadOnlyGetter = null;
     renamingFieldName = null;
   };
   let done = false;
@@ -129,6 +146,19 @@ function commitBoard(next: Board): void {
 function renderPanel(): void {
   if (!panel || !currentBoard || !currentCard) return;
 
+  // c25 — re-read read-only from its live source on EVERY render. The flag is
+  // captured when the panel opens, but the panel re-renders on every commit
+  // (a property, status or tag edit), and a read-only toggle in between would
+  // otherwise be missed: a stale `true` re-locks the description editor so
+  // clicking it gives no caret and you can't type, and a stale `false` leaves
+  // it editable while the document is locked. Same staleness c47 fixed for
+  // board cells — see BoardRendererCtx.isReadonly.
+  if (currentReadOnlyGetter) currentReadOnly = currentReadOnlyGetter();
+
+  // Tear down the previous description editor before wiping the DOM so its
+  // debounce can't fire against a detached node / stale card.
+  currentBodyEditor?.destroy();
+  currentBodyEditor = null;
   panel.innerHTML = '';
 
   // === Toolbar (just close) ===
@@ -421,11 +451,8 @@ function openStatusDropdown(anchor: HTMLElement, field: FieldDef): void {
   menu.className = 'board-status-dropdown';
   document.body.appendChild(menu);
 
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
-  menu.style.minWidth = `${rect.width}px`;
+  const placement = placeFloating(menu, anchor);
+  menu.style.minWidth = `${anchor.getBoundingClientRect().width}px`;
 
   for (const col of getStatusOptions(board, field.name)) {
     const opt = document.createElement('button');
@@ -446,6 +473,7 @@ function openStatusDropdown(anchor: HTMLElement, field: FieldDef): void {
   }
 
   function close(): void {
+    placement.destroy();
     menu.remove();
     document.removeEventListener('mousedown', onOutside, true);
   }
@@ -509,13 +537,14 @@ function renderBody(): HTMLElement {
   bodyHost.className = 'board-panel-body editable';
   bodyWrap.appendChild(bodyHost);
 
-  const sub = createEditor(bodyHost, card.body || '', (markdown: string) => {
+  const sub = createDetachedEditor(bodyHost, card.body || '', (markdown: string) => {
     // Use currentCard (latest) instead of the stale closure capture so a
     // body update doesn't clobber other edits the user already made.
     commitCard((c) => ({ ...c, body: markdown }));
     updateBodyPlaceholderVisibility(bodyWrap, markdown);
   });
-  sub.setEditable(!currentReadOnly);
+  sub.editor.setEditable(!currentReadOnly);
+  currentBodyEditor = sub;
 
   const placeholder = document.createElement('div');
   placeholder.className = 'board-panel-body-placeholder';

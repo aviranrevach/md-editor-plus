@@ -7,9 +7,13 @@
 import type { Board, Card, FieldDef, ColorToken } from './boardModel';
 import { COLOR_TOKENS_PUBLIC, mintCardId } from './boardModel';
 import type { BoardRendererCtx, BoardRendererOps } from './boardBlock';
+import { applyFilter } from './boardFilter';
 import { resolveImageSrc } from './mediaResolve';
 import { firstImageSrc } from './boardImageLinks';
+import { renderInlineMarkdown } from './boardInlineRender';
+import { flattenMarkdownLines } from './boardBodyPreview';
 import { attachSmartTypography } from './extensions/smartTypography';
+import { createPopover } from './popover';
 
 export function mountKanban(ctx: BoardRendererCtx): BoardRendererOps {
   function paint(board: Board): void {
@@ -51,7 +55,8 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
   for (const col of board.columns) {
     row.appendChild(renderColumn(board, col, mutate, readOnly, ctx));
   }
-  const orphans = board.cards.filter((c) => !validNames.has(c.values.Status || ''));
+  const visible = applyFilter(board.cards, ctx.getFilter(), board);
+  const orphans = visible.filter((c) => !validNames.has(c.values.Status || ''));
   if (orphans.length) {
     row.appendChild(renderUncategorized(board, orphans, mutate, readOnly, ctx));
   }
@@ -92,11 +97,17 @@ function renderColumns(board: Board, mutate: (next: Board) => void, readOnly: bo
       const color = nextColor(board.columns.map((c) => c.color));
       mutate({ ...board, columns: [...board.columns, { name: nm, color }] });
       // After mutate(), the row variable references a now-detached element.
-      // Query the FRESH DOM via the board id (set as data-board-id on .board-block).
+      // Re-find THIS board's fresh DOM. Anchor on our own `.board-block`
+      // ancestor rather than a document-wide [data-board-id] lookup: if two
+      // boards ever share an id, that query returns whichever comes first in the
+      // document and we'd focus/scroll the wrong board (c59).
+      const ownBlock = row.closest('.board-block') as HTMLElement | null;
       requestAnimationFrame(() => {
-        const boardDom = board.id
-          ? (document.querySelector(`.board-block[data-board-id="${board.id}"]`) as HTMLElement | null)
-          : null;
+        const boardDom = ownBlock?.isConnected
+          ? ownBlock
+          : (board.id
+              ? (document.querySelector(`.board-block[data-board-id="${board.id}"]`) as HTMLElement | null)
+              : null);
         if (!boardDom) return;
         const newColDom = boardDom.querySelector(
           `.board-column[data-column="${cssEscape(nm)}"]`,
@@ -127,7 +138,8 @@ function renderColumn(board: Board, col: { name: string; color: string }, mutate
   el.className = `board-column color-${col.color}`;
   el.dataset.column = col.name;
 
-  const cards = board.cards.filter((c) => (c.values.Status || '') === col.name);
+  const visible = applyFilter(board.cards, ctx.getFilter(), board);
+  const cards = visible.filter((c) => (c.values.Status || '') === col.name);
 
   if (!readOnly) {
     el.draggable = true;
@@ -466,7 +478,7 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
 
   const title = document.createElement('div');
   title.className = 'board-card-title';
-  title.textContent = card.values.Title || 'Untitled';
+  renderInlineMarkdown(title, card.values.Title || 'Untitled');
   el.appendChild(title);
 
   // Skip the body preview when the kanban view's Properties popover has hidden
@@ -477,7 +489,7 @@ function renderCard(board: Board, card: Card, mutate: (next: Board) => void, rea
   if (preview) {
     const p = document.createElement('div');
     p.className = 'board-card-preview';
-    p.textContent = preview;
+    renderInlineMarkdown(p, preview);
     el.appendChild(p);
   }
 
@@ -586,7 +598,7 @@ function startInlineTitleEdit(
       // mutate would re-render anyway; fall back to a direct restore for no-op.
       const restored = document.createElement('div');
       restored.className = 'board-card-title';
-      restored.textContent = original || 'Untitled';
+      renderInlineMarkdown(restored, original || 'Untitled');
       input.replaceWith(restored);
       return;
     }
@@ -603,7 +615,7 @@ function startInlineTitleEdit(
     cardEl.classList.remove('is-editing-title');
     const restored = document.createElement('div');
     restored.className = 'board-card-title';
-    restored.textContent = original || 'Untitled';
+    renderInlineMarkdown(restored, original || 'Untitled');
     input.replaceWith(restored);
   };
 
@@ -653,7 +665,8 @@ function renderChip(f: FieldDef, val: string): HTMLElement {
     const initial = val.replace(/^@/, '').charAt(0).toUpperCase();
     chip.innerHTML = `<span class="board-avatar">${escapeHtml(initial)}</span><span>${escapeHtml(val)}</span>`;
   } else {
-    chip.textContent = val;
+    // c27: text-field chips carry inline markdown too — render bold/italic/etc.
+    renderInlineMarkdown(chip, val);
   }
   return chip;
 }
@@ -709,16 +722,7 @@ function openColumnColorPicker(
   col: { name: string; color: string },
   mutate: (next: Board) => void,
 ): void {
-  document.querySelectorAll('.board-column-menu').forEach((n) => n.remove());
-
-  const menu = document.createElement('div');
-  menu.className = 'board-column-menu board-column-menu-color-only';
-  document.body.appendChild(menu);
-
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 6}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const popover = createPopover({ className: 'board-column-menu board-column-menu-color-only' });
 
   const colorRow = document.createElement('div');
   colorRow.className = 'board-color-swatches';
@@ -728,36 +732,19 @@ function openColumnColorPicker(
     swatch.className = `board-color-swatch color-${tok}`;
     swatch.title = tok;
     if (col.color === tok) swatch.classList.add('is-selected');
-    swatch.addEventListener('click', () => {
+    swatch.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       const cols = board.columns.map((c) =>
         c.name === col.name ? { ...c, color: tok } : c,
       );
       mutate({ ...board, columns: cols });
-      closeMenu();
+      popover.close();
     });
     colorRow.appendChild(swatch);
   }
-  menu.appendChild(colorRow);
+  popover.el.appendChild(colorRow);
 
-  function closeMenu(): void {
-    menu.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  function onOutside(e: MouseEvent): void {
-    if (!menu.contains(e.target as Node) && e.target !== anchor) {
-      closeMenu();
-    }
-  }
-  setTimeout(() => document.addEventListener('mousedown', onOutside, true), 0);
-
-  // Edge-aware: nudge left if it would overflow the right edge.
-  requestAnimationFrame(() => {
-    const r = menu.getBoundingClientRect();
-    const overflowRight = r.right - window.innerWidth;
-    if (overflowRight > 0) {
-      menu.style.left = `${Math.max(8, parseFloat(menu.style.left) - overflowRight - 8)}px`;
-    }
-  });
+  popover.open(anchor);
 }
 
 function openColumnMenu(
@@ -766,17 +753,8 @@ function openColumnMenu(
   col: { name: string; color: string },
   mutate: (next: Board) => void,
 ): void {
-  // Close any existing menu first
-  document.querySelectorAll('.board-column-menu').forEach((n) => n.remove());
-
-  const menu = document.createElement('div');
-  menu.className = 'board-column-menu';
-  document.body.appendChild(menu);
-
-  const rect = anchor.getBoundingClientRect();
-  menu.style.position = 'absolute';
-  menu.style.top = `${rect.bottom + window.scrollY + 4}px`;
-  menu.style.left = `${rect.left + window.scrollX}px`;
+  const popover = createPopover({ className: 'board-column-menu' });
+  const menu = popover.el;
 
   const section = (label: string) => {
     const s = document.createElement('div');
@@ -785,17 +763,20 @@ function openColumnMenu(
     menu.appendChild(s);
   };
 
-  const row = (icon: string, label: string, variant: '' | 'danger', onClick: () => void) => {
+  const row = (icon: string, label: string, variant: '' | 'danger', onSelect: () => void) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'board-column-menu-row' + (variant ? ` is-${variant}` : '');
     btn.innerHTML = `<span class="board-column-menu-icon">${icon}</span><span class="board-column-menu-label">${label}</span>`;
-    btn.addEventListener('click', onClick);
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      onSelect();
+    });
     menu.appendChild(btn);
     return btn;
   };
 
-  // Color picker
+  // Color picker section (custom HTML grid — not a standard menu item)
   section('Color');
   const colorRow = document.createElement('div');
   colorRow.className = 'board-color-swatches';
@@ -805,12 +786,13 @@ function openColumnMenu(
     swatch.className = `board-color-swatch color-${tok}`;
     swatch.title = tok;
     if (col.color === tok) swatch.classList.add('is-selected');
-    swatch.addEventListener('click', () => {
+    swatch.addEventListener('mousedown', (e) => {
+      e.preventDefault();
       const cols = board.columns.map((c) =>
         c.name === col.name ? { ...c, color: tok } : c,
       );
       mutate({ ...board, columns: cols });
-      closeMenu();
+      popover.close();
     });
     colorRow.appendChild(swatch);
   }
@@ -822,7 +804,7 @@ function openColumnMenu(
 
   // Rename — focuses the inline column name input on the source column
   row(ICON_EDIT, 'Rename', '', () => {
-    closeMenu();
+    popover.close();
     // Find the column DOM and focus its name span. The board re-renders on
     // mutate, so reading the live DOM right now is safe.
     const colEl = document.querySelector(`.board-column[data-column="${cssEscape(col.name)}"]`);
@@ -843,7 +825,7 @@ function openColumnMenu(
     const others = board.cards.filter((c) => (c.values.Status || '') !== col.name);
     inCol.sort((a, b) => (a.values.Title || '').localeCompare(b.values.Title || ''));
     mutate({ ...board, cards: [...others, ...inCol] });
-    closeMenu();
+    popover.close();
   });
 
   const divider2 = document.createElement('div');
@@ -860,7 +842,7 @@ function openColumnMenu(
         otherCols[0]?.name || '',
       );
       if (choice === null) {
-        closeMenu();
+        popover.close();
         return; // canceled
       }
       let nextCards: Card[];
@@ -878,23 +860,11 @@ function openColumnMenu(
     } else {
       mutate({ ...board, columns: board.columns.filter((c) => c.name !== col.name) });
     }
-    closeMenu();
+    popover.close();
   });
 
-  function closeMenu(): void {
-    menu.remove();
-    document.removeEventListener('mousedown', onOutside, true);
-  }
-  function onOutside(e: MouseEvent): void {
-    if (!menu.contains(e.target as Node) && e.target !== anchor) {
-      closeMenu();
-    }
-  }
-  setTimeout(() => {
-    document.addEventListener('mousedown', onOutside, true);
-  }, 0);
+  popover.open(anchor);
 }
-
 // ---------------------------------------------------------------------------
 // Edge-scroll while dragging
 // ---------------------------------------------------------------------------
@@ -1019,13 +989,10 @@ function nextColor(used: string[]): ColorToken {
 }
 
 function bodyPreview(body: string): string {
-  if (!body) return '';
-  // Strip simple markdown: leading #, *, -, [task] markers.
-  const lines = body
-    .split('\n')
-    .map((l) => l.replace(/^\s*[#>\-*]\s*\[.\]\s*/, '').replace(/^\s*[#>\-*]\s*/, '').trim())
-    .filter(Boolean);
-  return lines[0] || '';
+  // c9 — first line with real content, block syntax already stripped. Shares the
+  // table Description column's flattener so both views agree on what a body
+  // looks like as one line (fenced code, tables and pasted block HTML included).
+  return flattenMarkdownLines(body, { maxLines: 1 })[0] ?? '';
 }
 
 function formatDate(iso: string): string {

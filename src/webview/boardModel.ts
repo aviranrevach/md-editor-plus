@@ -62,10 +62,23 @@ export function setStatusOptions(board: Board, fieldName: string, options: Colum
   };
 }
 
+/** True if `name` (trimmed, case-insensitive) is free to use on a status field,
+ *  ignoring the option named `exclude` (the one being renamed). */
+export function isStatusNameAvailable(
+  board: Board, fieldName: string, name: string, exclude?: string,
+): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const target = norm(name);
+  return !getStatusOptions(board, fieldName).some(
+    (o) => o.name !== exclude && norm(o.name) === target,
+  );
+}
+
 /** Rename a status option and migrate every card value holding the old name. */
 export function renameStatusOption(
   board: Board, fieldName: string, oldName: string, newName: string,
 ): Board {
+  if (!isStatusNameAvailable(board, fieldName, newName, oldName)) return board;
   const opts = getStatusOptions(board, fieldName).map(
     (o) => (o.name === oldName ? { ...o, name: newName } : o),
   );
@@ -109,6 +122,19 @@ export function recolorStatusOption(
   const opts = getStatusOptions(board, fieldName).map(
     (o) => (o.name === name ? { ...o, color } : o),
   );
+  return setStatusOptions(board, fieldName, opts);
+}
+
+/** Move the status option at index `from` to index `to`. Pure array reorder. */
+export function reorderStatusOption(
+  board: Board, fieldName: string, from: number, to: number,
+): Board {
+  const opts = [...getStatusOptions(board, fieldName)];
+  if (from < 0 || from >= opts.length || to < 0 || to >= opts.length || from === to) {
+    return board;
+  }
+  const [moved] = opts.splice(from, 1);
+  opts.splice(to, 0, moved);
   return setStatusOptions(board, fieldName, opts);
 }
 
@@ -619,6 +645,23 @@ export function mintBoardId(taken: Iterable<string>): string {
   let id = `b-${Math.random().toString(36).slice(2, 6)}`;
   while (used.has(id)) id = `b-${Math.random().toString(36).slice(2, 6)}`;
   return id;
+}
+
+// Read / swap the board id straight off a region's start marker. Both work on
+// the raw `source` string so a pasted board can be re-identified (c59) without a
+// parse → serialize round-trip, which would also renormalize everything else in
+// the region. `id` is documented as the first start-marker attribute, but the
+// lazy prefix tolerates it appearing later.
+const BOARD_ID_RE = /(<!--\s*board:start[^>]*?\bid=")([^"]*)(")/i;
+
+/** The board id on `source`'s start marker, or '' when absent / malformed. */
+export function boardIdOf(source: string): string {
+  return BOARD_ID_RE.exec(source)?.[2] ?? '';
+}
+
+/** `source` with its board id replaced — every other byte untouched. */
+export function replaceBoardId(source: string, id: string): string {
+  return source.replace(BOARD_ID_RE, (_m, before: string, _old: string, after: string) => `${before}${id}${after}`);
 }
 
 // Duplicate a board's `source`: parse it, assign a fresh unique board id, and

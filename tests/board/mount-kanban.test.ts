@@ -49,6 +49,9 @@ function makeCtx(
     openSidePanel: (_id: string) => { /* no-op */ },
     requestDelete: () => { /* no-op */ },
     readonly: false,
+    isReadonly: () => Boolean(overrides.readonly),
+    getFilter: () => ({}),
+    setFilter: (_next) => {},
     ...overrides,
   };
 }

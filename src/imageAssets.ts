@@ -73,6 +73,24 @@ export function extensionForMime(mime: string): string {
   return map[mime.toLowerCase()] ?? 'png';
 }
 
+// Map an image file extension (no dot) to its MIME type — the inverse of
+// extensionForMime. Used when inlining local images as data: URIs for export.
+// Falls back to image/png for anything unrecognized.
+export function mimeForExtension(ext: string): string {
+  const map: Record<string, string> = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    bmp: 'image/bmp',
+    avif: 'image/avif',
+    ico: 'image/x-icon',
+  };
+  return map[ext.toLowerCase()] ?? 'image/png';
+}
+
 // Name for a clipboard image (which carries no filename): pasted-YYYY-MM-DD.<ext>.
 // The extension side de-dupes (adds -2, -3, …) when the name already exists.
 export function pastedImageName(mime: string, date: Date): string {

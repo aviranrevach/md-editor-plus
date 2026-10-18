@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import Table from '@tiptap/extension-table';
+import { TableWithRail } from './tableNodeView';
 import TableRow from '@tiptap/extension-table-row';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
@@ -16,6 +16,7 @@ import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle';
+import { EmptyPlaceholder } from './extensions/emptyPlaceholder';
 import { common, createLowlight } from 'lowlight';
 import { Markdown } from 'tiptap-markdown';
 import Callout, { preprocessMarkdownCallouts } from './extensions/callout';
@@ -25,18 +26,65 @@ import BlockDirection from './extensions/blockDirection';
 import BlockOutline from './extensions/outline';
 import SmartTypography from './extensions/smartTypography';
 import { createBubbleMenu } from './bubbleMenu';
+import { initBoardFormatToolbar } from './boardFormatToolbar';
 import { createImageBubbleMenu } from './imageBubbleMenu';
 import { createBlockHandle } from './blockHandle';
 import { splitFrontmatter, frontmatterInfo } from './frontmatter';
 import SearchExtension from './searchExtension';
 import ImagePasteDrop from './extensions/imagePasteDrop';
+import ClickBelowContent from './extensions/clickBelowContent';
 import { createFlushableDebounce, FlushableDebounce } from './flushableDebounce';
 import { setMediaBaseUri, resolveImageSrc } from './mediaResolve';
 import { imageNodeToMarkdown, normalizeWidth } from './imageMarkdown';
 import { imageNodeViewFactory } from './imageNodeView';
+import { BlockMath, InlineMath, MathShortcuts } from './extensions/math';
 export { setMediaBaseUri };
 
 const lowlight = createLowlight(common);
+
+// Returns the shared extension set. `suppressEmptyPlaceholder` drops the
+// generic empty hint (used by the board card panel, c50). The diff panes
+// also suppress it — an empty base side should look empty, not prompt.
+function editorExtensions(options?: { suppressEmptyPlaceholder?: boolean }) {
+  return [
+    StarterKit.configure({
+      codeBlock: false,
+      dropcursor: { color: '#2383e2', width: 3 },
+    }),
+    MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    TableWithRail.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    ResolvedImage,
+    InlineMath,
+    BlockMath,
+    Link.configure({ openOnClick: false }),
+    Underline,
+    TextStyle,
+    Color,
+    Highlight.configure({ multicolor: true }),
+    Markdown.configure({ transformCopiedText: true }),
+    MathShortcuts,
+    Callout,
+    Board,
+    Toggle,
+    BlockDirection,
+    BlockOutline,
+    SmartTypography,
+    SearchExtension,
+    ImagePasteDrop,
+    // Click-below-to-add-a-block stays on everywhere; only its ghost hint is
+    // dropped where the host already draws its own empty-state text (c25).
+    ClickBelowContent.configure({ showHint: !options?.suppressEmptyPlaceholder }),
+    GlobalDragHandle.configure({ dragHandleWidth: 48 }),
+    // The board card panel supplies its own "Add a description…" placeholder,
+    // so suppress this generic hint there to avoid two overlapping placeholders (c50).
+    ...(options?.suppressEmptyPlaceholder ? [] : [EmptyPlaceholder]),
+  ];
+}
 
 let _editor: Editor | null = null;
 let _editDebounce: FlushableDebounce | null = null;
@@ -99,14 +147,26 @@ function notifyFrontmatterChange(): void {
 
 export type OnChangeCallback = (markdown: string) => void;
 
-export function createEditor(
+interface BuiltEditor {
+  editor: Editor;
+  debounce: FlushableDebounce;
+  frontmatter: string;
+}
+
+// Builds a fully self-contained rich editor whose onChange/flush operate ONLY
+// on its own instance. The `debounce` it returns is closed over by this
+// editor's own onUpdate/onBlur, so nothing here touches the module-level
+// primary singletons. Both the primary editor and detached editors (card
+// description panel) are built through here.
+function buildRichEditor(
   element: HTMLElement,
   initialMarkdown: string,
   onChange: OnChangeCallback,
   onDirty?: () => void,
-): Editor {
+  options?: { suppressEmptyPlaceholder?: boolean },
+): BuiltEditor {
   const split = splitFrontmatter(initialMarkdown);
-  _frontmatter = split.frontmatter;
+  const frontmatter = split.frontmatter;
   let body: string;
   try {
     body = preprocessMarkdownBoards(preprocessMarkdownCallouts(split.body));
@@ -115,63 +175,85 @@ export function createEditor(
     body = split.body;
   }
 
-  _editor = new Editor({
+  let debounce: FlushableDebounce | null = null;
+  const editor = new Editor({
     element,
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false,
-        dropcursor: { color: '#2383e2', width: 3 },
-      }),
-      MermaidBlock.configure({ lowlight, HTMLAttributes: { dir: 'ltr' } }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Table.configure({ resizable: false }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      ResolvedImage,
-      Link.configure({ openOnClick: false }),
-      Underline,
-      TextStyle,
-      Color,
-      Highlight.configure({ multicolor: true }),
-      Markdown.configure({ transformCopiedText: true }),
-      Callout,
-      Board,
-      Toggle,
-      BlockDirection,
-      BlockOutline,
-      SmartTypography,
-      SearchExtension,
-      ImagePasteDrop,
-      GlobalDragHandle.configure({ dragHandleWidth: 48 }),
-    ],
+    extensions: editorExtensions(options),
     editorProps: {
       attributes: { spellcheck: 'true' },
     },
     content: body,
     onUpdate() {
       onDirty?.();
-      _editDebounce?.schedule();
+      debounce?.schedule();
     },
     onBlur() {
       // Losing focus is a natural save point — flush so the last keystrokes
       // reach the host immediately instead of waiting on the debounce.
-      _editDebounce?.flush();
+      debounce?.flush();
     },
   });
 
-  _editDebounce = createFlushableDebounce(() => {
-    if (!_editor) return;
-    const markdown = _editor.storage.markdown.getMarkdown() as string;
-    onChange(_frontmatter + markdown);
+  debounce = createFlushableDebounce(() => {
+    const markdown = editor.storage.markdown.getMarkdown() as string;
+    onChange(frontmatter + markdown);
   }, 500);
 
-  createBubbleMenu(_editor);
-  createImageBubbleMenu(_editor);
-  createBlockHandle(_editor);
+  createBubbleMenu(editor);
+  createImageBubbleMenu(editor);
+  createBlockHandle(editor);
+  // Selection toolbar for board free-text cells (idempotent document-level singleton).
+  initBoardFormatToolbar();
+
+  return { editor, debounce, frontmatter };
+}
+
+// Creates the PRIMARY document editor and registers it as the module-level
+// singleton the host save path reads (getCurrentMarkdown / flushPendingEdit).
+export function createEditor(
+  element: HTMLElement,
+  initialMarkdown: string,
+  onChange: OnChangeCallback,
+  onDirty?: () => void,
+): Editor {
+  const built = buildRichEditor(element, initialMarkdown, onChange, onDirty);
+  _editor = built.editor;
+  _editDebounce = built.debounce;
+  _frontmatter = built.frontmatter;
   notifyFrontmatterChange();
-  return _editor;
+  return built.editor;
+}
+
+export interface DetachedEditorHandle {
+  editor: Editor;
+  flush(): void;
+  destroy(): void;
+}
+
+// Creates an INDEPENDENT rich editor (used for the board card description
+// panel). Unlike createEditor it does NOT register itself as `_editor` /
+// `_editDebounce` / `_frontmatter`, so the host's save path keeps reading the
+// MAIN document. Hijacking those singletons with a nested editor is the c37
+// data-loss bug: saving wrote one card's description as the entire file.
+export function createDetachedEditor(
+  element: HTMLElement,
+  initialMarkdown: string,
+  onChange: OnChangeCallback,
+  onDirty?: () => void,
+): DetachedEditorHandle {
+  // Suppress the generic empty-state hint: the board card panel renders its own
+  // "Add a description to this card…" placeholder over this editor (c50).
+  const built = buildRichEditor(element, initialMarkdown, onChange, onDirty, {
+    suppressEmptyPlaceholder: true,
+  });
+  return {
+    editor: built.editor,
+    flush: () => built.debounce.flush(),
+    destroy: () => {
+      built.debounce.flush();
+      built.editor.destroy();
+    },
+  };
 }
 
 export function updateContent(markdown: string): void {
@@ -327,4 +409,24 @@ export function getEditor(): Editor | null {
 
 export function getSourceEditor(): Editor | null {
   return _sourceEditor;
+}
+
+// Build a standalone, read-only editor for ONE diff pane. Does NOT touch the
+// module singletons (_editor/_editDebounce/_frontmatter) — the diff renders two
+// of these and must not hijack the main editor's state. Read-only sidesteps the
+// whole save/dirty family (c56, c28, c37); the diff never writes.
+export function createDiffEditor(element: HTMLElement, markdown: string): Editor {
+  const split = splitFrontmatter(markdown);
+  let body: string;
+  try {
+    body = preprocessMarkdownBoards(preprocessMarkdownCallouts(split.body));
+  } catch {
+    body = split.body;
+  }
+  return new Editor({
+    element,
+    editable: false,
+    extensions: editorExtensions({ suppressEmptyPlaceholder: true }),
+    content: body,
+  });
 }

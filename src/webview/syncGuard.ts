@@ -21,6 +21,16 @@ export interface UpdateContext {
   editorCurrent: string;
   /** Normalized markdown we last sent to the host, or null if none sent yet. */
   lastSent: string | null;
+  /**
+   * A small window of normalized markdown versions we recently sent. The host's
+   * echo-suppression flag is released when applyEdit() resolves, but the
+   * resulting onDidChangeTextDocument can fire slightly later — leaking the echo
+   * back as an "external" update. On the double-debounced board-description path
+   * that echo can also arrive out of order (a stale V1 after we've moved on to
+   * V2/V3), so matching only `lastSent` is not enough to recognize it as ours.
+   * Any incoming that matches a version in here is our own edit, not a conflict.
+   */
+  recentSent?: string[];
   /** True when the update came from an explicit user-initiated refresh. */
   isRefresh: boolean;
 }
@@ -28,11 +38,17 @@ export interface UpdateContext {
 const isBlank = (s: string): boolean => s.trim() === '';
 
 export function decideExternalUpdate(ctx: UpdateContext): UpdateDecision {
-  const { incoming, editorCurrent, lastSent, isRefresh } = ctx;
+  const { incoming, editorCurrent, lastSent, recentSent, isRefresh } = ctx;
 
   // 1. Echo of our own edit — re-running setContent would needlessly re-render
-  //    (and flicker syntax colors), so skip it.
+  //    (and flicker syntax colors), so skip it. We check both the last-sent
+  //    version AND a small history of recent sends: a leaked host echo can arrive
+  //    late and out of order (c41), so a stale echo of an earlier edit we sent is
+  //    still ours, not an external conflict. Keeping the editor as-is is safe —
+  //    a pending edit will re-sync it — and a genuinely external write won't
+  //    match anything we sent.
   if (lastSent !== null && incoming === lastSent) return 'dedup';
+  if (recentSent && recentSent.includes(incoming)) return 'dedup';
 
   // 2. DATA-LOSS GUARD. An empty incoming update that would replace a non-empty
   //    editor is never applied implicitly — that is the wipe this bug caused.

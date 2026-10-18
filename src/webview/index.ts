@@ -2,6 +2,7 @@ import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
+import katexCss from 'katex/dist/katex.min.css';
 import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
 import { computeConflictDiff } from './conflictDiff';
 import { buildConflictDiffPanel } from './conflictDiffView';
@@ -14,10 +15,15 @@ import { setSmartTypographyEnabled } from './extensions/smartTypography';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
+import { createStructureMap } from './structureMap';
+import { createDiffMap, type DiffMap } from './diffMap';
 import { initBoardSidePanel } from './boardSidePanel';
 import { setDocumentPath, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
+import { placeFloating, type PlacementHandle } from './menuPosition';
 import { nextSaveState, describeSaveState, SaveState, SaveEvent } from './saveState';
+import { createReadOnlyController } from './readonlyState';
+import { createReadOnlyNotice } from './readonlyNotice';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -82,13 +88,14 @@ interface SavedDefaults {
   shortenCodeSnippets?: boolean;
   smartTypography?: boolean;
   outlineVisible?: boolean;
-  readOnly?: boolean;
+  structureMapVisible?: boolean;
   sourceWordWrap?: boolean;
 }
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
 interface SaveStateMessage { type: 'saveState'; state: 'saving' | 'saved' | 'failed'; flash?: boolean }
-type HostMessage = InitMessage | UpdateMessage | SaveStateMessage;
+interface DiffBaseMessage { type: 'diffBase'; content: string; label?: string; }
+type HostMessage = InitMessage | UpdateMessage | SaveStateMessage | DiffBaseMessage;
 
 type WidthMode  = 'normal' | 'full';
 type TextSize   = 's' | 'm' | 'l' | 'xl';
@@ -123,7 +130,7 @@ const DEFAULT_KEYS = [
 
 function injectStyles(): void {
   const style = document.createElement('style');
-  style.textContent = lightCss + darkCss + editorCss + boardCss;
+  style.textContent = lightCss + darkCss + katexCss + editorCss + boardCss;
   document.head.appendChild(style);
 }
 
@@ -151,7 +158,7 @@ function init(): void {
     const fresh = editorReady ? getCurrentMarkdown() : currentMarkdown;
     if (fresh !== currentMarkdown) {
       currentMarkdown = fresh;
-      lastSentMarkdown = normalizeMd(fresh);
+      rememberSent(fresh);
       vscode.postMessage({ type: 'edit', markdown: fresh });
     }
     if (sourceEditorReady) {
@@ -160,7 +167,7 @@ function init(): void {
     }
     createSourceEditor(sourceEditorEl, currentMarkdown, (md) => {
       currentMarkdown = md;
-      lastSentMarkdown = normalizeMd(md);
+      rememberSent(md);
       vscode.postMessage({ type: 'edit', markdown: md });
     }, () => applySaveEvent('localEdit'));
     sourceEditorReady = true;
@@ -173,6 +180,8 @@ function init(): void {
 
   const settingsBtn   = document.getElementById('settings-btn') as HTMLElement;
   const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
+  let settingsPlacement: PlacementHandle | null = null;
+  let dotsPlacement: PlacementHandle | null = null;
   const fullWidthTog  = document.getElementById('full-width-toggle') as HTMLElement;
   const widthSlider   = document.getElementById('width-slider') as HTMLInputElement;
   const widthValue    = document.getElementById('width-value') as HTMLElement;
@@ -185,9 +194,27 @@ function init(): void {
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
   const smartTypographyToggle = document.getElementById('smart-typography-toggle') as HTMLElement;
-  const readOnlyActionBtn     = document.getElementById('act-toggle-readonly')     as HTMLElement | null;
+  const readOnlyToggle = document.getElementById('readonly-toggle') as HTMLElement | null;
+  const readOnlyPill   = document.getElementById('readonly-pill')   as HTMLElement | null;
+  const readOnlyRow    = document.getElementById('readonly-row')    as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
+  const openVscodeBtn         = document.getElementById('open-vscode-btn')          as HTMLElement | null;
+
+  const roController = createReadOnlyController({
+    root: document.documentElement,
+    toggleSwitch: readOnlyToggle,
+    pill: readOnlyPill,
+    saveIndicator: document.getElementById('save-indicator'),
+    setEditable: (editable) => setReadOnly(!editable),
+  });
+  const roNotice = createReadOnlyNotice({
+    container: document.body,
+    onEnableEditing: () => applyReadOnly(false),
+  });
+  function applyReadOnly(on: boolean): void {
+    roController.set(on);
+  }
 
   function setAlwaysDarkCode(on: boolean): void {
     document.documentElement.classList.toggle('code-always-dark', on);
@@ -254,10 +281,13 @@ function init(): void {
     setSmartTypography(!smartTypographyToggle.classList.contains('on'));
   });
 
-  readOnlyActionBtn?.addEventListener('click', () => {
-    const next = !readOnlyActionBtn.classList.contains('active');
-    applyReadOnly(next);
-    vscode.postMessage({ type: 'saveReadOnly', value: next });
+  // The whole row toggles (the switch inside has pointer-events:none, so a click
+  // anywhere on the row — label or switch — flips read-only exactly once).
+  readOnlyRow?.addEventListener('click', () => {
+    applyReadOnly(!roController.get());
+  });
+  readOnlyPill?.addEventListener('click', () => {
+    applyReadOnly(false);
   });
 
   function applySourceWordWrap(on: boolean): void {
@@ -277,8 +307,12 @@ function init(): void {
     vscode.postMessage({ type: 'refresh' });
   });
 
+  openVscodeBtn?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openInVscodeEditor' });
+  });
+
   document.getElementById('diff-btn')?.addEventListener('click', () => {
-    vscode.postMessage({ type: 'openFullDiff' });
+    vscode.postMessage({ type: 'openFullDiff', markdown: getCurrentMarkdown() });
   });
 
   // External-edit conflict banner. Rendered once and toggled via 'visible'.
@@ -333,7 +367,7 @@ function init(): void {
     const diff = computeConflictDiff(yours, disk);
     conflictCount = diff.rows.length + diff.truncated;
     conflictPanel.replaceChildren(buildConflictDiffPanel(diff, {
-      onOpenFullDiff: () => vscode.postMessage({ type: 'openFullDiff', baseContent: disk, baseLabel: 'On disk' }),
+      onOpenFullDiff: () => vscode.postMessage({ type: 'openFullDiff', baseContent: disk, baseLabel: 'On disk', markdown: getCurrentMarkdown() }),
     }));
     setRevealOpen(false); // collapsed by default
   }
@@ -385,7 +419,7 @@ function init(): void {
     pendingExternalMarkdown = null;
     hideConflictBanner();
     currentMarkdown = md;
-    lastSentMarkdown = normalizeMd(md);
+    rememberSent(md);
     updateContent(md);
     if (sourceMode && sourceEditorReady) updateSourceContent(md);
   });
@@ -394,13 +428,27 @@ function init(): void {
     hideConflictBanner();
     // Push our current version back so disk catches up on next save.
     const ours = getCurrentMarkdown();
-    lastSentMarkdown = normalizeMd(ours);
+    rememberSent(ours);
     vscode.postMessage({ type: 'edit', markdown: ours });
   });
 
   let editorReady     = false;
   let currentMarkdown = '';
   let lastSentMarkdown: string | null = null;
+  // A short window of recently-sent versions. A leaked host echo can arrive late
+  // and out of order (c41) — matching only lastSentMarkdown misses a stale echo
+  // of an earlier send, which then looks like an external conflict. rememberSent
+  // is the single place both are updated.
+  const recentSentMarkdowns: string[] = [];
+  const RECENT_SENT_MAX = 10;
+  function rememberSent(md: string): void {
+    const n = normalizeMd(md);
+    lastSentMarkdown = n;
+    if (recentSentMarkdowns[recentSentMarkdowns.length - 1] !== n) {
+      recentSentMarkdowns.push(n);
+      if (recentSentMarkdowns.length > RECENT_SENT_MAX) recentSentMarkdowns.shift();
+    }
+  }
   let pendingExternalMarkdown: string | null = null;
   let sourceMode      = false;
   let widthMode: WidthMode = 'normal';
@@ -419,7 +467,7 @@ function init(): void {
       const md = getSourceMarkdown();
       if (md !== currentMarkdown) {
         currentMarkdown = md;
-        lastSentMarkdown = normalizeMd(md);
+        rememberSent(md);
         vscode.postMessage({ type: 'edit', markdown: md });
       }
     }
@@ -709,6 +757,8 @@ function init(): void {
 
   function closeDotsPanel(): void {
     actionsPanelDots.classList.add('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = null;
     closeSubmenu();
     actionsBtn.classList.remove('active');
     syncToolbarPanelState();
@@ -725,6 +775,8 @@ function init(): void {
   }
   function closeSettingsPanel(): void {
     settingsPanel.classList.add('hidden');
+    settingsPlacement?.destroy();
+    settingsPlacement = null;
     settingsBtn.classList.remove('active');
     syncToolbarPanelState();
   }
@@ -829,6 +881,13 @@ function init(): void {
     findBar?.close();
     settingsPanel.classList.toggle('hidden');
     settingsBtn.classList.toggle('active');
+    if (!settingsPanel.classList.contains('hidden')) {
+      settingsPlacement?.destroy();
+      settingsPlacement = placeFloating(settingsPanel, settingsBtn, { preferX: 'right' });
+    } else {
+      settingsPlacement?.destroy();
+      settingsPlacement = null;
+    }
     syncToolbarPanelState();
   });
 
@@ -838,6 +897,8 @@ function init(): void {
     closeFilenamePanel();
     findBar?.close();
     actionsPanelDots.classList.remove('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = placeFloating(actionsPanelDots, actionsBtn, { preferX: 'right' });
     actionsBtn.classList.add('active');
     syncToolbarPanelState();
   }
@@ -927,18 +988,19 @@ function init(): void {
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
     setSmartTypography(d.smartTypography ?? true); // default ON (unlike the Boolean()-defaulted toggles above)
-    applyReadOnly(Boolean(d.readOnly));
+    applyReadOnly(false);
     applySourceWordWrap(Boolean(d.sourceWordWrap));
   }
 
-  function applyReadOnly(on: boolean): void {
-    document.documentElement.classList.toggle('read-only', on);
-    if (readOnlyActionBtn) {
-      readOnlyActionBtn.classList.toggle('active', on);
-      readOnlyActionBtn.setAttribute('aria-pressed', String(on));
-    }
-    setReadOnly(on);
-  }
+  document.addEventListener('keydown', (e) => {
+    if (!roController.get()) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // shortcuts aren't edits
+    const isEdit = e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete';
+    if (!isEdit) return;
+    const t = e.target as HTMLElement | null;
+    if (!t?.closest('.ProseMirror, .bd-table-cell, .board-panel-body')) return;
+    roNotice.show();
+  }, true);
 
   let savedDefaults: SavedDefaults = { ...FACTORY_DEFAULTS };
 
@@ -1004,6 +1066,8 @@ function init(): void {
     refreshDefaultsButtons();
   });
 
+  let diffMap: DiffMap | null = null;
+
   window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     const msg = event.data;
 
@@ -1018,9 +1082,10 @@ function init(): void {
       refreshDefaultsButtons();
       const editorInstance = createEditor(editorEl, msg.markdown, (markdown) => {
         currentMarkdown = markdown;
-        lastSentMarkdown = normalizeMd(markdown);
+        rememberSent(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);
         vscode.postMessage({ type: 'edit', markdown });
+        diffMap?.recompute();
       }, () => applySaveEvent('localEdit'));
       editorReady = true;
       initBoardSidePanel();
@@ -1047,7 +1112,7 @@ function init(): void {
           // source editor, not the preview one.
           const md = sourceMode ? getSourceMarkdown() : getCurrentMarkdown();
           currentMarkdown = md;
-          lastSentMarkdown = normalizeMd(md);
+          rememberSent(md);
           vscode.postMessage({ type: 'save', markdown: md });
         }
       });
@@ -1077,6 +1142,34 @@ function init(): void {
       } catch (err) {
         console.error('[md-editor-plus] outline init failed', err);
       }
+
+      try {
+        const mapBtn  = document.getElementById('structure-map-btn') as HTMLElement | null;
+        const mapRail = document.getElementById('structure-map') as HTMLElement | null;
+        if (mapBtn && mapRail) {
+          const map = createStructureMap({
+            editor: editorInstance,
+            railEl: mapRail,
+            toggleBtn: mapBtn,
+            initialVisible: Boolean(msg.defaults?.structureMapVisible),
+            onVisibilityChange: (visible) => {
+              vscode.postMessage({ type: 'saveStructureMapVisible', value: visible });
+            },
+          });
+          mapBtn.addEventListener('click', () => map.setVisible(!map.isVisible()));
+        }
+      } catch (err) {
+        console.error('[md-editor-plus] structure map init failed', err);
+      }
+
+      try {
+        const mapRail = document.getElementById('structure-map') as HTMLElement | null;
+        if (mapRail) {
+          diffMap = createDiffMap({ editor: editorInstance, railEl: mapRail });
+        }
+      } catch (err) {
+        console.error('[md-editor-plus] diff map init failed', err);
+      }
       } catch (err) {
         console.error('[md-editor-plus] INIT FAILED', err);
         document.body.innerHTML = '<pre style="padding:20px;color:#c44">md-editor-plus init failed:\n\n' + String(err && (err as Error).stack || err) + '</pre>';
@@ -1092,6 +1185,11 @@ function init(): void {
       return;
     }
 
+    if (msg.type === 'diffBase') {
+      diffMap?.setBase(typeof msg.content === 'string' ? msg.content : '');
+      return;
+    }
+
     if (msg.type === 'update' && editorReady) {
       // The decision (echo / data-loss guard / conflict / apply) is a pure
       // function so it can be unit-tested without the DOM. Compare normalized —
@@ -1100,12 +1198,19 @@ function init(): void {
         incoming:      normalizeMd(msg.markdown),
         editorCurrent: normalizeMd(getCurrentMarkdown()),
         lastSent:      lastSentMarkdown,
+        recentSent:    recentSentMarkdowns,
         isRefresh:     msg.source === 'refresh',
       });
 
       if (decision === 'dedup') {
         // Echo of our own edit. Re-running setContent would force lowlight to
         // re-tokenize, briefly clearing syntax colors — so don't.
+        // A STALE self-echo (matches a recent send but not the latest) is a
+        // leaked host echo of an earlier edit arriving after lastSent advanced —
+        // the c41 phantom-conflict trigger. Don't adopt it as currentMarkdown; a
+        // pending edit is the real latest, so leaving the editor untouched is
+        // correct. Only a fresh echo (== lastSent) updates currentMarkdown.
+        if (normalizeMd(msg.markdown) !== lastSentMarkdown) return;
         currentMarkdown = msg.markdown;
         if (sourceMode && sourceEditorReady) updateSourceContent(msg.markdown);
         return;
@@ -1123,7 +1228,7 @@ function init(): void {
           { editorChars: ours.length, hadLocalEdit: lastSentMarkdown !== null },
         );
         currentMarkdown = ours;
-        lastSentMarkdown = normalizeMd(ours);
+        rememberSent(ours);
         vscode.postMessage({ type: 'edit', markdown: ours });
         return;
       }
@@ -1138,7 +1243,7 @@ function init(): void {
           : null;
         if (merged !== null) {
           currentMarkdown = merged;
-          lastSentMarkdown = normalizeMd(merged);
+          rememberSent(merged);
           updateContent(merged);
           if (sourceMode && sourceEditorReady) updateSourceContent(merged);
           vscode.postMessage({ type: 'edit', markdown: merged });

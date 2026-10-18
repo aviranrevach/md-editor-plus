@@ -1,0 +1,23 @@
+html, body { overflow-x: hidden; }
+.diff-pane-body { overflow: visible; }
+#diff-panes { display: flex; gap: 8px; align-items: flex-start; margin-right: 18px; } /* margin-right clears the fixed rail */
+#diff-rail {
+  position: fixed; top: 0; right: 0; width: 14px; height: 100vh;
+  background: var(--rail-bg, #f0f2f5); z-index: 5; cursor: pointer;
+}
+#diff-rail .diff-mark { position: absolute; left: 3px; right: 3px; height: 12px; border-radius: 3px; }
+#diff-rail .diff-mark.add { background: #2da44e; }
+#diff-rail .diff-mark.del { background: #cf222e; }
+#diff-rail .diff-mark.change { background: #d4a017; }
+.diff-pane { flex: 1 1 0; min-width: 0; }
+.diff-pane-hd {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted, #8a93a0); padding: 4px 10px;
+  position: sticky; top: 0; background: var(--bg, #fff); z-index: 2;
+}
+.diff-pane-body { padding: 0 12px; }
+
+.diff-block-add    { background: #e9fbef; box-shadow: inset 3px 0 #2da44e; border-radius: 4px; }
+.diff-block-del    { background: #fdeef0; box-shadow: inset 3px 0 #cf222e; border-radius: 4px; }
+.diff-block-change { background: #fff7e6; box-shadow: inset 3px 0 #d4a017; border-radius: 4px; }
+.diff-filler { background: repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 5px, #eaecef 5px, #eaecef 10px); border-radius: 4px; opacity: .6; margin: 0; padding: 0; }

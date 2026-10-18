@@ -53,6 +53,9 @@ function makeCtx(
     openSidePanel: (_id: string) => { /* no-op */ },
     requestDelete: () => { /* no-op */ },
     readonly: false,
+    isReadonly: () => ctx.readonly,
+    getFilter: () => ({}),
+    setFilter: (_next) => {},
     ...overrides,
   };
   return { ctx, boardRef };
@@ -146,6 +149,25 @@ describe('inline text/person editor', () => {
     titleCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(titleCell.getAttribute('contenteditable')).toBe('true');
+
+    ops.destroy();
+  });
+
+  it('does NOT make a cell editable while read-only, even if locked after render (c47)', () => {
+    // Board rendered editable, then read-only is toggled ON without a re-render
+    // (the c47 bug: stale click listeners stay live). beginInlineText must read
+    // read-only LIVE via ctx.isReadonly() and refuse to enter edit mode.
+    const { ctx } = makeCtx(makeBoard());
+    const ops = mountTable(ctx);
+
+    ctx.readonly = true; // simulate the read-only toggle, no re-render
+
+    const titleCell = ctx.root.querySelector(
+      'td.bd-table-cell[data-field="Title"]',
+    ) as HTMLElement;
+    titleCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(titleCell.getAttribute('contenteditable')).not.toBe('true');
 
     ops.destroy();
   });
@@ -250,11 +272,12 @@ describe('status chip + dropdown', () => {
     ) as HTMLElement;
     statusCell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-    // Click the second option (Doing)
+    // Mousedown the second option (Doing) — the new Popover-backed implementation
+    // uses mousedown+preventDefault on each option (same pattern as createMenu items).
     const dropdown = document.querySelector('.board-status-dropdown')!;
     const options = dropdown.querySelectorAll('.board-status-option');
     (options[1] as HTMLElement).dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
     );
 
     expect(boardRef.current.cards[0].values.Status).toBe('Doing');
@@ -287,7 +310,7 @@ describe('status chip + dropdown', () => {
     const options = dropdown.querySelectorAll('.board-status-option');
     expect(options).toHaveLength(2);
 
-    (options[1] as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    (options[1] as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     expect(boardRef.current.cards[0].values.Impact).toBe('High');
     expect(boardRef.current.cards[0].values.Status).toBe('Todo');
 
@@ -741,7 +764,7 @@ describe('column-header ⋯ menu Edit options item', () => {
 
     const menu = document.querySelector('.bd-col-menu') as HTMLElement;
     expect(menu).not.toBeNull();
-    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    const labels = Array.from(menu.querySelectorAll('.mp-menu-label')).map(el => el.textContent);
     expect(labels).toContain('Edit options');
 
     ops.destroy();
@@ -757,10 +780,89 @@ describe('column-header ⋯ menu Edit options item', () => {
 
     const menu = document.querySelector('.bd-col-menu') as HTMLElement;
     expect(menu).not.toBeNull();
-    const labels = Array.from(menu.querySelectorAll('.bd-col-menu-label')).map(el => el.textContent);
+    const labels = Array.from(menu.querySelectorAll('.mp-menu-label')).map(el => el.textContent);
     expect(labels).not.toContain('Edit options');
 
     ops.destroy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. Row grip actions menu
+// ---------------------------------------------------------------------------
+
+// Helper: simulate a real click on the grip — mousedown + mouseup + the native
+// `click` event the browser fires afterwards. The menu opens on the `click`
+// event (the robust, drift-tolerant path), so the click event is the part that
+// matters; mousedown/mouseup are included so the drag wiring sees a realistic
+// gesture.
+function clickNoDrag(el: Element): void {
+  el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 5, clientY: 5 }));
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }));
+}
+
+describe('row grip actions menu', () => {
+  it('opens a menu with the full action set on grip click (unsorted)', () => {
+    const { ctx } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    clickNoDrag(grip);
+    const labels = Array.from(document.querySelectorAll('.mp-menu .mp-menu-label'))
+      .map(el => el.textContent);
+    expect(labels).toEqual([
+      'Open in side panel', 'Duplicate', 'Insert row above', 'Insert row below', 'Delete row',
+    ]);
+  });
+
+  it('opens on the native click event even after pointer drift (regression: c36 grip)', () => {
+    // Real grip clicks drift a few px; the menu must open on the browser `click`
+    // event, NOT a sub-threshold mouseup, or the menu rarely appears.
+    const { ctx } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    grip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 5, clientY: 5 }));
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 11, clientY: 5 })); // 6px drift
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 11, clientY: 5 }));
+    expect(document.querySelectorAll('.mp-menu .mp-menu-label').length).toBe(0); // mouseup alone must NOT open it
+    grip.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 11, clientY: 5 }));
+    expect(document.querySelectorAll('.mp-menu .mp-menu-label').length).toBeGreaterThan(0); // the click does
+  });
+
+  it('Delete row removes the card', () => {
+    const { ctx, boardRef } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const firstGrip = ctx.root.querySelector('tr.bd-table-row .bd-row-grip')!;
+    clickNoDrag(firstGrip);
+    const del = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
+      .find(el => el.textContent?.includes('Delete row'))!;
+    del.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(boardRef.current.cards.map(c => c.id)).toEqual(['c2']);
+  });
+
+  it('Duplicate adds a clone directly after the source', () => {
+    const { ctx, boardRef } = makeCtx(makeBoard());
+    mountTable(ctx);
+    const firstGrip = ctx.root.querySelector('tr.bd-table-row .bd-row-grip')!;
+    clickNoDrag(firstGrip);
+    const dup = Array.from(document.querySelectorAll('.mp-menu .mp-menu-item'))
+      .find(el => el.textContent?.includes('Duplicate'))!;
+    dup.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(boardRef.current.cards).toHaveLength(3);
+    expect(boardRef.current.cards[0].id).toBe('c1');
+    expect(boardRef.current.cards[1].id).not.toBe('c1'); // clone sits after source
+  });
+
+  it('omits Insert items and drops drag affordance when the view is sorted', () => {
+    const board = makeBoard({ views: [{ name: 'table', sort: { field: 'Title', dir: 'asc' } }] });
+    const { ctx } = makeCtx(board);
+    mountTable(ctx);
+    const grip = ctx.root.querySelector('.bd-row-grip')!;
+    expect(grip.hasAttribute('data-board-drag')).toBe(false);
+    clickNoDrag(grip);
+    const labels = Array.from(document.querySelectorAll('.mp-menu .mp-menu-label'))
+      .map(el => el.textContent);
+    expect(labels).toEqual(['Open in side panel', 'Duplicate', 'Delete row']);
   });
 });
 

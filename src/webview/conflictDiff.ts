@@ -10,10 +10,10 @@ function splitLines(s: string): string[] {
   return t === '' ? [] : t.split('\n');
 }
 
-type Op = { t: 'eq' | 'del' | 'add'; a?: string; b?: string };
+export type Op = { t: 'eq' | 'del' | 'add'; a?: string; b?: string };
 
 // Classic LCS via DP, then backtrack into an ordered op list.
-function lineOps(a: string[], b: string[]): Op[] {
+export function lineOps(a: string[], b: string[]): Op[] {
   const n = a.length, m = b.length;
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i--) {

@@ -1,4 +1,4 @@
-import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption } from '../../src/webview/boardModel';
+import { parseBoardSource, serializeBoard, getStatusOptions, setStatusOptions, renameStatusOption, deleteStatusOption, addStatusOption, isStatusNameAvailable, reorderStatusOption } from '../../src/webview/boardModel';
 import type { Board } from '../../src/webview/boardModel';
 
 describe('10-color palette', () => {
@@ -80,6 +80,32 @@ describe('status-option mutations migrate card values', () => {
   });
 });
 
+describe('status rename uniqueness guard', () => {
+  it('isStatusNameAvailable is false for an existing name (case/space-insensitive)', () => {
+    const b = makeBoard(); // Status: Todo, Done
+    expect(isStatusNameAvailable(b, 'Status', '  done ')).toBe(false);
+    expect(isStatusNameAvailable(b, 'Status', 'Backlog')).toBe(true);
+  });
+
+  it('isStatusNameAvailable ignores the option being renamed (exclude)', () => {
+    const b = makeBoard();
+    // Renaming "Todo" to "todo" (case fix) is allowed: only itself matches.
+    expect(isStatusNameAvailable(b, 'Status', 'todo', 'Todo')).toBe(true);
+  });
+
+  it('renameStatusOption returns the board UNCHANGED when the new name collides', () => {
+    const b = makeBoard();
+    const next = renameStatusOption(b, 'Status', 'Todo', 'Done'); // Done already exists
+    expect(next).toBe(b); // identical reference — no mutation
+  });
+
+  it('renameStatusOption allows a case-only change of the same option', () => {
+    const next = renameStatusOption(makeBoard(), 'Status', 'Todo', 'todo');
+    expect(next.columns[0]).toEqual({ name: 'todo', color: 'blue' });
+    expect(next.cards[0].values.Status).toBe('todo');
+  });
+});
+
 describe('field-options round-trip', () => {
   const src = [
     `<!-- board:start id="b1" columns="Todo|Done" column-colors="blue|emerald" field-types="Title=text,Status=status,Impact=status,Risk Level=status" field-options="Impact=Low:gray|High:red;Risk Level=R1:orange|R2:teal" -->`,
@@ -112,5 +138,39 @@ describe('field-options round-trip', () => {
     const plain = `<!-- board:start id="b1" columns="Todo" column-colors="blue" field-types="Title=text,Status=status" -->\n\n| Title | Status |\n|---|---|\n\n<!-- board:end -->`;
     const out = serializeBoard(parseBoardSource(plain));
     expect(out).not.toContain('field-options');
+  });
+});
+
+describe('reorderStatusOption', () => {
+  it('moves a Status option and rewrites board.columns (drives kanban order)', () => {
+    const next = reorderStatusOption(makeBoard(), 'Status', 1, 0); // Done before Todo
+    expect(next.columns.map(c => c.name)).toEqual(['Done', 'Todo']);
+  });
+
+  it('moves an option on an additional status field', () => {
+    const b = makeBoard();
+    b.fields.find(f => f.name === 'Impact')!.options =
+      [{ name: 'Low', color: 'gray' }, { name: 'High', color: 'red' }, { name: 'Mid', color: 'blue' }];
+    const next = reorderStatusOption(b, 'Impact', 2, 0); // Mid to front
+    expect(next.fields.find(f => f.name === 'Impact')!.options!.map(o => o.name))
+      .toEqual(['Mid', 'Low', 'High']);
+  });
+
+  it('returns the board unchanged for a no-op or out-of-range move', () => {
+    const b = makeBoard();
+    expect(reorderStatusOption(b, 'Status', 0, 0)).toBe(b);
+    expect(reorderStatusOption(b, 'Status', 5, 0)).toBe(b);
+  });
+
+  it('reordered options survive a serialize -> parse round-trip', () => {
+    const src = [
+      `<!-- board:start id="b1" columns="Todo|Done" column-colors="blue|emerald" field-types="Title=text,Status=status,Impact=status" field-options="Impact=Low:gray|High:red" -->`,
+      ``, `| Title | Status | Impact |`, `|---|---|---|`, `| A | Todo | Low |`, ``,
+      `<!-- board:end -->`,
+    ].join('\n');
+    const b = reorderStatusOption(parseBoardSource(src), 'Impact', 1, 0); // High, Low
+    const round = parseBoardSource(serializeBoard(b));
+    expect(round.fields.find(f => f.name === 'Impact')!.options!.map(o => o.name))
+      .toEqual(['High', 'Low']);
   });
 });

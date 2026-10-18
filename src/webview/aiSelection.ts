@@ -1,4 +1,20 @@
-// Pure helpers for deriving prompt context from a selection. No DOM/editor imports.
+// Pure helpers for deriving prompt context from a selection, including building AI panel input.
+// Imports Editor type and AiTarget for buildAiPanelInput but no DOM operations.
+
+import type { Editor } from '@tiptap/core';
+import type { AiTarget } from './aiTransforms';
+import { getDocumentPath } from './docContext';
+
+export interface AiPanelInput {
+  target: AiTarget;
+  targetLabel: string;
+  filePath: string;
+  startText: string;
+  endText: string;
+  startLine: number | null;
+  endLine: number | null;
+  summary: SelectionSummary;
+}
 
 export interface SelectionSummary {
   lines: number;
@@ -40,4 +56,28 @@ export function locateAnchors(
 export function truncateAnchor(text: string, max = 80): string {
   const collapsed = text.replace(/\s+/g, ' ').trim();
   return collapsed.length <= max ? collapsed : collapsed.slice(0, max) + '…';
+}
+
+// Build the AI-transform panel payload for an arbitrary document range. Shared
+// by the selection bubble menu and the dragger "Turn into" so both compute
+// anchors and line hints identically.
+export function buildAiPanelInput(
+  editor: Editor, target: AiTarget, label: string, from: number, to: number,
+): AiPanelInput {
+  const slice = editor.state.doc.textBetween(from, to, '\n', '\n');
+  const nonEmpty = slice.split('\n').filter((l) => l.trim().length > 0);
+  const startRaw = nonEmpty[0] ?? '';
+  const endRaw   = nonEmpty[nonEmpty.length - 1] ?? startRaw;
+  const md = editor.storage.markdown.getMarkdown() as string;
+  const { startLine, endLine } = locateAnchors(md, startRaw, endRaw);
+  return {
+    target,
+    targetLabel: label,
+    filePath: getDocumentPath() || 'this file',
+    startText: truncateAnchor(startRaw),
+    endText: truncateAnchor(endRaw),
+    startLine,
+    endLine,
+    summary: summarizeSelection(slice),
+  };
 }

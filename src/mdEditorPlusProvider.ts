@@ -6,7 +6,9 @@ import { spawn } from 'child_process';
 import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
 import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 import { ApplyingTracker } from './applyingTracker';
-import { openFullDiff } from './diffViewer';
+import { openFullDiff, resolveBaseForDocument } from './diffViewer';
+import { assessWrite } from './saveGuard';
+import { inlineImagesAsDataUris } from './exportInline';
 
 const CHROME_PATHS: Record<NodeJS.Platform, string[]> = {
   darwin: [
@@ -47,8 +49,15 @@ function findChromiumBinary(): string | null {
 
 function renderHtmlToPdf(chromePath: string, htmlPath: string, pdfPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
+    // A throwaway, unique --user-data-dir is essential: modern Chrome maps
+    // --headless to "new headless", which otherwise shares the user's default
+    // profile. If Chrome is already running (the common case), that profile is
+    // locked and the headless launch fails to render — the classic "export PDF
+    // does nothing" bug. A private profile dir sidesteps the lock entirely.
+    const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-editor-plus-chrome-'));
     const proc = spawn(chromePath, [
       '--headless',
+      `--user-data-dir=${profileDir}`,
       '--disable-gpu',
       '--no-sandbox',
       '--no-pdf-header-footer',
@@ -58,11 +67,30 @@ function renderHtmlToPdf(chromePath: string, htmlPath: string, pdfPath: string):
     ], { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
     proc.stderr?.on('data', (d) => { stderr += d.toString(); });
-    proc.on('error', reject);
+    const cleanup = () => { try { fs.rmSync(profileDir, { recursive: true, force: true }); } catch { /* ignore */ } };
+    proc.on('error', (err) => { cleanup(); reject(err); });
     proc.on('close', (code) => {
+      cleanup();
       if (code === 0) resolve();
       else reject(new Error(`Chrome exited with code ${code}: ${stderr.slice(0, 400)}`));
     });
+  });
+}
+
+// Rewrite document-relative <img> sources in exported HTML to self-contained
+// data: URIs by reading the bytes from disk (relative to the document's folder).
+// Keeps HTML/PDF exports portable — webview-resource URIs would 404 outside VS Code.
+function inlineExportImages(document: vscode.TextDocument, html: string): Promise<string> {
+  return inlineImagesAsDataUris(html, async (relPath) => {
+    if (/^(?:https?:|data:|\/\/)/i.test(relPath)) return null;
+    if (!document.uri.scheme.startsWith('file')) return null;
+    try {
+      const clean = relPath.replace(/^\.\//, '');
+      const docDir = vscode.Uri.joinPath(document.uri, '..');
+      return await vscode.workspace.fs.readFile(vscode.Uri.joinPath(docDir, clean));
+    } catch {
+      return null;
+    }
   });
 }
 
@@ -73,10 +101,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   // clear suppression for another still mid-apply, leaking an echo update.
   private readonly _applying = new ApplyingTracker();
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly _extensionUri: vscode.Uri,
+    private readonly _context: vscode.ExtensionContext,
+  ) {}
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    const provider = new MdEditorPlusProvider(context.extensionUri);
+    const provider = new MdEditorPlusProvider(context.extensionUri, context);
     return vscode.window.registerCustomEditorProvider(
       MdEditorPlusProvider.viewType,
       provider,
@@ -125,6 +156,18 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
     };
 
+    // Re-assert the (untouched) document content into the webview after the save
+    // guard refuses a catastrophic write, so the webview, host, and disk all
+    // reconverge on the good content instead of silently diverging. Tagged as a
+    // 'refresh' so the webview's sync guard re-renders it unconditionally.
+    const resyncWebview = (): void => {
+      void webviewPanel.webview.postMessage({
+        type: 'update',
+        markdown: document.getText(),
+        source: 'refresh',
+      });
+    };
+
     // Writes the (already-applied, in-memory) document to disk. Gated on conflict:
     // while a conflict banner is up the webview suppresses edits AND pauses us, so
     // we never overwrite an external change with the user's un-reconciled version.
@@ -150,7 +193,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       pendingFlash = flash;
       try {
         const ok = await document.save();
-        if (!ok) { pendingFlash = false; postSaveState('failed'); }
+        if (!ok) { pendingFlash = false; postSaveState('failed'); return; }
+        void sendDiffBase();
       } catch (err) {
         pendingFlash = false;
         console.error('[md-editor-plus] save failed', err);
@@ -184,10 +228,20 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           shortenCodeSnippets: cfg.get<boolean>('shortenCodeSnippets', false),
           smartTypography:     cfg.get<boolean>('smartTypography', true),
           outlineVisible:      cfg.get<boolean>('outlineVisible', false),
-          readOnly:            cfg.get<boolean>('readOnly', false),
+          structureMapVisible: cfg.get<boolean>('structureMapVisible', false),
           sourceWordWrap:      cfg.get<boolean>('sourceWordWrap', false),
         },
       });
+      void sendDiffBase();
+    };
+
+    const sendDiffBase = async (): Promise<void> => {
+      try {
+        const base = await resolveBaseForDocument(document, openSnapshot);
+        void webviewPanel.webview.postMessage({ type: 'diffBase', content: base.content, label: base.label });
+      } catch {
+        // base unavailable (no git, etc.) — the diff map simply shows nothing
+      }
     };
 
     const openMarkdownInEditor = async (uri: vscode.Uri): Promise<void> => {
@@ -258,17 +312,30 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         return;
       }
       if (msg.type === 'openFullDiff') {
-        const m = msg as unknown as { baseContent?: string; baseLabel?: string };
-        await openFullDiff(document, { baseContent: m.baseContent, baseLabel: m.baseLabel }, openSnapshot);
+        const m = msg as unknown as { baseContent?: string; baseLabel?: string; markdown?: string };
+        // Pass the webview's live markdown straight into the diff's current side.
+        // Do NOT flush it into the document first — that marked the file "modified"
+        // even when nothing was edited (c56). The diff is a read-only preview; it
+        // never needs to mutate the underlying document.
+        await openFullDiff(
+          this._context,
+          document,
+          { baseContent: m.baseContent, baseLabel: m.baseLabel, currentMarkdown: m.markdown },
+          openSnapshot,
+        );
         return;
       }
       if (msg.type === 'edit' && msg.markdown !== undefined) {
-        await this._applyEdit(document, msg.markdown);
+        const applied = await this._applyEdit(document, msg.markdown);
+        if (!applied) { resyncWebview(); return; }
         scheduleAutoSave();
         return;
       }
       if (msg.type === 'save') {
-        if (msg.markdown !== undefined) await this._applyEdit(document, msg.markdown);
+        if (msg.markdown !== undefined) {
+          const applied = await this._applyEdit(document, msg.markdown);
+          if (!applied) { resyncWebview(); cancelAutoSave(); postSaveState('saved', true); return; }
+        }
         cancelAutoSave();
         await saveToDisk(true);
         return;
@@ -310,6 +377,9 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       }
       if (msg.type === 'openInFinder') {
         await vscode.commands.executeCommand('revealFileInOS', document.uri);
+      }
+      if (msg.type === 'openInVscodeEditor') {
+        await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default');
       }
       if (msg.type === 'openFromClipboard') {
         const raw = (await vscode.env.clipboard.readText()).trim();
@@ -398,6 +468,12 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         await vscode.window.showInformationMessage(note);
         return;
       }
+      if (msg.type === 'toast') {
+        const note = (msg as unknown as { text?: unknown }).text;
+        if (typeof note !== 'string' || note.length === 0) return;
+        await vscode.window.showInformationMessage(note);
+        return;
+      }
       if (msg.type === 'installSkill') {
         const m = msg as unknown as { scope?: unknown; skillMd?: unknown };
         const skillMd = m.skillMd;
@@ -471,11 +547,11 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         await cfg.update('outlineVisible', value, vscode.ConfigurationTarget.Global);
         return;
       }
-      if (msg.type === 'saveReadOnly') {
+      if (msg.type === 'saveStructureMapVisible') {
         const value = (msg as unknown as { value?: unknown }).value;
         if (typeof value !== 'boolean') return;
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
-        await cfg.update('readOnly', value, vscode.ConfigurationTarget.Global);
+        await cfg.update('structureMapVisible', value, vscode.ConfigurationTarget.Global);
         return;
       }
       if (msg.type === 'saveSourceWordWrap') {
@@ -497,9 +573,10 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         return;
       }
       if (msg.type === 'exportPdf') {
-        const html = (msg as unknown as { html?: unknown }).html;
+        const rawHtml = (msg as unknown as { html?: unknown }).html;
         const fname = (msg as unknown as { filename?: unknown }).filename;
-        if (typeof html !== 'string' || !html) return;
+        if (typeof rawHtml !== 'string' || !rawHtml) return;
+        const html = await inlineExportImages(document, rawHtml);
         const base = (typeof fname === 'string' ? fname : 'document.md')
           .replace(/\.[^.]+$/, '')
           .replace(/[^a-zA-Z0-9_.\-]+/g, '_') || 'document';
@@ -554,8 +631,9 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         );
       }
       if (msg.type === 'exportHtml') {
-        const html = (msg as unknown as { html?: unknown }).html;
-        if (typeof html !== 'string' || !html) return;
+        const rawHtml = (msg as unknown as { html?: unknown }).html;
+        if (typeof rawHtml !== 'string' || !rawHtml) return;
+        const html = await inlineExportImages(document, rawHtml);
         const base = (document.uri.path.split('/').pop() ?? 'document.md').replace(/\.[^.]+$/, '');
         const dir = vscode.Uri.joinPath(document.uri, '..');
         const defaultUri = vscode.Uri.joinPath(dir, `${base}.html`);
@@ -644,6 +722,31 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           const docDir = vscode.Uri.joinPath(document.uri, '..');
           const target = vscode.Uri.joinPath(docDir, clean);
           await vscode.commands.executeCommand('revealFileInOS', target);
+          reply({ ok: true });
+        } catch (err) {
+          reply({ error: (err as Error).message });
+        }
+        return;
+      }
+      if (msg.type === 'copyImagePath') {
+        const m = msg as unknown as { requestId?: unknown; relPath?: unknown };
+        const requestId = typeof m.requestId === 'string' ? m.requestId : '';
+        const reply = (extra: Record<string, unknown>) =>
+          void webviewPanel.webview.postMessage({ type: 'imagePathCopied', requestId, ...extra });
+        if (!requestId || typeof m.relPath !== 'string') {
+          reply({ error: 'bad copyImagePath request' });
+          return;
+        }
+        if (!document.uri.scheme.startsWith('file')) {
+          reply({ error: 'save the file first' });
+          return;
+        }
+        try {
+          const clean = m.relPath.replace(/^\.\//, '');
+          const docDir = vscode.Uri.joinPath(document.uri, '..');
+          const target = vscode.Uri.joinPath(docDir, clean);
+          await vscode.env.clipboard.writeText(target.fsPath);
+          void vscode.window.showInformationMessage('Copied image path');
           reply({ ok: true });
         } catch (err) {
           reply({ error: (err as Error).message });
@@ -752,16 +855,24 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     // not here — so it can't arrive before the webview is listening.
   }
 
-  private async _applyEdit(document: vscode.TextDocument, markdown: string): Promise<void> {
-    // Diagnostic for the empty-on-open data-loss bug: a webview 'edit'/'save'
-    // that would replace existing content with nothing is the prime suspect for
-    // the on-disk wipe. Log it (with a stack) so we can trace which path sent it.
-    if (markdown.trim() === '' && document.getText().trim() !== '') {
-      console.warn('[md-editor-plus] _applyEdit replacing NON-EMPTY document with EMPTY', {
+  // Returns true if the edit was applied, false if it was REFUSED by the
+  // save guard (a catastrophic, never-legitimate wipe — see saveGuard.ts).
+  // Callers must re-sync the webview from the untouched document when refused.
+  private async _applyEdit(document: vscode.TextDocument, markdown: string): Promise<boolean> {
+    const prev = document.getText();
+    const assessment = assessWrite(prev, markdown);
+    if (assessment.verdict === 'wipe') {
+      // c37/c48 last line of defense: do NOT write this to disk. The on-disk
+      // file (and the in-memory document) stay as they are; the caller re-asserts
+      // the good content back into the webview so nothing diverges.
+      console.error('[md-editor-plus] save guard REFUSED a catastrophic write', {
         uri: document.uri.toString(),
-        prevChars: document.getText().length,
+        reason: assessment.reason,
+        prevChars: prev.length,
+        nextChars: markdown.length,
         stack: new Error().stack,
       });
+      return false;
     }
     const edit = new vscode.WorkspaceEdit();
     edit.replace(
@@ -778,6 +889,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     } finally {
       this._applying.end(key);
     }
+    return true;
   }
 
   private _getHtml(webview: vscode.Webview, document: vscode.TextDocument): string {
@@ -804,6 +916,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     const iFolder = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M228,104a12,12,0,0,1-24,0V69l-59.51,59.51a12,12,0,0,1-17-17L187,52H152a12,12,0,0,1,0-24h64a12,12,0,0,1,12,12Zm-44,24a12,12,0,0,0-12,12v64H52V84h64a12,12,0,0,0,0-24H48A20,20,0,0,0,28,80V208a20,20,0,0,0,20,20H176a20,20,0,0,0,20-20V140A12,12,0,0,0,184,128Z"/></svg>`;
     const iDownload = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M228,144v64a12,12,0,0,1-12,12H40a12,12,0,0,1-12-12V144a12,12,0,0,1,24,0v52H204V144a12,12,0,0,1,24,0Zm-108.49,8.49a12,12,0,0,0,17,0l40-40a12,12,0,0,0-17-17L140,115V32a12,12,0,0,0-24,0v83L96.49,95.51a12,12,0,0,0-17,17Z"/></svg>`;
     const iOutline = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round" viewBox="0 0 256 256"><line x1="40" y1="64" x2="60" y2="64"/><line x1="100" y1="64" x2="216" y2="64"/><line x1="80" y1="128" x2="100" y2="128"/><line x1="140" y1="128" x2="216" y2="128"/><line x1="80" y1="192" x2="100" y2="192"/><line x1="140" y1="192" x2="216" y2="192"/></svg>`;
+    const iVscode = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 100 100"><mask id="a" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><path d="M70.9119 99.3171C72.4869 99.9307 74.2828 99.8914 75.8725 99.1264L96.4608 89.2197C98.6242 88.1787 100 85.9892 100 83.5872V16.4133C100 14.0113 98.6243 11.8218 96.4609 10.7808L75.8725 0.873756C73.7862 -0.130129 71.3446 0.11576 69.5135 1.44695C69.252 1.63711 69.0028 1.84943 68.769 2.08341L29.3551 38.0415L12.1872 25.0096C10.589 23.7965 8.35363 23.8959 6.86933 25.2461L1.36303 30.2549C-0.452552 31.9064 -0.454633 34.7627 1.35853 36.417L16.2471 50.0001L1.35853 63.5832C-0.454633 65.2374 -0.452552 68.0938 1.36303 69.7452L6.86933 74.7541C8.35363 76.1043 10.589 76.2036 12.1872 74.9905L29.3551 61.9586L68.769 97.9167C69.3925 98.5406 70.1246 99.0104 70.9119 99.3171ZM75.0152 27.2989L45.1091 50.0001L75.0152 72.7012V27.2989Z" fill="#fff"/></mask><g mask="url(#a)"><path d="M96.4614 10.7962L75.8569 0.875542C73.4719 -0.272773 70.6217 0.211611 68.75 2.08333L1.29858 63.5765C-0.515693 65.2318 -0.## 68.0902 1.30191 69.7426L6.81006 74.7522C8.29572 76.1034 10.5326 76.2029 12.1318 74.989L96.4614 10.7962Z" fill="#0065A9"/><g filter="url(#b)"><path d="M96.4614 89.2038L75.8569 99.1245C73.4719 100.273 70.6217 99.7884 68.75 97.9167L1.29858 36.4235C-0.515693 34.7682 -0.513607 31.9098 1.30191 30.2574L6.81006 25.2478C8.29572 23.8966 10.5326 23.7971 12.1318 25.011L96.4614 89.2038Z" fill="#007ACC"/></g><g filter="url(#c)"><path d="M75.8578 99.1263C73.4721 100.274 70.6219 99.7885 68.75 97.9166C71.0564 100.223 75 98.5895 75 95.3278V4.67213C75 1.41039 71.0564 -0.223106 68.75 2.08329C70.6219 0.211402 73.4721 -0.273666 75.8578 0.873633L96.4587 10.7807C98.6234 11.8217 100 14.0112 100 16.4132V83.5871C100 85.9891 98.6234 88.1786 96.4587 89.2196L75.8578 99.1263Z" fill="#1F9CF0"/></g></g></svg>`;
+    const iStructureMap = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" viewBox="0 0 256 256"><line x1="176" y1="52" x2="216" y2="52"/><line x1="176" y1="100" x2="204" y2="100"/><line x1="176" y1="148" x2="216" y2="148"/><line x1="176" y1="196" x2="204" y2="196"/><rect x="40" y="84" width="80" height="88" rx="10" fill="currentColor" fill-opacity="0.18" stroke-width="16"/></svg>`;
     const iRefresh = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg>`;
     const iLock = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M208,76H180V56A52,52,0,0,0,76,56V76H48A20,20,0,0,0,28,96V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V96A20,20,0,0,0,208,76ZM100,56a28,28,0,0,1,56,0V76H100ZM204,204H52V100H204Z"/></svg>`;
     const iSearch = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></svg>`;
@@ -840,9 +954,12 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       <button class="seg-btn active" data-view="preview" data-tip="Notion view — rich rendering">${iEye}<span class="seg-label">Preview</span></button>
       <button class="seg-btn" data-view="source" data-tip="Source view — raw markdown">${iCode}<span class="seg-label">Code</span><span class="fm-badge hidden" id="fm-badge" aria-hidden="true"></span></button>
     </div>
+    <button class="toolbar-icon" id="open-vscode-btn" data-tip="Open in VS Code text editor">${iVscode}</button>
     <button class="toolbar-icon" id="outline-btn" data-tip="Outline (⌘⇧O)">${iOutline}</button>
+    <button class="toolbar-icon" id="structure-map-btn" data-tip="Structure map">${iStructureMap}</button>
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
     <span class="save-indicator" id="save-indicator" aria-live="polite"></span>
+    <button class="readonly-pill" id="readonly-pill" hidden data-tip="Read-only — click to enable editing">${iLock}<span>Read only</span></button>
     <span class="toolbar-spacer"></span>
     <button class="toolbar-icon" id="diff-btn" data-tip="View changes (diff)">${iArrowsH}</button>
     <button class="toolbar-icon" id="refresh-btn" data-tip="Reload from disk">${iRefresh}</button>
@@ -969,7 +1086,8 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
   </div>
   <div class="actions-panel hidden" id="actions-panel-dots" data-anchor="dots">
     <button class="settings-action act-find" data-tip="Find text in this document (⌘F / Ctrl+F)">${iSearch}<span class="settings-action-label">Find in page</span></button>
-    <button class="settings-action act-toggle-readonly" id="act-toggle-readonly" data-tip="Toggle read-only mode — when on, typing and structural edits are blocked">${iLock}<span class="settings-action-label">Read only</span></button>
+    <div class="actions-sep"></div>
+    <div class="settings-action readonly-row" id="readonly-row" data-tip="Lock this file — blocks typing and structural edits (never persists; reopen to edit)">${iLock}<span class="settings-action-label">Read only</span><button class="toggle-switch" id="readonly-toggle" role="switch" aria-checked="false" tabindex="-1"></button></div>
     <div class="actions-sep"></div>
     <button class="settings-action act-copy" data-tip="Copy the entire markdown to clipboard">${iCopy}<span class="settings-action-label">Copy page content</span></button>
     <button class="settings-action act-copy-path" data-tip="Copy the absolute file path to clipboard">${iLink}<span class="settings-action-label">Copy file path</span></button>
@@ -983,6 +1101,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <button class="settings-action act-blocks-skill" data-tip="Generate a Claude skill that teaches your AI this app's block grammar">${iSparkle}<span class="settings-action-label">Create blocks skill…</span></button>
   </div>
   <div class="outline-panel hidden" id="outline-panel"></div>
+  <div class="structure-map" id="structure-map" aria-hidden="true"></div>
   <div class="actions-submenu hidden" id="actions-submenu-export" role="menu">
     <button class="settings-action act-export-html" data-tip="Save the rendered view as a standalone HTML file">${iDownload}<span class="settings-action-label">Export to HTML</span></button>
     <button class="settings-action act-export-pdf" data-tip="Render to PDF — uses headless Chrome/Edge if installed, otherwise opens the system print dialog">${iPdf}<span class="settings-action-label">Export to PDF</span></button>

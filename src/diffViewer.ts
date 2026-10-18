@@ -1,20 +1,6 @@
 import * as vscode from 'vscode';
-import { resolveDiffBase, type GitApiLike, type DiffBase } from './diffBase';
-
-const SCHEME = 'md-editor-plus-diff';
-// token -> base (left) content. Read-only docs served to vscode.diff's left pane.
-const bases = new Map<string, string>();
-let seq = 0;
-
-/** Register the read-only content provider that serves the diff's base side. */
-export function registerDiffContentProvider(context: vscode.ExtensionContext): void {
-  const provider: vscode.TextDocumentContentProvider = {
-    provideTextDocumentContent(uri) { return bases.get(uri.query) ?? ''; },
-  };
-  context.subscriptions.push(
-    vscode.workspace.registerTextDocumentContentProvider(SCHEME, provider),
-  );
-}
+import { resolveDiffBase, resolveCurrentSide, type GitApiLike, type DiffBase } from './diffBase';
+import { openRenderedDiff } from './diffPaneView';
 
 /** Adapt the built-in vscode.git extension's (untyped) API to GitApiLike, or null. */
 async function getGitApi(): Promise<GitApiLike | null> {
@@ -29,10 +15,25 @@ async function getGitApi(): Promise<GitApiLike | null> {
   }
 }
 
-/** Open VS Code's native diff editor: base (left) vs the live document (right). */
-export async function openFullDiff(
+/** Resolve the diff base (HEAD → on-disk → snapshot) for a document, for the diff map (c55). */
+export async function resolveBaseForDocument(
   document: vscode.TextDocument,
-  msg: { baseContent?: string; baseLabel?: string },
+  snapshot: string,
+): Promise<DiffBase> {
+  const gitApi = await getGitApi();
+  return resolveDiffBase({
+    fsPath: document.uri.fsPath,
+    uri: document.uri,
+    gitApi,
+    snapshot,
+  });
+}
+
+/** Open the rendered two-pane diff: base (left) vs current (right), in the editor (c57). */
+export async function openFullDiff(
+  context: vscode.ExtensionContext,
+  document: vscode.TextDocument,
+  msg: { baseContent?: string; baseLabel?: string; currentMarkdown?: string },
   snapshot: string,
 ): Promise<void> {
   const explicitBase: DiffBase | undefined =
@@ -47,15 +48,6 @@ export async function openFullDiff(
     gitApi,
     snapshot,
   });
-
-  const token = String(++seq);
-  bases.set(token, base.content);
-  const fileName = document.uri.path.split('/').pop() ?? 'document.md';
-  const leftUri = vscode.Uri.from({ scheme: SCHEME, path: '/' + fileName, query: token });
-  await vscode.commands.executeCommand(
-    'vscode.diff',
-    leftUri,
-    document.uri,
-    `${fileName} — changes since ${base.label}`,
-  );
+  const current = resolveCurrentSide(msg.currentMarkdown, document.getText());
+  await openRenderedDiff(context, document, base, current);
 }
