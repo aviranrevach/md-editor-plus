@@ -8,7 +8,6 @@ import { placeFloating, type PlacementHandle } from './menuPosition';
 import { copySelectionAsPlainText, copySelectionRich } from './copySelection';
 import { MORE_MENU_ITEMS, runMoreMenuAction, type MoreMenuId } from './moreMenu';
 import { insertInlineMath } from './extensions/math';
-import { COPY_ICON_SVG } from './extensions/codeBlock';
 
 // All paths verified from @phosphor-icons/core assets/bold/
 const P = {
@@ -226,7 +225,7 @@ function buildEl(): HTMLElement {
       ${DIV}
       <button class="bm-btn" data-action="code" data-tip-html="Inline code<kbd>⌘E</kbd>">${svg(P.code)}</button>
       <button class="bm-btn bm-math-btn" data-action="math" data-tip-html="Inline equation<kbd>⌘⇧E</kbd>">√x</button>
-      <button class="bm-btn bm-copy-plain" data-action="copy-plain" data-tip="Copy as plain text">${COPY_ICON_SVG}</button>
+      <button class="bm-btn bm-copy-plain" data-action="copy-plain" data-tip="Copy as plain text">${svg(P.subtractSquare)}</button>
     </div>
     <div class="bubble-row">
       <button class="bm-btn" data-action="link" data-tip-html="Add link<kbd>⌘K</kbd>">${svg(P.link)}</button>
