@@ -199,6 +199,7 @@ function init(): void {
   const readOnlyRow    = document.getElementById('readonly-row')    as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
+  const openVscodeBtn         = document.getElementById('open-vscode-btn')          as HTMLElement | null;
 
   const roController = createReadOnlyController({
     root: document.documentElement,
@@ -304,6 +305,10 @@ function init(): void {
 
   refreshBtn?.addEventListener('click', () => {
     vscode.postMessage({ type: 'refresh' });
+  });
+
+  openVscodeBtn?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openInVscodeEditor' });
   });
 
   document.getElementById('diff-btn')?.addEventListener('click', () => {
