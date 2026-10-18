@@ -2,7 +2,7 @@
   "name": "md-editor-plus",
   "displayName": "MD Editor Plus",
   "description": "Notion-style block editor for Markdown. Edit .md files inline with rich blocks, drag-to-reorder, slash commands, callouts, and polished light/dark themes.",
-  "version": "0.4.2",
+  "version": "0.9.2",
   "publisher": "AviranRevach",
   "license": "MIT",
   "author": {
@@ -41,6 +41,9 @@
     "notion-style",
     "preview",
     "notes",
+    "latex",
+    "math",
+    "katex",
     "mdx"
   ],
   "activationEvents": [],
@@ -144,6 +147,11 @@
           "default": false,
           "description": "Render code blocks with a dark background regardless of page theme"
         },
+        "mdEditorPlus.alwaysDarkDiagram": {
+          "type": "boolean",
+          "default": false,
+          "description": "Render mermaid diagrams with a dark theme regardless of page theme"
+        },
         "mdEditorPlus.alwaysDarkSource": {
           "type": "boolean",
           "default": false,
@@ -164,15 +172,20 @@
           "default": false,
           "description": "Show the outline panel (left gutter) by default"
         },
-        "mdEditorPlus.readOnly": {
+        "mdEditorPlus.structureMapVisible": {
           "type": "boolean",
           "default": false,
-          "description": "Open files in read-only mode by default (disables editing)"
+          "description": "Show the structure map (right-edge navigation rail) by default"
         },
         "mdEditorPlus.sourceWordWrap": {
           "type": "boolean",
           "default": false,
           "description": "Wrap long lines in the Code (source) view instead of horizontal scrolling"
+        },
+        "mdEditorPlus.smartTypography": {
+          "type": "boolean",
+          "default": true,
+          "description": "Smart typography: replace typed sequences like -> with arrows (→), -- with em dash (—), ... with ellipsis (…) as you type. Suppressed inside code."
         }
       }
     }
@@ -211,11 +224,13 @@
     "concurrently": "^8.0.0",
     "esbuild": "^0.21.0",
     "jest": "^29.0.0",
+    "jest-environment-jsdom": "^30.4.1",
+    "katex": "^0.16.47",
     "lowlight": "^3.1.0",
-    "mermaid": "^11.15.0",
+    "markdown-it-texmath": "^1.0.0",
+    "mermaid": "^11.4.0",
     "ovsx": "^0.9.0",
     "tiptap-extension-global-drag-handle": "^0.1.18",
-    "tiptap-extension-mermaid": "^0.0.0",
     "tiptap-markdown": "^0.8.10",
     "ts-jest": "^29.0.0",
     "typescript": "^5.4.0"
@@ -226,9 +241,14 @@
     "testMatch": [
       "**/tests/**/*.test.ts"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.worktrees/"
+    ],
     "moduleNameMapper": {
       "\\.css$": "<rootDir>/tests/__mocks__/fileMock.js",
-      "^mermaid$": "<rootDir>/tests/__mocks__/mermaid.js"
+      "^(\\.{1,2}/)*editor$": "<rootDir>/tests/__mocks__/editorMock.js",
+      "^mermaid$": "<rootDir>/tests/__mocks__/mermaidMock.js"
     },
     "transform": {
       "^.+\\.tsx?$": [

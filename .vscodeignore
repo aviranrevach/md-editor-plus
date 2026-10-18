@@ -2,6 +2,7 @@
 .vscode-test/**
 .git/**
 .github/**
+.worktrees/**
 .superpowers/**
 .DS_Store
 src/**
@@ -19,8 +20,19 @@ package-lock.json
 demo.md
 demo-rtl.md
 demo-tester.md
+demo-*.md
+*-test.md
+*.assets/**
+TODO.md
+BOARD-PARSE-BUG-FINDINGS.md
+ai-turn-into-test.md
 PUBLISHING.md
+.playwright-mcp/**
+.claude/**
+*.png
 media/icon.svg
 media/header.svg
 media/claude-icon.svg
 media/demo.*
+media/*.webm
+media/*.mov

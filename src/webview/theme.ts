@@ -7,9 +7,27 @@ export type ThemeSetting =
   | 'sync-ide'
   | 'auto'; // legacy alias for sync-ide
 
-type Resolved = 'light' | 'dark' | 'sepia' | 'claude';
+export type Resolved = 'light' | 'dark' | 'sepia' | 'claude';
 
 let _currentSetting: ThemeSetting = 'sync-ide';
+let _currentResolved: Resolved = 'light';
+const _subscribers = new Set<(resolved: Resolved) => void>();
+
+export function currentResolvedTheme(): Resolved {
+  return _currentResolved;
+}
+
+export function subscribeThemeChanges(cb: (resolved: Resolved) => void): () => void {
+  _subscribers.add(cb);
+  return () => _subscribers.delete(cb);
+}
+
+function notify(resolved: Resolved): void {
+  _currentResolved = resolved;
+  for (const cb of _subscribers) {
+    try { cb(resolved); } catch (err) { console.error('[md-editor-plus] theme subscriber failed', err); }
+  }
+}
 
 function isDarkOS(): boolean {
   return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
@@ -37,6 +55,7 @@ export function applyTheme(setting: ThemeSetting): void {
   html.classList.toggle('theme-dark',   resolved === 'dark');
   html.classList.toggle('theme-sepia',  resolved === 'sepia');
   html.classList.toggle('theme-claude', resolved === 'claude');
+  notify(resolved);
 }
 
 export function initTheme(setting: ThemeSetting): void {

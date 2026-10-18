@@ -1,8 +1,10 @@
 import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
+import katexCss from 'katex/dist/katex.min.css';
+import { unresolveImageSrc } from './mediaResolve';
 
-const BUNDLED_CSS = lightCss + '\n' + darkCss + '\n' + editorCss;
+const BUNDLED_CSS = lightCss + '\n' + darkCss + '\n' + katexCss + '\n' + editorCss;
 
 const EXPORT_CSS = `
 /* Standalone export adjustments */
@@ -61,6 +63,8 @@ function cleanContent(editorEl: HTMLElement): string {
   // Remove drop placeholder / cursor markers
   clone.querySelectorAll('.ProseMirror-yjs-cursor, .ProseMirror-gapcursor, .ProseMirror-dropcursor')
     .forEach((el) => el.remove());
+  clone.querySelectorAll('.math-inline-input-wrap, .math-block-source')
+    .forEach((el) => el.remove());
   // Strip class="ProseMirror-trailingBreak" content used purely for caret
   clone.querySelectorAll('br.ProseMirror-trailingBreak').forEach((el) => el.remove());
   // Remove editor-state-only classes that style hover/selected blocks. These
@@ -70,12 +74,42 @@ function cleanContent(editorEl: HTMLElement): string {
     'bm-target-block',
     'has-focus',
     'ProseMirror-selectednode',
+    'math-editing',
+    'math-selected',
   ];
   STATE_CLASSES.forEach((cls) => {
     clone.querySelectorAll('.' + cls).forEach((el) => el.classList.remove(cls));
   });
   // Strip the class from the outer editor element too (the clone root).
   STATE_CLASSES.forEach((cls) => clone.classList.remove(cls));
+  // Boards (kanban + table) render interactive chrome and hidden layout mirrors
+  // that must not appear in a static export (c15). We keep the active view's real
+  // content — status/tag pills are <span>s, card text is real DOM — and remove:
+  //   • every <button> (view switcher, + New card / + Add row, ⋯ menus) — none work in a file
+  //   • aria-hidden sizing mirrors, which carry DUPLICATE column/card text
+  //   • drag handles, add-row/add-card affordances, and toolbar control clusters
+  clone.querySelectorAll('.board-block').forEach((board) => {
+    board.querySelectorAll('button').forEach((el) => el.remove());
+    board.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.remove());
+    const CHROME = [
+      '.board-chrome .bd-view-seg', '.board-chrome .bd-more',
+      '.board-add', '.board-add-card',
+      '.board-add-column-big', '.board-add-column-spacer', '.board-add-column-mirror',
+      '.bd-row-grip', '.bd-col-drag-handle', '.bd-col-menu-btn',
+      '.bd-table-addrow', '.bd-addrow-placeholder', '.bd-group-add',
+      '.board-properties-handle', '.board-properties-add', '.board-properties-more',
+    ].join(',');
+    board.querySelectorAll(CHROME).forEach((el) => el.remove());
+  });
+  // Turn resolved webview-resource image URLs back into document-relative paths.
+  // Those relative paths are portable and let the extension inline the bytes as
+  // data: URIs; a raw webview URI would 404 in a standalone file.
+  clone.querySelectorAll('img[src]').forEach((el) => {
+    const img = el as HTMLImageElement;
+    const raw = img.getAttribute('src') ?? '';
+    const rel = unresolveImageSrc(raw);
+    if (rel !== raw) img.setAttribute('src', rel);
+  });
   return clone.innerHTML;
 }
 

@@ -4,7 +4,9 @@
 
 Open any Markdown file and it renders as polished, block-based content. Click anywhere to edit, drag blocks to reorder, slash to insert. Your file stays plain Markdown on disk, so it works with every other tool in your pipeline.
 
-![MD Editor Plus](media/MD-editor-plus.png)\---
+[![MD Editor Plus](media/Md-editor-plus02.gif)](https://github.com/aviranrevach/md-editor-plus/raw/main/media/Md-editor-plus02.webm)
+
+---
 
 ## Why use it
 
@@ -23,19 +25,43 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 ### Block editor
 
 - **Drag-handle reordering** — hover any block for a `⠿` handle and move it anywhere
+- **Block action menu** — click the `⠿` handle for one consistent menu on any block: **Turn into**, **Duplicate**, **Delete**, with a search box to jump straight to a type
 - **Slash / block picker** — `⌘/` (`Ctrl+/`) opens an inline picker; type to filter
-- **Bubble menu** — select text for inline formatting, links, color, highlight, emoji, and a "Turn into" converter
+- **Bubble menu** — select text for inline formatting (bold, italic, underline, strikethrough, inline code, inline equation), links, color, highlight, and emoji. A **⋯** menu holds the rest: **Turn into**, **Turn into using AI** ([see below](#turn-selection-into-ai)), **Copy**, and **Copy as plain text** (clean, unformatted text for when a selection pastes in with the wrong styling)
 - **Click-to-edit** — every block is editable in place; no mode switching
+- **Click below to keep typing** — hover the empty space under the last block and a faint "Start writing…" hint previews where a new block will land; click to drop your cursor into a fresh paragraph, even when the doc ends in a board, table, code block, or image (hidden in read-only)
+- **Delete any block** — from the `⠿` dragger menu, a block's own `⋯` menu (boards, diagrams), or select it and press Delete / Backspace
 
 ### Block types
 
 - **Text** — paragraph, H1, H2, H3
 - **Lists** — bullet, numbered, task lists with real checkboxes that round-trip to `- [ ]` / `- [x]`
-- **Tables** — GFM pipe syntax, inline cell editing, add rows/columns from the bubble menu
+- **Tables** — GFM pipe syntax, inline cell editing, plus Notion-style `⠿` **row & column handles** on the edges to drag-reorder or open a menu (insert / duplicate / delete), with a blue outline selection on cells, rows, and columns
 - **Code blocks** — syntax highlighting for \~50 languages, line-number gutter, drag lines to reorder, copy button, optional auto-collapse for long snippets
 - **Callouts** — GFM `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]` with colored backgrounds and icons
 - **Toggles** — collapsible `<details>` sections
+- **Math equations** — `/math`, `/latex`, or `/公式` opens Notion-style commands for block equations, inline equations, and converting the current block, with a live KaTeX preview. Includes `\ce` and `\pu` chemistry macros. ([see below](#math-equations))
+- **Boards** — `/board kanban` or `/board table` for project/task views with columns, cards, properties, drag-to-reorder, inline editing, hideable fields. Stored as a fenced HTML comment block so the file stays plain Markdown. ([see below](#boards-kanban--table))
+- **Mermaid diagrams** — `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart` / `/graph` / `/canvas`) drops a freeform mermaid canvas with a starter `flowchart LR` (`Idea → Next → Done`). Visual edit opens automatically: drag nodes, draw arrows, add sticky notes, change shapes, zoom and pan. Persists as a normal ```` ```mermaid ```` code fence with optional position/style sidecars in mermaid comments. Code view shows raw mermaid source you can hand-edit. ([see below](#whiteboard--mermaid-diagrams))
 - **Media & misc** — images, blockquotes, dividers
+
+### Turn selection into… (AI)
+
+Select any run of blocks, open the bubble menu's **⋯** menu and choose **Turn into using AI** (or the **Using AI** group inside *Turn into*), and MD Editor Plus builds a ready-to-paste prompt for your **file-aware AI** (Claude Code, Cursor, the VS Code AI). Paste it in — the AI edits the file, and the viewer re-renders. **No network, no API keys, no accounts: the prompt travels through your clipboard, nothing else.**
+
+The prompt carries the file path, the selection's location (line + text anchors), and — crucially — the app's *exact* block grammar, so the AI's output round-trips into a real board/table/diagram instead of a near-miss. Targets:
+
+- **Ask AI…** — opens a conversation about the selected section; the prompt ends open so you type your request in the chat after pasting
+- **Table** — a GFM pipe table from loose notes
+- **Board: Kanban** / **Board: Table** — a full board, in either of its two views
+- **Mermaid diagram** — a diagram from a process description
+- **Summary** · **Action items** · **Outline** · **Timeline** — plain-markdown "thinking" transforms
+
+A small panel walks you through it: choose where the result goes via a segmented control — **Add below** (default), **Replace**, or **Custom** (leaves placement open so you direct it in the chat) — preview the exact prompt, then copy. Prompts end with the action itself, so when they land in your AI the cursor sits right where you'd keep typing.
+
+### Create a blocks skill
+
+From the ⋯ actions menu, **Create blocks skill…** generates a reusable **Claude Skill** (`SKILL.md`) that teaches your AI the exact grammar for this app's blocks (Kanban/Table boards, Mermaid, Callouts, Toggles) — tick which blocks to include, then **Install in project** (`.claude/skills/`), **Install globally** (`~/.claude/skills/`), or **Download**. Hit **Preview** first to see the exact `SKILL.md` it will write — a read-only, scrollable view that updates live as you tick blocks, so you know precisely what lands on disk before you create it. Once installed, Claude auto-loads it whenever you ask for one of these blocks, so the output renders correctly with no copy-paste. The grammar comes from the same single source as the ✨ prompts, so they never drift.
 
 ### Display settings (Aa panel)
 
@@ -55,16 +81,22 @@ VS Code's built-in preview is great for reading. The default text editor is grea
 
 ### Workflow & UX
 
+- **Auto-save + save status** — a condensed indicator by the filename always shows where you stand: `• Unsaved` the instant you type, `⟳ Saving…` while it writes, `✓ Saved` at rest. Edits auto-save to disk ~1 s after you stop typing; **⌘S / Ctrl+S** saves immediately with a confirming pulse. If the file changes on disk while you have unsaved edits, auto-save pauses and the conflict banner lets you choose — nothing is silently overwritten.
+- **Find in page** — ⌘F / Ctrl+F (or **Find in page** in the `⋯` menu) opens a Notion-style find bar: every match highlights with a live `3 / 12` count, Enter / Shift+Enter (or ↑ ↓) jumps between them, Esc closes. Works in both Preview and Code views. A match hidden inside a collapsed toggle auto-expands and scrolls into view, and search reaches **inside equations and boards** too — formula source, card titles, body previews, field/tag values, column names — scrolling the matching content into view.
+- **Structure map** — a slim navigation rail down the right edge: a **tick per heading** (bolder for H1, fainter for H3) and a box marking your current viewport. **Click a tick** to jump, **drag the box** to scroll, **hover** for the heading text. Toggle it from the toolbar — it recolors to match your theme and hides in Code view.
+- **Diff map** — the structure-map rail also paints **change marks** vs your last commit: 🟢 added · 🟠 modified · 🔴 removed, each beside the block it touches. **Click a mark** to jump to the change; marks appear only when there's something changed.
+- **Rendered two-pane diff** — click the **↔** toolbar button to open a read-only side-by-side diff panel beside the editor. Both panes render through the full editor (formatted text, callouts, boards, images), not raw Markdown. Changed blocks are tinted — 🟢 green for added, 🔴 red for removed, 🟠 amber for modified — and paired blocks align with filler gaps so nothing drifts out of context. The change rail on the right shows all edits at a glance; **click any mark** to jump straight to it, and both panes scroll in lock-step. The base is resolved automatically (HEAD commit → on-disk version → session snapshot). Both panes are read-only — edits happen in your main editor.
+- **Export to HTML / PDF** — from the `⋯` menu, save the rendered page as a standalone **HTML** or **PDF** file. Local images are embedded directly, so the file is fully portable — email it or move it and the images still show. Boards export as their current view (kanban or table) with all the editing controls stripped out. PDF uses headless Chrome/Edge if installed (one click, no dialog), otherwise opens your browser's print dialog.
 - **Code / Preview toggle** — switch between rendered blocks and raw Markdown without leaving the editor
 - **Auto-fading toolbar** — drops to 50% opacity when your cursor is away, lights up when you approach
-- **Filename actions menu** — Copy page content, Copy file path, Duplicate, Open in Finder
+- **Actions menu** — the `⋯` menu carries Find in page, Read only, Reload from disk, Copy page content, Copy file path, Duplicate, Open in Finder, Export, and Create blocks skill
 - **Rich tooltips** — color swatches, font and size previews, 350 ms hover delay, edge-aware flipping
-- **Keyboard shortcuts** — `⌘B` / `⌘I` / `⌘U` / `⌘⇧X` / `⌘E` / `⌘K` / `⌘/` work the way you expect
+- **Keyboard shortcuts** — `⌘F` / `⌘B` / `⌘I` / `⌘U` / `⌘⇧X` / `⌘E` / `⌘⇧E` / `⌘K` / `⌘/` work the way you expect
 - **Command palette** — Open Block View / Open Source View on any file
 
 ### Privacy & footprint
 
-- **100% local** — no telemetry, no network calls, no accounts
+- **100% local** — no telemetry, no network calls, no accounts (even the ✨ AI assist works purely through your clipboard — it never calls out)
 - **Works on any folder** — no database, no cloud, no migration
 
 ---
@@ -93,11 +125,7 @@ To switch a single file back to VS Code's default editor, run **MD Editor Plus: 
 
 ## The toolbar
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ [logo]  [Preview | Code]              filename.md              [Aa] [⋯] │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+![The MD Editor Plus toolbar](media/toolbar.png)
 
 The toolbar fades to 50% opacity when your cursor isn't near it, so it stays out of the way while you write. Bring the mouse within \~150 px of the top of the page and it lights back up.
 
@@ -105,6 +133,8 @@ The toolbar fades to 50% opacity when your cursor isn't near it, so it stays out
 | --- | --- |
 | **Logo** | Icon for the extension. |
 | **Preview / Code** | Switch between the rendered block view and the raw Markdown view. The active button shows its label (`Preview` or `Code`). |
+| **Outline** | **Click** to toggle the heading outline tree (also ⌘⇧O). |
+| **Structure map** | **Click** to toggle the right-edge navigation rail — heading ticks plus a draggable viewport box. |
 | **Filename** | Centered. **Hover** to open the actions menu (Copy, Duplicate, etc.). The full name shows in a native tooltip when truncated. |
 | **Aa** | **Click** to open the display-settings panel (theme, page width, font, code-block options). |
 | **⋯** | **Click** to open the actions menu, anchored to the top-right. |
@@ -191,22 +221,53 @@ Clears the saved defaults and restores the built-in ones (Light theme, Sans font
 
 ## Editor blocks
 
-Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**. Filter by typing.
+Click `+` in the gutter or press `⌘/` (`Ctrl+/`) to open the **block picker**. Filter by typing, or walk the list with `↑` / `↓` — the menu scrolls to follow the highlight, so the selected row stays visible however long the list is. `↵` inserts, `esc` closes.
 
 | Section | Blocks |
 | --- | --- |
 | **Text** | Paragraph, Heading 1, Heading 2, Heading 3 |
-| **Lists** | Bullet list, Numbered list, Task list |
-| **Media** | Image, Callout, Toggle |
+| **Lists** | Bullet list, Numbered list, Task list, **Table**, Board: Kanban, Board: Table |
+| **Media & blocks** | Image, Callout, Toggle, **Block equation**, **Inline equation**, **Whiteboard** |
 | **Other** | Blockquote, Code block, Divider |
+
+### Images
+
+Pick **Image** from the block picker to drill into four ways to add one (all inside the picker):
+
+- **Upload from computer** — choose a file. It's copied into a per-note `<note>.assets/` folder next to your file and inserted as a clean relative link (`![](./Note.assets/photo.png)`), so it stays put when you reopen or move the file.
+- **Browse project** — opens the native file picker so you can pick an image already in your workspace (real folders and files). It's referenced in place — no duplicate copy.
+- **Embed link** — type or paste an image URL (or a project path) into the in-window field.
+- **Embed from clipboard** — use the image link already on your clipboard (a web/data URL, or a path to a file in the project).
+
+Filenames keep their original name, with a `-2` suffix added only if there's a clash.
+
+You can also **paste an image** straight from the clipboard (⌘V / Ctrl+V) anywhere in the body — it's saved into `<note>.assets/` as `pasted-<date>.<ext>` and inserted inline.
+
+**Click any image** to reveal a small toolbar in the same style as the text bubble menu — one row of actions (Replace · Compress · Reveal · Remove) and one row of sizes (S · M · L · Full):
+
+- **Size presets** — S / M / L / Full set the width instantly. For a precise width, drag the **resize grips** on the left/right edges of the image (Notion-style). Resized images are stored as a standard HTML `<img src="…" width="…">`, so they render at the correct size in GitHub, Obsidian, VS Code preview, and any other Markdown reader. Images you never resize stay as plain `![](src)` Markdown.
+- **Replace** — swaps the image via the same drill-down picker (upload / browse / clipboard).
+- **Compress** — re-encodes the image locally (canvas pass, no server round-trip; never writes a larger file). The button's tooltip shows the current file size, and after compressing it reports the saving — e.g. `Compressed · 1.2 MB → 410 KB`.
+- **Reveal in Finder** — opens the folder that contains the image file in the OS file browser.
+- **Remove** — deletes the image from the document.
+
+**In boards**, images work three ways: add an **Image column** (its cells show a thumbnail + a `+N` badge, click to add); any `![](…)` link inside a text or Description cell renders as an inline thumbnail; and a kanban card automatically gets a **cover** from the first image in its body.
 
 ### Task lists
 
 Render as actual checkboxes. Click to toggle. Your changes round-trip to standard `- [ ]` / `- [x]` Markdown.
 
+### Smart typography
+
+Type `->` and `<-` and they become `→` and `←` as you go — Notion-style. Also `<->` → `↔`, `=>` → `⇒`, `--` → `—`, `...` → `…`, and `(c)` / `(r)` / `(tm)` → `©` / `®` / `™`. Works in the document body **and** in board table cells, card titles, and column names. Code stays untouched, and you can turn it off in Visual settings (the **Aa** menu).
+
 ### Tables
 
-Insert from the block picker, then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table.
+Insert a plain Markdown table from the block picker (under **Lists**) — a 3×3 starter with a header row — then edit cells inline. Add rows and columns from the bubble menu when the cursor is in a table. It's a distinct block from **Board: Table**, so typing `table` in the picker surfaces both.
+
+**Row & column handles + selection** — Notion-style edge handles. **Hover a cell** → a thin stroke marks its **row** (left edge) and **column** (top edge); drift toward an edge and a **⠿ grip emerges**. **Click** the grip to select the whole row/column and open its menu (rows: **Insert above / below**, **Duplicate**, **Delete**; columns: **Insert left / right**, **Duplicate**, **Delete**), or **drag** it to reorder. Selection shows as a **blue outline box** (never a fill) — on the clicked cell, a selected row/column, or a **drag across cells / shift-click** range. The header row stays first (menu: **Insert row below** only), and a table always keeps at least one column. The margin handle still moves the whole table.
+
+Outgrown a simple grid? Use the `⠿` handle → **Turn into → Board: Table** to convert it into a full board: the header row becomes the columns, each body row becomes a card, and the first column becomes the card titles. The board opens in table view; flip it to Kanban with the view toggle.
 
 ### Code blocks
 
@@ -230,9 +291,76 @@ GitHub-flavored `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, etc. Render with a colo
 
 Collapsible sections that hide their contents until clicked. Useful for FAQs, long answer keys, etc. Round-trip as HTML `<details>` blocks.
 
+### Math equations
+
+Equations follow the same core interaction model as [Notion math equations](https://www.notion.com/help/math-equations) and render locally with KaTeX — no CDN or network request. Type `/math`, `/latex`, `/equation`, or `/公式` to filter the picker to three formula commands; the highlighted command shows a rendered preview beside the menu.
+
+- **Block equation** — choose **Block equation** from the filtered picker. It replaces an empty command paragraph and immediately opens the LaTeX source editor. Click the rendered equation later to edit with a live preview; `⌘/Ctrl+Enter` finishes and `Esc` cancels.
+- **Inline equation** — choose **Inline equation** to insert at the current cursor or turn selected text into a formula. You can also type `$$`, the formula, and closing `$$`; select text and click **√x** in the bubble menu; or press `⌘⇧E` / `Ctrl+Shift+E`. Click an equation to edit it live. At either edge of the input, `←` / `→` moves the caret back into surrounding text.
+- **Source and conversion** — choose **Block equation · Turn into** from the filtered picker to convert the current block while preserving its text as LaTeX. The equation editor can copy the LaTeX source, and an inline equation can become a block equation with **Make block**.
+- **Syntax** — existing Markdown loads from `$...$`, inline `$$...$$`, `\(...\)`, standalone `$$...$$`, and `\[...\]`. The original delimiter style is preserved when possible. Math inside inline code or fenced code blocks stays literal.
+- **Coverage** — supports KaTeX's LaTeX subset plus mhchem `\ce` and `\pu`. Invalid or unsupported input remains editable and displays a visible error state instead of breaking the document.
+
+Equations participate in read-only pages, search, copy, rendered diff, standalone HTML/PDF export, and inline rendering inside board text fields.
+
+### Whiteboard / Mermaid diagrams
+
+Type `/whiteboard` in the block picker (aliases: `/mermaid`, `/diagram`, `/flowchart`, `/graph`, `/canvas`) to drop a freeform mermaid canvas onto the page. Ships with a starter `flowchart LR` (`Idea → Next → Done`) so you can begin dragging immediately — visual edit opens automatically on insert.
+
+**In visual-edit mode** (eye icon in the block chrome, or double-click on the diagram):
+
+- **Drag nodes** anywhere — the canvas auto-grows to include them; the block frame stays the same physical size.
+- **Drag from a node hook (N/E/S/W)** to draw a new edge to another node.
+- **Shape palette** — pick rectangle, pill, circle, diamond, hexagon, cylinder, subroutine, trapezoid, parallelogram.
+- **Sticky notes**, free text, free lines, and arrows — add via the toolbar.
+- **Multi-select** with the marquee or `Shift+click`; align/distribute and bulk-style multiple nodes at once.
+- **Per-edge styling** — solid / dashed / dotted, thickness, color, marching-ants animation (slow / fast, forward / reverse), arrow / circle caps on either end.
+- **Zoom + pan** — `Cmd+wheel` to zoom (clamped to 20–400%), space-drag or the hand tool to pan, `Cmd +/-` from the keyboard, `Cmd+0` resets.
+- **Viewport lock** (lock icon in the toolbar) — engage after arranging things to freeze the view; toggle off to let the canvas auto-fit on every render.
+- **Undo / redo** across all visual-edit mutations.
+
+**Toggle to source** (`</>` icon) to see and edit the raw mermaid syntax. Pinned positions, per-node styles, free lines, and edge styles persist as mermaid comments (`%% mb-positions:`, `%% mb-styles:`, etc.) so the diagram round-trips losslessly as a normal ```` ```mermaid ```` code fence in your Markdown file.
+
+```markdown
+​```mermaid
+flowchart LR
+    A[Idea]
+    B[Next]
+    C[Done]
+    A --> B
+    B --> C
+​```
+```
+
+**Click the expand icon** (top-right of the block) for a fullscreen modal — useful for presenting a complex diagram. **Copy / Download** is available from the `⋯` menu: copy source, copy SVG, download SVG, download PNG.
+
+### Boards (Kanban / Table)
+
+![Kanban board](media/kanban-board.gif)
+
+Type `/board kanban` or `/board table` to drop a project board. Two views over the same data:
+
+- **Kanban view** — columns of cards. Drag cards between columns, drag columns to reorder. Add columns from the right edge, add cards from the bottom of any column. Double-click a column header to rename. Per-column color swatch from a **10-color palette** (gray, blue, amber, emerald, red, purple, orange, teal, indigo, pink).
+- **Table view** — a true database table. Sort by column, resize columns, drag to reorder. Show / hide properties from the Properties popover. Inline-edit every cell. The Description column is a synthetic field that maps to the card body text. Each card carries an auto-assigned **`id`** (`C1`, `C2`, …) shown read-only and copyable in a compact column — it's the link between a row and its description, so it's never editable. The column **⋯ menu** leads with the "shape what you see" actions — **Filter · Group by this · Sort** — then *Rename · Edit options · Reset column width · Hide column* below a divider, and **Delete property** in a danger section at the bottom. **Sort** reads as a dropdown: the row shows the column's current sort (*None*, *Ascending*, *Descending*) and its flyout offers those same three choices with a ✓ on the active one; picking *None* clears the sort. **Delete property** removes the column, its values on every card, and any sort / grouping / width the column owned — it asks for confirmation first when cards actually hold data, and is unavailable for the built-in Title, Status and Description fields. **Filter** (on status / tag columns) opens a **mini-filter** for just that column: the field's value chips, a *Clear* for that one field, and an *All filters…* link down to the full filter panel; toggling a chip hides cards live and keeps the toolbar filter's count in sync. **Group by any status or tag column** (column ⋯ → *Group by this*) — rows stack into colored, collapsible sections in that field's color and order, with a *Remove grouping* control. Each row has a `⠿` grip in the left gutter: **drag** it to reorder (and, in a grouped table, drag a row into another group to **re-assign that field**, just like moving a kanban card); **click** it for a row menu — Open in side panel, Duplicate, Insert row above / below, Delete row. The grip stays clickable when the table is sorted (only the Insert options hide, since order is computed there).
+
+**Field types** — `text`, `status`, `date`, `person`, `tags`, with type-aware editors.
+
+- **Multiple status columns** — beyond the built-in Status, add as many `status` columns as you like (e.g. *Impact*, *Priority*). Each owns its own set of states with colors, editable from **Edit options** (the column ⋯, the property ⋯, or right when you create the column). Picking a state sets that column, independently of Status.
+- **Colored, managed tags** — `tags` columns are a multi-select set with colors. Click a cell for a **checklist picker** (toggle tags on/off, or type to create). New tags auto-pick a stable color you can change later; rename / recolor / delete the whole set from **Edit options**, and renames/deletes propagate across every card. Existing tags light up with colors automatically.
+
+**Rich text in cells** — inline Markdown renders everywhere a board shows text: **bold**, *italic*, ~~strike~~, `code`, ==highlight==, links and text color show styled in table cells, the Description column, and kanban card titles, body previews, and field chips. Editing a cell still works on the plain Markdown, so the file content is unchanged. A card **description** is written in the side panel with the full block editor, so it can hold headings, lists, tables, code blocks and pasted rich text — the Description column and kanban preview flatten all of that into one readable line (a code block shows as `code`, a table as its cell values, a list as `a • b • c`) instead of printing the raw syntax. **Selecting a word** while editing a text cell (or a text property in the side panel) pops a small **formatting toolbar** — the board's version of the text bubble menu — with **Bold · Italic · Strikethrough · Inline code · Highlight · Link · Text color**; each wraps your selection in the matching Markdown and your cursor never leaves the cell. (Column / board / field names and the kanban card title are left out on purpose, so styling can't corrupt a column's identity.)
+
+**Locked columns** (gray pill) can be renamed but not moved. Boards round-trip as an HTML comment block + a fenced Markdown table, so the file stays plain text and works with any other Markdown tool. Each board carries a short unique `id` on its start marker — duplicating, copying or inserting a board always gives the new one its own id, so two boards in a file never get mistaken for each other. (If you hand-write or AI-generate a board, give it its own `id` too.)
+
 ### Drag handle
 
-Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. Grab it to drag the whole block to a new position.
+Hover any block (paragraph, heading, list, image, code block, anything) to surface a `⠿` handle in the left gutter. **Drag** it to move the block anywhere; **click** it to open the **block action menu** — the same for every block type. Empty blocks show a hint — "Start writing, or press / for commands" — and pressing `/` on an empty block opens the block picker (⌘/ works everywhere).
+
+- **Turn into** — hover it (or press `→`) to open a **side panel** of convert targets: paragraph, heading, list, quote, code block, **table**, **Board: Table**, or any callout type (the current type is checkmarked), plus a **✨ Using AI** section for targets without a direct converter (Ask AI…, Board: Kanban, Mermaid, Summary, Action items, Outline, Timeline) — it reuses the same clipboard-prompt flow as the bubble menu, scoped to the active block. (Typing in the search box collapses the panels into one flat list, so `h1` still jumps straight to Heading 1.)
+- **Duplicate** — drop an identical copy right below (duplicating a board mints a fresh id, so the copy stays independent and saves cleanly)
+- **Delete** — remove the block
+
+A single search box at the top filters everything at once: leave it empty for the grouped menu, or type to jump straight to an action or a turn-into target (`h1` → Heading 1, `warning` → Warning callout). The `+` button on the handle opens the block picker to insert a new block below.
 
 ### Bubble menu
 
@@ -242,7 +370,7 @@ Hover any block (paragraph, heading, list, image, code block, anything) to surfa
 | --- | --- |
 | **Inline formatting** | Bold, italic, underline, strikethrough, inline code |
 | **Linking & color** | Insert link, text color, highlight color |
-| **Insert** | Emoji picker |
+| **Insert** | Inline equation, emoji picker |
 | **Convert** | "Turn into" submenu. Change paragraph to heading, list, quote, code block, etc. |
 
 ### Frontmatter
@@ -255,12 +383,14 @@ YAML (`---`) and TOML (`+++`) frontmatter is **detected automatically** and hidd
 
 | Shortcut | Action |
 | --- | --- |
+| `/` | Open the block picker on an empty block |
 | `⌘/`  /  `Ctrl+/` | Open the block picker at the cursor |
 | `⌘B`  /  `Ctrl+B` | Bold |
 | `⌘I`  /  `Ctrl+I` | Italic |
 | `⌘U`  /  `Ctrl+U` | Underline |
 | `⌘⇧X`  /  `Ctrl+Shift+X` | Strikethrough |
 | `⌘E`  /  `Ctrl+E` | Inline code |
+| `⌘⇧E`  /  `Ctrl+Shift+E` | Create an inline equation from the selection or at the cursor |
 | `⌘K`  /  `Ctrl+K` | Insert link |
 | `Esc` | Close any open menu / popover |
 
@@ -313,9 +443,10 @@ MD Editor Plus reads and writes **CommonMark** plus the GitHub-flavored extensio
 - Links, autolinks, images
 - HTML passthrough (`<details>`, etc.)
 - GFM callouts: `> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]`
+- KaTeX equations: `$...$`, inline or block `$$...$$`, `\(...\)`, `\[...\]`
 - YAML / TOML frontmatter (preserved, not rendered)
 
-Open the bundled `demo.md` to see every supported block in one place.
+Open the bundled [demo.md](demo.md) to see every supported block in one place.
 
 ---
 

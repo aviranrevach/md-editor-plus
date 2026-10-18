@@ -35,6 +35,7 @@ Keyboard shortcuts that work right now:
 | `⌘U` / `Ctrl+U` | Underline |
 | `⌘⇧X` / `Ctrl+Shift+X` | Strikethrough |
 | `⌘E` / `Ctrl+E` | Inline code |
+| `⌘⇧E` / `Ctrl+Shift+E` | Inline equation |
 | `⌘K` / `Ctrl+K` | Insert link |
 | `⌘/` / `Ctrl+/` | Open block picker |
 
@@ -217,8 +218,9 @@ Local image (extension icon, from `media/`):
 
 ![Logo SVG](media/icon.svg)A reference-style image works too:
 
-![Claude icon](media/claude-icon.svg "Claude theme icon")&gt; \[!NOTE\] 💡
+![Claude icon](media/claude-icon.svg "Claude theme icon")
 
+> [!NOTE] 💡
 > Image paths render relative to the workspace root, so media/icon.png resolves the same way it does on GitHub.
 
 ---
@@ -257,6 +259,37 @@ ToggleToggleCan I use this on .mdx files?Yes — .mdx is registered as a support
 </details>
 \\---
 
+## Whiteboard / Mermaid diagrams
+
+Type `/whiteboard` (or `/mermaid` / `/diagram` / `/flowchart`) to drop a freeform mermaid canvas. The visual-edit palette opens on insert — drag nodes, draw arrows, change shapes, add sticky notes. Round-trips as a plain `` ```mermaid `` code fence.
+
+```mermaid
+flowchart LR
+    A[Idea]
+    B[Next]
+    C[Done]
+    A --> B
+    B --> C
+```
+
+\\---
+
+## Boards (Kanban / Table)
+
+Type `/board kanban` or `/board table` for a project board. Two views over the same data, both round-tripping as an HTML comment block + Markdown table.
+
+<!-- board:start id="b-demo" name="Sprint" columns="Todo|Doing|Done" column-colors="gray|amber|emerald" field-types="Title=text,Status=status,id=text" hidden-fields="id" -->
+
+| Title              | Status | id |
+|--------------------|--------|----|
+| Draft release notes | Todo  | c1 |
+| Polish visual edit  | Doing | c2 |
+| Ship 0.5.0          | Done  | c3 |
+
+<!-- board:end -->
+
+\\---
+
 ## Horizontal rules
 
 The line below is a horizontal rule.
@@ -277,9 +310,23 @@ Backticks in prose: `` `foo` `` renders as `` `foo` ``. An escaped asterisk \*no
 
 ---
 
-## Math-flavored line (just text)
+## Math equations
 
-Inline math isn't a built-in block, but you can write expressions as inline code: `E = mc²`, `∀x ∈ ℝ, f(x) ≥ 0`.
+Inline equations render inside prose: the mass-energy relation is $E = mc^2$, and a fraction can use `$$` shortcuts such as $$\frac{a+b}{c}$$. Click either formula to edit its LaTeX source live.
+
+Chemistry macros from mhchem work too: $\ce{H2O + CO2 -> H2CO3}$ and $\pu{1.23 kg}$.
+
+The following is a block equation. Type `/math`, `/latex`, `/equation`, or `/公式` to open the formula command results: insert a block equation, insert an inline equation at the cursor, or convert the current block into an equation. The highlighted command shows a rendered preview beside the menu.
+
+$$
+\mathrm{AgentState} = (M, H, C)
+$$
+
+Bracket delimiters also round-trip as block equations:
+
+\[
+P = F(\mathrm{AgentState}, E, T)
+\]
 
 ---
 

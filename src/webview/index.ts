@@ -1,11 +1,29 @@
 import lightCss from './styles/notion-light.css';
 import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
-import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly } from './editor';
+import boardCss from './styles/board.css';
+import katexCss from 'katex/dist/katex.min.css';
+import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
+import { computeConflictDiff } from './conflictDiff';
+import { buildConflictDiffPanel } from './conflictDiffView';
+import { decideExternalUpdate } from './syncGuard';
+import { merge3 } from './merge3';
+import { createFindBar, FindBar } from './findBar';
 import { initTheme, applyTheme, ThemeSetting } from './theme';
+import { setAlwaysDarkDiagram } from './mermaidRenderer';
+import { setSmartTypographyEnabled } from './extensions/smartTypography';
 import { initTooltips } from './tooltip';
 import { buildHtmlExport } from './exportHtml';
 import { createOutlinePanel, OutlinePanel } from './outlinePanel';
+import { createStructureMap } from './structureMap';
+import { createDiffMap, type DiffMap } from './diffMap';
+import { initBoardSidePanel } from './boardSidePanel';
+import { setDocumentPath, setWorkspaceName } from './docContext';
+import { createSkillPanel } from './skillPanel';
+import { placeFloating, type PlacementHandle } from './menuPosition';
+import { nextSaveState, describeSaveState, SaveState, SaveEvent } from './saveState';
+import { createReadOnlyController } from './readonlyState';
+import { createReadOnlyNotice } from './readonlyNotice';
 import { common, createLowlight } from 'lowlight';
 
 const lowlight = createLowlight(common);
@@ -64,16 +82,20 @@ interface SavedDefaults {
   pageWidth?: number;
   fullWidth?: boolean;
   alwaysDarkCode?: boolean;
+  alwaysDarkDiagram?: boolean;
   alwaysDarkSource?: boolean;
   sourceFullWidth?: boolean;
   shortenCodeSnippets?: boolean;
+  smartTypography?: boolean;
   outlineVisible?: boolean;
-  readOnly?: boolean;
+  structureMapVisible?: boolean;
   sourceWordWrap?: boolean;
 }
-interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; }
+interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
-type HostMessage = InitMessage | UpdateMessage;
+interface SaveStateMessage { type: 'saveState'; state: 'saving' | 'saved' | 'failed'; flash?: boolean }
+interface DiffBaseMessage { type: 'diffBase'; content: string; label?: string; }
+type HostMessage = InitMessage | UpdateMessage | SaveStateMessage | DiffBaseMessage;
 
 type WidthMode  = 'normal' | 'full';
 type TextSize   = 's' | 'm' | 'l' | 'xl';
@@ -94,19 +116,21 @@ const FACTORY_DEFAULTS = {
   pageWidth:           DEFAULT_WIDTH_PX,
   fullWidth:           false,
   alwaysDarkCode:      false,
+  alwaysDarkDiagram:   false,
   alwaysDarkSource:    false,
   sourceFullWidth:     false,
   shortenCodeSnippets: false,
+  smartTypography:     true,
 };
 
 const DEFAULT_KEYS = [
   'theme', 'font', 'textSize', 'pageWidth', 'fullWidth',
-  'alwaysDarkCode', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets',
+  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets', 'smartTypography',
 ] as const;
 
 function injectStyles(): void {
   const style = document.createElement('style');
-  style.textContent = lightCss + darkCss + editorCss;
+  style.textContent = lightCss + darkCss + katexCss + editorCss + boardCss;
   document.head.appendChild(style);
 }
 
@@ -134,7 +158,7 @@ function init(): void {
     const fresh = editorReady ? getCurrentMarkdown() : currentMarkdown;
     if (fresh !== currentMarkdown) {
       currentMarkdown = fresh;
-      lastSentMarkdown = normalizeMd(fresh);
+      rememberSent(fresh);
       vscode.postMessage({ type: 'edit', markdown: fresh });
     }
     if (sourceEditorReady) {
@@ -143,9 +167,9 @@ function init(): void {
     }
     createSourceEditor(sourceEditorEl, currentMarkdown, (md) => {
       currentMarkdown = md;
-      lastSentMarkdown = normalizeMd(md);
+      rememberSent(md);
       vscode.postMessage({ type: 'edit', markdown: md });
-    });
+    }, () => applySaveEvent('localEdit'));
     sourceEditorReady = true;
   }
 
@@ -156,6 +180,8 @@ function init(): void {
 
   const settingsBtn   = document.getElementById('settings-btn') as HTMLElement;
   const settingsPanel = document.getElementById('settings-panel') as HTMLElement;
+  let settingsPlacement: PlacementHandle | null = null;
+  let dotsPlacement: PlacementHandle | null = null;
   const fullWidthTog  = document.getElementById('full-width-toggle') as HTMLElement;
   const widthSlider   = document.getElementById('width-slider') as HTMLInputElement;
   const widthValue    = document.getElementById('width-value') as HTMLElement;
@@ -163,18 +189,45 @@ function init(): void {
   const pageWidthRow  = document.getElementById('page-width-row') as HTMLElement;
 
   const alwaysDarkCodeToggle = document.getElementById('always-dark-code-toggle') as HTMLElement;
+  const alwaysDarkDiagramToggle = document.getElementById('always-dark-diagram-toggle') as HTMLElement;
   const alwaysDarkSourceToggle = document.getElementById('always-dark-source-toggle') as HTMLElement;
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
-  const readOnlyActionBtn     = document.getElementById('act-toggle-readonly')     as HTMLElement | null;
+  const smartTypographyToggle = document.getElementById('smart-typography-toggle') as HTMLElement;
+  const readOnlyToggle = document.getElementById('readonly-toggle') as HTMLElement | null;
+  const readOnlyPill   = document.getElementById('readonly-pill')   as HTMLElement | null;
+  const readOnlyRow    = document.getElementById('readonly-row')    as HTMLElement | null;
   const sourceWordWrapToggle  = document.getElementById('source-word-wrap-toggle') as HTMLElement | null;
   const refreshBtn            = document.getElementById('refresh-btn')              as HTMLElement | null;
   const openVscodeBtn         = document.getElementById('open-vscode-btn')          as HTMLElement | null;
+
+  const roController = createReadOnlyController({
+    root: document.documentElement,
+    toggleSwitch: readOnlyToggle,
+    pill: readOnlyPill,
+    saveIndicator: document.getElementById('save-indicator'),
+    setEditable: (editable) => setReadOnly(!editable),
+  });
+  const roNotice = createReadOnlyNotice({
+    container: document.body,
+    onEnableEditing: () => applyReadOnly(false),
+  });
+  function applyReadOnly(on: boolean): void {
+    roController.set(on);
+  }
 
   function setAlwaysDarkCode(on: boolean): void {
     document.documentElement.classList.toggle('code-always-dark', on);
     alwaysDarkCodeToggle.classList.toggle('on', on);
     alwaysDarkCodeToggle.setAttribute('aria-checked', String(on));
+    refreshDefaultsButtons();
+  }
+
+  function setAlwaysDarkDiagramState(on: boolean): void {
+    document.documentElement.classList.toggle('diagram-always-dark', on);
+    alwaysDarkDiagramToggle.classList.toggle('on', on);
+    alwaysDarkDiagramToggle.setAttribute('aria-checked', String(on));
+    setAlwaysDarkDiagram(on);
     refreshDefaultsButtons();
   }
 
@@ -202,8 +255,18 @@ function init(): void {
     refreshDefaultsButtons();
   }
 
+  function setSmartTypography(on: boolean): void {
+    setSmartTypographyEnabled(on);
+    smartTypographyToggle.classList.toggle('on', on);
+    smartTypographyToggle.setAttribute('aria-checked', String(on));
+    refreshDefaultsButtons();
+  }
+
   alwaysDarkCodeToggle.addEventListener('click', () => {
     setAlwaysDarkCode(!alwaysDarkCodeToggle.classList.contains('on'));
+  });
+  alwaysDarkDiagramToggle.addEventListener('click', () => {
+    setAlwaysDarkDiagramState(!alwaysDarkDiagramToggle.classList.contains('on'));
   });
   alwaysDarkSourceToggle.addEventListener('click', () => {
     setAlwaysDarkSource(!alwaysDarkSourceToggle.classList.contains('on'));
@@ -214,11 +277,17 @@ function init(): void {
   shortenSnippetsToggle.addEventListener('click', () => {
     setShortenSnippets(!shortenSnippetsToggle.classList.contains('on'));
   });
+  smartTypographyToggle.addEventListener('click', () => {
+    setSmartTypography(!smartTypographyToggle.classList.contains('on'));
+  });
 
-  readOnlyActionBtn?.addEventListener('click', () => {
-    const next = !readOnlyActionBtn.classList.contains('active');
-    applyReadOnly(next);
-    vscode.postMessage({ type: 'saveReadOnly', value: next });
+  // The whole row toggles (the switch inside has pointer-events:none, so a click
+  // anywhere on the row — label or switch — flips read-only exactly once).
+  readOnlyRow?.addEventListener('click', () => {
+    applyReadOnly(!roController.get());
+  });
+  readOnlyPill?.addEventListener('click', () => {
+    applyReadOnly(false);
   });
 
   function applySourceWordWrap(on: boolean): void {
@@ -242,24 +311,107 @@ function init(): void {
     vscode.postMessage({ type: 'openInVscodeEditor' });
   });
 
+  document.getElementById('diff-btn')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openFullDiff', markdown: getCurrentMarkdown() });
+  });
+
   // External-edit conflict banner. Rendered once and toggled via 'visible'.
   const conflictBanner = document.createElement('div');
   conflictBanner.id = 'conflict-banner';
   conflictBanner.className = 'conflict-banner';
+  // Phosphor icons (regular weight, 256 viewBox) — matches the rest of the UI.
+  const iConflictCaret = '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z"/></svg>';
+  const iConflictWarn = '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09Zm-13.87,15.71a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></svg>';
   conflictBanner.innerHTML = `
-    <span class="conflict-banner-icon" aria-hidden="true">⚠</span>
-    <span class="conflict-banner-text">This file was changed outside the editor while you have unsaved changes.</span>
-    <button type="button" class="conflict-banner-btn primary" id="conflict-reload">Reload from disk</button>
-    <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
+    <div class="conflict-bar">
+      <button type="button" class="conflict-reveal" id="conflict-reveal" aria-expanded="false">
+        <span class="conflict-chevron">${iConflictCaret}</span>
+        <span class="conflict-count"></span>
+      </button>
+      <span class="conflict-banner-icon" aria-hidden="true">${iConflictWarn}</span>
+      <span class="conflict-banner-text">This file was changed outside the editor while you have unsaved changes.</span>
+      <button type="button" class="conflict-banner-btn primary" id="conflict-reload">Reload from disk</button>
+      <button type="button" class="conflict-banner-btn" id="conflict-keep">Keep my version</button>
+    </div>
+    <div class="conflict-panel" id="conflict-panel" hidden></div>
   `;
   document.body.appendChild(conflictBanner);
+
+  const conflictReveal = conflictBanner.querySelector<HTMLElement>('#conflict-reveal');
+  const conflictPanel  = conflictBanner.querySelector<HTMLElement>('#conflict-panel');
+  const conflictCountLabel = conflictReveal?.querySelector<HTMLElement>('.conflict-count') ?? null;
+  let conflictCount = 0; // total changed lines for the current conflict
+
+  // The chevron + "N changes" red pill together are the reveal toggle. The chevron
+  // (a real Phosphor caret) rotates via CSS on aria-expanded; the pill shows the count.
+  function renderRevealPill(open: boolean): void {
+    if (conflictCountLabel) {
+      conflictCountLabel.textContent = `${conflictCount} change${conflictCount === 1 ? '' : 's'}`;
+    }
+    conflictReveal?.setAttribute('aria-expanded', String(open));
+  }
+
+  function setRevealOpen(open: boolean): void {
+    if (!conflictPanel) return;
+    if (open) conflictPanel.removeAttribute('hidden');
+    else conflictPanel.setAttribute('hidden', '');
+    renderRevealPill(open);
+  }
+
+  // Build the (collapsed) diff panel for the current conflict. Computed once per
+  // conflict — not on every keystroke. Both versions are in hand at conflict time.
+  // (The future full diff viewer — c24 — will hang off this same panel.)
+  function renderConflictPanel(yours: string, disk: string): void {
+    if (!conflictPanel) return;
+    // computeConflictDiff normalizes CRLF / trailing blanks internally — pass raw.
+    const diff = computeConflictDiff(yours, disk);
+    conflictCount = diff.rows.length + diff.truncated;
+    conflictPanel.replaceChildren(buildConflictDiffPanel(diff, {
+      onOpenFullDiff: () => vscode.postMessage({ type: 'openFullDiff', baseContent: disk, baseLabel: 'On disk', markdown: getCurrentMarkdown() }),
+    }));
+    setRevealOpen(false); // collapsed by default
+  }
+
+  conflictReveal?.addEventListener('click', () => {
+    setRevealOpen(conflictPanel?.hasAttribute('hidden') ?? false);
+  });
+
+  let saveState: SaveState = 'saved';
+  const saveIndicatorEl = document.getElementById('save-indicator');
+  let flashTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function renderSaveIndicator(flash: boolean): void {
+    if (!saveIndicatorEl) return;
+    const v = describeSaveState(saveState);
+    saveIndicatorEl.textContent = `${v.glyph} ${v.label}`;
+    saveIndicatorEl.className = `save-indicator ${v.cssClass}${flash ? ' save-ind-flash' : ''}`;
+    if (flash) {
+      if (flashTimer) clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => saveIndicatorEl.classList.remove('save-ind-flash'), 1000);
+    }
+  }
+
+  function applySaveEvent(event: SaveEvent, flash = false): void {
+    const prev = saveState;
+    saveState = nextSaveState(saveState, event);
+    if (saveState !== prev || flash) renderSaveIndicator(flash);
+  }
+
+  renderSaveIndicator(false); // show "✓ Saved" from the moment the file opens
+
   function showConflictBanner(): void {
     conflictBanner.classList.add('visible');
     document.documentElement.classList.add('conflict-active');
+    applySaveEvent('conflictDetected');
+    vscode.postMessage({ type: 'conflictPause', paused: true });
   }
   function hideConflictBanner(): void {
     conflictBanner.classList.remove('visible');
     document.documentElement.classList.remove('conflict-active');
+    conflictPanel?.replaceChildren();
+    setRevealOpen(false);
+    applySaveEvent('conflictResolved');
+    vscode.postMessage({ type: 'conflictPause', paused: false });
   }
   conflictBanner.querySelector('#conflict-reload')?.addEventListener('click', () => {
     if (pendingExternalMarkdown === null) { hideConflictBanner(); return; }
@@ -267,7 +419,7 @@ function init(): void {
     pendingExternalMarkdown = null;
     hideConflictBanner();
     currentMarkdown = md;
-    lastSentMarkdown = normalizeMd(md);
+    rememberSent(md);
     updateContent(md);
     if (sourceMode && sourceEditorReady) updateSourceContent(md);
   });
@@ -276,16 +428,31 @@ function init(): void {
     hideConflictBanner();
     // Push our current version back so disk catches up on next save.
     const ours = getCurrentMarkdown();
-    lastSentMarkdown = normalizeMd(ours);
+    rememberSent(ours);
     vscode.postMessage({ type: 'edit', markdown: ours });
   });
 
   let editorReady     = false;
   let currentMarkdown = '';
   let lastSentMarkdown: string | null = null;
+  // A short window of recently-sent versions. A leaked host echo can arrive late
+  // and out of order (c41) — matching only lastSentMarkdown misses a stale echo
+  // of an earlier send, which then looks like an external conflict. rememberSent
+  // is the single place both are updated.
+  const recentSentMarkdowns: string[] = [];
+  const RECENT_SENT_MAX = 10;
+  function rememberSent(md: string): void {
+    const n = normalizeMd(md);
+    lastSentMarkdown = n;
+    if (recentSentMarkdowns[recentSentMarkdowns.length - 1] !== n) {
+      recentSentMarkdowns.push(n);
+      if (recentSentMarkdowns.length > RECENT_SENT_MAX) recentSentMarkdowns.shift();
+    }
+  }
   let pendingExternalMarkdown: string | null = null;
   let sourceMode      = false;
   let widthMode: WidthMode = 'normal';
+  let findBar: FindBar | null = null;
 
   function setView(mode: 'preview' | 'source'): void {
     const targetSource = mode === 'source';
@@ -300,7 +467,7 @@ function init(): void {
       const md = getSourceMarkdown();
       if (md !== currentMarkdown) {
         currentMarkdown = md;
-        lastSentMarkdown = normalizeMd(md);
+        rememberSent(md);
         vscode.postMessage({ type: 'edit', markdown: md });
       }
     }
@@ -333,6 +500,13 @@ function init(): void {
       // returning to preview, so any external edits applied while in code
       // view are reflected.
       if (editorReady) updateContent(currentMarkdown);
+    }
+
+    // If find is open, move the search over to the now-active editor and clear
+    // it on the one we just left.
+    if (findBar?.isOpen()) {
+      const previousEditor = sourceMode ? getEditor() : getSourceEditor();
+      findBar.retarget(previousEditor);
     }
   }
 
@@ -505,21 +679,28 @@ function init(): void {
     toolbarEl.classList.toggle('panel-open', open);
   }
 
-  const submenuExport = document.getElementById('actions-submenu-export') as HTMLElement;
+  const submenuExport = document.getElementById('actions-submenu-export') as HTMLElement | null;
   let submenuOpenTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
   let submenuAnchor: HTMLElement | null = null;
+  let openSubmenuEl: HTMLElement | null = null;
 
+  function submenuElFor(trigger: HTMLElement): HTMLElement | null {
+    const name = trigger.dataset.submenu;
+    return name ? document.getElementById(`actions-submenu-${name}`) : null;
+  }
   function clearSubmenuTimers(): void {
     if (submenuOpenTimer) { clearTimeout(submenuOpenTimer); submenuOpenTimer = null; }
     if (submenuCloseTimer) { clearTimeout(submenuCloseTimer); submenuCloseTimer = null; }
   }
   function positionSubmenu(trigger: HTMLElement): void {
+    const sub = submenuElFor(trigger);
+    if (!sub) return;
     const triggerRect = trigger.getBoundingClientRect();
-    submenuExport.style.left = '0px';
-    submenuExport.style.top = '0px';
-    submenuExport.classList.remove('hidden');
-    const subRect = submenuExport.getBoundingClientRect();
+    sub.style.left = '0px';
+    sub.style.top = '0px';
+    sub.classList.remove('hidden');
+    const subRect = sub.getBoundingClientRect();
     // Default: align top edge of submenu with top edge of trigger row,
     // and position to the right of the parent actions panel.
     const panel = trigger.closest('.actions-panel') as HTMLElement | null;
@@ -533,20 +714,26 @@ function init(): void {
       top = Math.max(8, window.innerHeight - subRect.height - 8);
     }
     if (top < 8) top = 8;
-    submenuExport.style.left = `${left}px`;
-    submenuExport.style.top = `${top}px`;
+    sub.style.left = `${left}px`;
+    sub.style.top = `${top}px`;
   }
   function openSubmenu(trigger: HTMLElement): void {
     clearSubmenuTimers();
+    const sub = submenuElFor(trigger);
+    if (!sub) return;
+    // Close any other submenu that's currently showing.
+    if (openSubmenuEl && openSubmenuEl !== sub) openSubmenuEl.classList.add('hidden');
     submenuAnchor = trigger;
-    document.querySelectorAll<HTMLElement>('.act-export-menu')
+    openSubmenuEl = sub;
+    document.querySelectorAll<HTMLElement>('[data-submenu]')
       .forEach((el) => el.classList.toggle('submenu-open', el === trigger));
     positionSubmenu(trigger);
   }
   function closeSubmenu(): void {
     clearSubmenuTimers();
-    submenuExport.classList.add('hidden');
-    document.querySelectorAll<HTMLElement>('.act-export-menu')
+    if (openSubmenuEl) openSubmenuEl.classList.add('hidden');
+    openSubmenuEl = null;
+    document.querySelectorAll<HTMLElement>('[data-submenu]')
       .forEach((el) => el.classList.remove('submenu-open'));
     submenuAnchor = null;
   }
@@ -562,11 +749,16 @@ function init(): void {
     submenuCloseTimer = setTimeout(closeSubmenu, 250);
   }
 
-  submenuExport.addEventListener('mouseenter', () => clearSubmenuTimers());
-  submenuExport.addEventListener('mouseleave', scheduleSubmenuClose);
+  // Keep any submenu open while the pointer is over it; close on leave.
+  document.querySelectorAll<HTMLElement>('.actions-submenu').forEach((sub) => {
+    sub.addEventListener('mouseenter', () => clearSubmenuTimers());
+    sub.addEventListener('mouseleave', scheduleSubmenuClose);
+  });
 
   function closeDotsPanel(): void {
     actionsPanelDots.classList.add('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = null;
     closeSubmenu();
     actionsBtn.classList.remove('active');
     syncToolbarPanelState();
@@ -583,26 +775,36 @@ function init(): void {
   }
   function closeSettingsPanel(): void {
     settingsPanel.classList.add('hidden');
+    settingsPlacement?.destroy();
+    settingsPlacement = null;
     settingsBtn.classList.remove('active');
     syncToolbarPanelState();
   }
 
+  // Single skill panel instance shared by both actions panels (wide + narrow).
+  const skillPanel = createSkillPanel();
+
   // Wire up action buttons inside both panels (each panel has its own DOM)
   function bindActions(panel: HTMLElement): void {
-    const exportTrigger = panel.querySelector<HTMLElement>('.act-export-menu');
-    exportTrigger?.addEventListener('mouseenter', () => scheduleSubmenuOpen(exportTrigger));
-    exportTrigger?.addEventListener('mouseleave', scheduleSubmenuClose);
-    // Click as an accessibility fallback (keyboard/Enter, touch).
-    exportTrigger?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (submenuAnchor === exportTrigger) closeSubmenu();
-      else openSubmenu(exportTrigger);
+    panel.querySelectorAll<HTMLElement>('[data-submenu]').forEach((trigger) => {
+      trigger.addEventListener('mouseenter', () => scheduleSubmenuOpen(trigger));
+      trigger.addEventListener('mouseleave', scheduleSubmenuClose);
+      // Click as an accessibility fallback (keyboard/Enter, touch).
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (submenuAnchor === trigger) closeSubmenu();
+        else openSubmenu(trigger);
+      });
     });
-    // Hovering any other row in the panel should dismiss the submenu so it
-    // doesn't linger over the wrong row.
+    // Hovering any non-submenu row should dismiss an open submenu so it doesn't
+    // linger over the wrong row.
     panel.querySelectorAll<HTMLElement>('.settings-action').forEach((el) => {
-      if (el === exportTrigger) return;
+      if (el.hasAttribute('data-submenu')) return;
       el.addEventListener('mouseenter', scheduleSubmenuClose);
+    });
+    panel.querySelector<HTMLElement>('.act-refresh')?.addEventListener('click', () => {
+      vscode.postMessage({ type: 'refresh' });
+      closeAllActionsPanels();
     });
     panel.querySelector<HTMLElement>('.act-copy')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'copyContent' });
@@ -616,9 +818,18 @@ function init(): void {
       vscode.postMessage({ type: 'duplicate' });
       closeAllActionsPanels();
     });
+    panel.querySelector<HTMLElement>('.act-blocks-skill')?.addEventListener('click', () => {
+      skillPanel.open();
+      closeAllActionsPanels();
+    });
     panel.querySelector<HTMLElement>('.act-finder')?.addEventListener('click', () => {
       vscode.postMessage({ type: 'openInFinder' });
       closeAllActionsPanels();
+    });
+    panel.querySelector<HTMLElement>('.act-find')?.addEventListener('click', () => {
+      closeAllActionsPanels();
+      closeSettingsPanel();
+      findBar?.open();
     });
   }
   bindActions(actionsPanelDots);
@@ -641,16 +852,25 @@ function init(): void {
     const fullWidth = widthMode === 'full';
     return { filename, themeClasses, editorClasses, pageWidthPx, fullWidth };
   }
-  submenuExport.querySelector<HTMLElement>('.act-export-html')?.addEventListener('click', () => {
+  submenuExport?.querySelector<HTMLElement>('.act-export-html')?.addEventListener('click', () => {
     const ctx = buildExportContext();
     const html = buildHtmlExport(editorEl, ctx);
     vscode.postMessage({ type: 'exportHtml', html });
     closeAllActionsPanels();
   });
-  submenuExport.querySelector<HTMLElement>('.act-export-pdf')?.addEventListener('click', () => {
+  submenuExport?.querySelector<HTMLElement>('.act-export-pdf')?.addEventListener('click', () => {
     const ctx = buildExportContext();
     const html = buildHtmlExport(editorEl, ctx);
     vscode.postMessage({ type: 'exportPdf', html, filename: ctx.filename });
+    closeAllActionsPanels();
+  });
+  const submenuOpen = document.getElementById('actions-submenu-open') as HTMLElement | null;
+  submenuOpen?.querySelector<HTMLElement>('.act-open-clipboard')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'openFromClipboard' });
+    closeAllActionsPanels();
+  });
+  submenuOpen?.querySelector<HTMLElement>('.act-browse-markdown')?.addEventListener('click', () => {
+    vscode.postMessage({ type: 'browseMarkdown' });
     closeAllActionsPanels();
   });
 
@@ -658,8 +878,16 @@ function init(): void {
   settingsBtn.addEventListener('click', e => {
     e.stopPropagation();
     closeAllActionsPanels();
+    findBar?.close();
     settingsPanel.classList.toggle('hidden');
     settingsBtn.classList.toggle('active');
+    if (!settingsPanel.classList.contains('hidden')) {
+      settingsPlacement?.destroy();
+      settingsPlacement = placeFloating(settingsPanel, settingsBtn, { preferX: 'right' });
+    } else {
+      settingsPlacement?.destroy();
+      settingsPlacement = null;
+    }
     syncToolbarPanelState();
   });
 
@@ -667,7 +895,10 @@ function init(): void {
   function openDotsPanel(): void {
     closeSettingsPanel();
     closeFilenamePanel();
+    findBar?.close();
     actionsPanelDots.classList.remove('hidden');
+    dotsPlacement?.destroy();
+    dotsPlacement = placeFloating(actionsPanelDots, actionsBtn, { preferX: 'right' });
     actionsBtn.classList.add('active');
     syncToolbarPanelState();
   }
@@ -686,6 +917,7 @@ function init(): void {
   function openFilenamePanel(): void {
     closeSettingsPanel();
     closeDotsPanel();
+    findBar?.close();
     actionsPanelFile.classList.remove('hidden');
     filenameEl?.classList.add('active');
     syncToolbarPanelState();
@@ -724,13 +956,13 @@ function init(): void {
     if (!actionsPanelDots.classList.contains('hidden')
         && !actionsPanelDots.contains(t)
         && !actionsBtn.contains(t)
-        && !submenuExport.contains(t)) {
+        && !(t instanceof Element && t.closest('.actions-submenu'))) {
       closeDotsPanel();
     }
     if (!actionsPanelFile.classList.contains('hidden')
         && !actionsPanelFile.contains(t)
         && !(filenameEl?.contains(t))
-        && !submenuExport.contains(t)) {
+        && !(t instanceof Element && t.closest('.actions-submenu'))) {
       closeFilenamePanel();
     }
   });
@@ -751,21 +983,24 @@ function init(): void {
     applyPageWidth();
     setWidth(d.fullWidth ? 'full' : 'normal');
     setAlwaysDarkCode(Boolean(d.alwaysDarkCode));
+    setAlwaysDarkDiagramState(Boolean(d.alwaysDarkDiagram));
     setAlwaysDarkSource(Boolean(d.alwaysDarkSource));
     setSourceFullWidth(Boolean(d.sourceFullWidth));
     setShortenSnippets(Boolean(d.shortenCodeSnippets));
-    applyReadOnly(Boolean(d.readOnly));
+    setSmartTypography(d.smartTypography ?? true); // default ON (unlike the Boolean()-defaulted toggles above)
+    applyReadOnly(false);
     applySourceWordWrap(Boolean(d.sourceWordWrap));
   }
 
-  function applyReadOnly(on: boolean): void {
-    document.documentElement.classList.toggle('read-only', on);
-    if (readOnlyActionBtn) {
-      readOnlyActionBtn.classList.toggle('active', on);
-      readOnlyActionBtn.setAttribute('aria-pressed', String(on));
-    }
-    setReadOnly(on);
-  }
+  document.addEventListener('keydown', (e) => {
+    if (!roController.get()) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // shortcuts aren't edits
+    const isEdit = e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete';
+    if (!isEdit) return;
+    const t = e.target as HTMLElement | null;
+    if (!t?.closest('.ProseMirror, .bd-table-cell, .board-panel-body')) return;
+    roNotice.show();
+  }, true);
 
   let savedDefaults: SavedDefaults = { ...FACTORY_DEFAULTS };
 
@@ -808,9 +1043,11 @@ function init(): void {
       pageWidth:           parseInt(widthSlider.value, 10) || DEFAULT_WIDTH_PX,
       fullWidth:           widthMode === 'full',
       alwaysDarkCode:      alwaysDarkCodeToggle.classList.contains('on'),
+      alwaysDarkDiagram:   alwaysDarkDiagramToggle.classList.contains('on'),
       alwaysDarkSource:    alwaysDarkSourceToggle.classList.contains('on'),
       sourceFullWidth:     sourceFullWidthToggle.classList.contains('on'),
       shortenCodeSnippets: shortenSnippetsToggle.classList.contains('on'),
+      smartTypography:     smartTypographyToggle.classList.contains('on'),
     };
   }
 
@@ -829,6 +1066,8 @@ function init(): void {
     refreshDefaultsButtons();
   });
 
+  let diffMap: DiffMap | null = null;
+
   window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
     const msg = event.data;
 
@@ -836,16 +1075,47 @@ function init(): void {
       try {
       currentMarkdown = msg.markdown;
       if (msg.mediaBaseUri) setMediaBaseUri(msg.mediaBaseUri);
+      setDocumentPath(msg.documentPath ?? '');
+      setWorkspaceName(msg.workspaceName ?? null);
       savedDefaults = { ...FACTORY_DEFAULTS, ...(msg.defaults ?? {}) };
       applyDefaults(msg.defaults ?? {});
       refreshDefaultsButtons();
       const editorInstance = createEditor(editorEl, msg.markdown, (markdown) => {
         currentMarkdown = markdown;
-        lastSentMarkdown = normalizeMd(markdown);
+        rememberSent(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);
         vscode.postMessage({ type: 'edit', markdown });
-      });
+        diffMap?.recompute();
+      }, () => applySaveEvent('localEdit'));
       editorReady = true;
+      initBoardSidePanel();
+
+      // In-document find. The webview is a custom editor, so VS Code's native
+      // Cmd/Ctrl+F never reaches this content — we run our own find bar over
+      // whichever editor (preview or source) is currently active.
+      findBar = createFindBar({
+        getActiveEditor: () => (sourceMode ? getSourceEditor() : getEditor()),
+      });
+      document.addEventListener('keydown', (e) => {
+        const mod = e.metaKey || e.ctrlKey;
+        if (mod && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F')) {
+          e.preventDefault();
+          // Find and the dropdowns share the same spot — never show both.
+          closeAllActionsPanels();
+          closeSettingsPanel();
+          findBar?.open();
+        }
+        if (mod && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          flushPendingEdit();
+          // Read the ACTIVE editor — in Code view the latest text lives in the
+          // source editor, not the preview one.
+          const md = sourceMode ? getSourceMarkdown() : getCurrentMarkdown();
+          currentMarkdown = md;
+          rememberSent(md);
+          vscode.postMessage({ type: 'save', markdown: md });
+        }
+      });
 
       try {
         const outlineBtn   = document.getElementById('outline-btn') as HTMLElement | null;
@@ -872,31 +1142,131 @@ function init(): void {
       } catch (err) {
         console.error('[md-editor-plus] outline init failed', err);
       }
+
+      try {
+        const mapBtn  = document.getElementById('structure-map-btn') as HTMLElement | null;
+        const mapRail = document.getElementById('structure-map') as HTMLElement | null;
+        if (mapBtn && mapRail) {
+          const map = createStructureMap({
+            editor: editorInstance,
+            railEl: mapRail,
+            toggleBtn: mapBtn,
+            initialVisible: Boolean(msg.defaults?.structureMapVisible),
+            onVisibilityChange: (visible) => {
+              vscode.postMessage({ type: 'saveStructureMapVisible', value: visible });
+            },
+          });
+          mapBtn.addEventListener('click', () => map.setVisible(!map.isVisible()));
+        }
+      } catch (err) {
+        console.error('[md-editor-plus] structure map init failed', err);
+      }
+
+      try {
+        const mapRail = document.getElementById('structure-map') as HTMLElement | null;
+        if (mapRail) {
+          diffMap = createDiffMap({ editor: editorInstance, railEl: mapRail });
+        }
+      } catch (err) {
+        console.error('[md-editor-plus] diff map init failed', err);
+      }
       } catch (err) {
         console.error('[md-editor-plus] INIT FAILED', err);
         document.body.innerHTML = '<pre style="padding:20px;color:#c44">md-editor-plus init failed:\n\n' + String(err && (err as Error).stack || err) + '</pre>';
       }
     }
 
+    if (msg.type === 'saveState') {
+      const event: SaveEvent =
+        msg.state === 'saving' ? 'saveStarted' :
+        msg.state === 'saved'  ? 'saveSucceeded' :
+                                 'saveFailed';
+      applySaveEvent(event, Boolean(msg.flash));
+      return;
+    }
+
+    if (msg.type === 'diffBase') {
+      diffMap?.setBase(typeof msg.content === 'string' ? msg.content : '');
+      return;
+    }
+
     if (msg.type === 'update' && editorReady) {
-      // Skip the round-trip echo of our own edit — re-running setContent
-      // forces lowlight to re-tokenize, which briefly clears syntax colors.
-      // Compare normalized (VS Code may rewrite trailing whitespace / line endings).
-      if (lastSentMarkdown !== null && normalizeMd(msg.markdown) === lastSentMarkdown) {
+      // The decision (echo / data-loss guard / conflict / apply) is a pure
+      // function so it can be unit-tested without the DOM. Compare normalized —
+      // VS Code may rewrite trailing whitespace / line endings.
+      const decision = decideExternalUpdate({
+        incoming:      normalizeMd(msg.markdown),
+        editorCurrent: normalizeMd(getCurrentMarkdown()),
+        lastSent:      lastSentMarkdown,
+        recentSent:    recentSentMarkdowns,
+        isRefresh:     msg.source === 'refresh',
+      });
+
+      if (decision === 'dedup') {
+        // Echo of our own edit. Re-running setContent would force lowlight to
+        // re-tokenize, briefly clearing syntax colors — so don't.
+        // A STALE self-echo (matches a recent send but not the latest) is a
+        // leaked host echo of an earlier edit arriving after lastSent advanced —
+        // the c41 phantom-conflict trigger. Don't adopt it as currentMarkdown; a
+        // pending edit is the real latest, so leaving the editor untouched is
+        // correct. Only a fresh echo (== lastSent) updates currentMarkdown.
+        if (normalizeMd(msg.markdown) !== lastSentMarkdown) return;
         currentMarkdown = msg.markdown;
         if (sourceMode && sourceEditorReady) updateSourceContent(msg.markdown);
         return;
       }
-      // Conflict detection: the external content differs from what we last
-      // sent, AND the editor has unsent local edits queued in the 500ms
-      // debounce. Don't silently overwrite — surface a banner so the user
-      // picks. The 'refresh' source skips this check (user-initiated reload).
-      const editorCurrent = normalizeMd(getCurrentMarkdown());
-      const localDirty = lastSentMarkdown !== null && editorCurrent !== lastSentMarkdown;
-      if (localDirty && msg.source !== 'refresh') {
+
+      if (decision === 'restore-content') {
+        // DATA-LOSS GUARD. An empty 'update' would have wiped a non-empty
+        // editor (a race can deliver one right after open). Keep the editor as
+        // it is and re-assert our content so a spuriously-emptied host document
+        // / on-disk file is corrected on the next save.
+        const ours = getCurrentMarkdown();
+        console.warn(
+          '[md-editor-plus] data-loss guard: ignored an empty external update ' +
+          'that would have wiped the editor; re-asserting content',
+          { editorChars: ours.length, hadLocalEdit: lastSentMarkdown !== null },
+        );
+        currentMarkdown = ours;
+        rememberSent(ours);
+        vscode.postMessage({ type: 'edit', markdown: ours });
+        return;
+      }
+
+      if (decision === 'conflict') {
+        // c28-part-2: if our unsent edits and the external change touch DISJOINT
+        // lines, merge them silently (base = last-sent = the common ancestor)
+        // instead of interrupting. Any overlap / no base → merge3 returns null
+        // and we fall back to the banner.
+        const merged = lastSentMarkdown !== null
+          ? merge3(lastSentMarkdown, normalizeMd(getCurrentMarkdown()), normalizeMd(msg.markdown))
+          : null;
+        if (merged !== null) {
+          currentMarkdown = merged;
+          rememberSent(merged);
+          updateContent(merged);
+          if (sourceMode && sourceEditorReady) updateSourceContent(merged);
+          vscode.postMessage({ type: 'edit', markdown: merged });
+          return;
+        }
+        // True overlap — surface the banner so the user picks.
         pendingExternalMarkdown = msg.markdown;
+        renderConflictPanel(getCurrentMarkdown(), msg.markdown);
         showConflictBanner();
         return;
+      }
+
+      // Gap B diagnostic: applying an external update that DIFFERS from what the
+      // editor shows, while the user has edited this session (lastSent set), means
+      // we are about to overwrite the editor — the suspected silent-revert path.
+      // Logged (not changed) so a live repro can confirm whether this is what
+      // eats freshly-added board rows before they reach disk.
+      if (lastSentMarkdown !== null && normalizeMd(msg.markdown) !== normalizeMd(getCurrentMarkdown())) {
+        console.warn(
+          '[md-editor-plus] sync: APPLYING a differing external update over local edits ' +
+          '(possible silent revert — Gap B). If board rows vanish here, this is why.',
+          { incomingChars: msg.markdown.length, editorChars: getCurrentMarkdown().length, source: msg.source ?? null },
+        );
       }
       pendingExternalMarkdown = null;
       hideConflictBanner();
@@ -905,6 +1275,21 @@ function init(): void {
       if (sourceMode && sourceEditorReady) updateSourceContent(msg.markdown);
     }
   });
+
+  // Handshake: the host posts 'init' (carrying the markdown) only after it
+  // hears this. Without it, the host could fire 'init' before this listener
+  // exists — VS Code drops messages to a webview that isn't listening yet,
+  // leaving the editor uninitialized and the page blank. Must be the last
+  // thing init() does, so the listener above is guaranteed registered first.
+
+  // Never lose the last keystrokes: flush the pending edit on any teardown signal.
+  window.addEventListener('blur', () => flushPendingEdit());
+  window.addEventListener('pagehide', () => flushPendingEdit());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingEdit();
+  });
+
+  vscode.postMessage({ type: 'ready' });
 }
 
 document.addEventListener('DOMContentLoaded', init);

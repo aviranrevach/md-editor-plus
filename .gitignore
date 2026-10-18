@@ -3,3 +3,11 @@ dist/
 dist-webview/
 *.vsix
 .superpowers/
+
+# OS junk + tooling artifacts
+.DS_Store
+**/.DS_Store
+.playwright-mcp/
+
+# Dev-loop screenshots in the repo root (legit assets live in media/)
+/*.png
