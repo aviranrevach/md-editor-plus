@@ -489,6 +489,29 @@ Storage is plain Markdown — no special tokens, no frontmatter required. Direct
 
 ---
 
+## Development
+
+```bash
+git clone https://github.com/aviranrevach/md-editor-plus.git
+cd md-editor-plus
+npm install
+```
+
+**Run from source:** open the folder in VS Code and press **F5** (Run and Debug → "Run Extension"). It builds, then opens an Extension Development Host window with the extension loaded. Open any `.md` file there with MD Editor Plus. After a change, run `npm run compile` (or keep `npm run watch` running) and reload the host window with `Cmd/Ctrl+R`.
+
+**Install a local build** into your regular VS Code:
+
+```bash
+npm run package        # creates md-editor-plus-<version>.vsix
+code --install-extension md-editor-plus-<version>.vsix --force
+```
+
+Use `code-insiders` or `cursor` instead of `code` for those editors, then reload the window.
+
+**Tests:** `npm test`. See [PUBLISHING.md](PUBLISHING.md) for releasing.
+
+---
+
 ## Release notes
 
 See [CHANGELOG.md](CHANGELOG.md).
