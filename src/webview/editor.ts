@@ -29,7 +29,7 @@ import { createBubbleMenu } from './bubbleMenu';
 import { initBoardFormatToolbar } from './boardFormatToolbar';
 import { createImageBubbleMenu } from './imageBubbleMenu';
 import { createBlockHandle } from './blockHandle';
-import { splitFrontmatter, frontmatterInfo } from './frontmatter';
+import { splitFrontmatter, frontmatterInfo, parseFrontmatterFields, type FrontmatterField } from './frontmatter';
 import SearchExtension from './searchExtension';
 import ImagePasteDrop from './extensions/imagePasteDrop';
 import ClickBelowContent from './extensions/clickBelowContent';
@@ -139,6 +139,10 @@ export function setFrontmatterChangeListener(
   fn: (info: { lines: number; kind: 'yaml' | 'toml' | 'none' }) => void,
 ): void {
   _onFrontmatterChange = fn;
+}
+
+export function getFrontmatterFields(): FrontmatterField[] {
+  return parseFrontmatterFields(_frontmatter);
 }
 
 function notifyFrontmatterChange(): void {

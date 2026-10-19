@@ -229,6 +229,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           smartTypography:     cfg.get<boolean>('smartTypography', true),
           outlineVisible:      cfg.get<boolean>('outlineVisible', false),
           structureMapVisible: cfg.get<boolean>('structureMapVisible', false),
+          frontmatterVisible:  cfg.get<boolean>('frontmatterVisible', true),
           sourceWordWrap:      cfg.get<boolean>('sourceWordWrap', false),
         },
       });
@@ -552,6 +553,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         if (typeof value !== 'boolean') return;
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
         await cfg.update('structureMapVisible', value, vscode.ConfigurationTarget.Global);
+        return;
+      }
+      if (msg.type === 'saveFrontmatterVisible') {
+        const value = (msg as unknown as { value?: unknown }).value;
+        if (typeof value !== 'boolean') return;
+        const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
+        await cfg.update('frontmatterVisible', value, vscode.ConfigurationTarget.Global);
         return;
       }
       if (msg.type === 'saveSourceWordWrap') {
@@ -917,6 +925,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     const iDownload = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M228,144v64a12,12,0,0,1-12,12H40a12,12,0,0,1-12-12V144a12,12,0,0,1,24,0v52H204V144a12,12,0,0,1,24,0Zm-108.49,8.49a12,12,0,0,0,17,0l40-40a12,12,0,0,0-17-17L140,115V32a12,12,0,0,0-24,0v83L96.49,95.51a12,12,0,0,0-17,17Z"/></svg>`;
     const iOutline = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="22" stroke-linecap="round" viewBox="0 0 256 256"><line x1="40" y1="64" x2="60" y2="64"/><line x1="100" y1="64" x2="216" y2="64"/><line x1="80" y1="128" x2="100" y2="128"/><line x1="140" y1="128" x2="216" y2="128"/><line x1="80" y1="192" x2="100" y2="192"/><line x1="140" y1="192" x2="216" y2="192"/></svg>`;
     const iVscode = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 100 100"><path fill-rule="evenodd" clip-rule="evenodd" d="M70.9119 99.3171C72.4869 99.9307 74.2828 99.8914 75.8725 99.1264L96.4608 89.2197C98.6242 88.1787 100 85.9892 100 83.5872V16.4133C100 14.0113 98.6243 11.8218 96.4609 10.7808L75.8725 0.873756C73.7862 -0.130129 71.3446 0.11576 69.5135 1.44695C69.252 1.63711 69.0028 1.84943 68.769 2.08341L29.3551 38.0415L12.1872 25.0096C10.589 23.7965 8.35363 23.8959 6.86933 25.2461L1.36303 30.2549C-0.452552 31.9064 -0.454633 34.7627 1.35853 36.417L16.2471 50.0001L1.35853 63.5832C-0.454633 65.2374 -0.452552 68.0938 1.36303 69.7453L6.86933 74.7541C8.35363 76.1043 10.589 76.2037 12.1872 74.9905L29.3551 61.9587L68.769 97.9167C69.3925 98.5406 70.1246 99.0104 70.9119 99.3171ZM75.0152 27.2989L45.1091 50.0001L75.0152 72.7012V27.2989Z"/></svg>`;
+    const iFrontmatter = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 256 256"><rect x="32" y="48" width="192" height="64" rx="14"/><line x1="64" y1="80" x2="104" y2="80"/><line x1="128" y1="80" x2="192" y2="80"/><line x1="32" y1="160" x2="224" y2="160"/><line x1="32" y1="208" x2="160" y2="208"/></svg>`;
     const iStructureMap = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="20" stroke-linecap="round" viewBox="0 0 256 256"><line x1="176" y1="52" x2="216" y2="52"/><line x1="176" y1="100" x2="204" y2="100"/><line x1="176" y1="148" x2="216" y2="148"/><line x1="176" y1="196" x2="204" y2="196"/><rect x="40" y="84" width="80" height="88" rx="10" fill="currentColor" fill-opacity="0.18" stroke-width="16"/></svg>`;
     const iRefresh = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg>`;
     const iLock = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M208,76H180V56A52,52,0,0,0,76,56V76H48A20,20,0,0,0,28,96V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V96A20,20,0,0,0,208,76ZM100,56a28,28,0,0,1,56,0V76H100ZM204,204H52V100H204Z"/></svg>`;
@@ -957,6 +966,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <button class="toolbar-icon" id="open-vscode-btn" data-tip="Open in VS Code text editor">${iVscode}</button>
     <button class="toolbar-icon" id="outline-btn" data-tip="Outline (⌘⇧O)">${iOutline}</button>
     <button class="toolbar-icon" id="structure-map-btn" data-tip="Structure map">${iStructureMap}</button>
+    <button class="toolbar-icon" id="frontmatter-btn" data-tip="Show/hide frontmatter fields" hidden>${iFrontmatter}</button>
     <span class="toolbar-filename" id="toolbar-filename" title="${fileName}">${fileName}</span>
     <span class="save-indicator" id="save-indicator" aria-live="polite"></span>
     <button class="readonly-pill" id="readonly-pill" hidden data-tip="Read-only — click to enable editing">${iLock}<span>Read only</span></button>
@@ -1110,6 +1120,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
     <button class="settings-action act-open-clipboard" data-tip="Read a file path from the clipboard and open that markdown file">${iLink}<span class="settings-action-label">From clipboard path</span></button>
     <button class="settings-action act-browse-markdown" data-tip="Pick a markdown file from this workspace, or browse anywhere on disk">${iFolder}<span class="settings-action-label">Browse files…</span></button>
   </div>
+  <div id="frontmatter-row" class="frontmatter-row" hidden></div>
   <div id="editor"></div>
   <div id="source-view">
     <div id="source-editor"></div>
