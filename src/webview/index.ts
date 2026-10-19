@@ -3,7 +3,7 @@ import darkCss from './styles/notion-dark.css';
 import editorCss from './styles/editor.css';
 import boardCss from './styles/board.css';
 import katexCss from 'katex/dist/katex.min.css';
-import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
+import { createEditor, updateContent, createSourceEditor, updateSourceContent, getSourceMarkdown, getCurrentMarkdown, setFrontmatterChangeListener, getFrontmatterFields, setMediaBaseUri, setReadOnly, getEditor, getSourceEditor, flushPendingEdit } from './editor';
 import { computeConflictDiff } from './conflictDiff';
 import { buildConflictDiffPanel } from './conflictDiffView';
 import { decideExternalUpdate } from './syncGuard';
@@ -89,6 +89,7 @@ interface SavedDefaults {
   smartTypography?: boolean;
   outlineVisible?: boolean;
   structureMapVisible?: boolean;
+  frontmatterVisible?: boolean;
   sourceWordWrap?: boolean;
 }
 interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
@@ -459,6 +460,7 @@ function init(): void {
     // Idempotent — clicking the active button does nothing
     if (sourceMode === targetSource && editorReady) {
       segActivate(viewBtns, 'view', mode);
+    syncFrontmatterRow();
       return;
     }
     // Flush any unsaved source-editor content before leaving source mode so
@@ -515,6 +517,7 @@ function init(): void {
   const fmBadge = document.getElementById('fm-badge') as HTMLElement | null;
   const codeBtn = viewBtns.find(b => b.dataset.view === 'source') ?? null;
   setFrontmatterChangeListener(({ lines, kind }) => {
+    renderFrontmatterRow();
     const present = kind !== 'none' && lines > 0;
     if (fmBadge) {
       fmBadge.classList.toggle('hidden', !present);
@@ -527,10 +530,48 @@ function init(): void {
     }
   });
 
+  // Frontmatter fields row (Notion-style properties) above the document.
+  const fmRow = document.getElementById('frontmatter-row') as HTMLElement | null;
+  const fmBtn = document.getElementById('frontmatter-btn') as HTMLElement | null;
+  let fmVisible = true;
+  let fmHasFields = false;
+  function renderFrontmatterRow(): void {
+    if (!fmRow) return;
+    const fields = getFrontmatterFields();
+    fmHasFields = fields.length > 0;
+    fmRow.replaceChildren(...fields.map((f) => {
+      const cell = document.createElement('div');
+      cell.className = 'fm-field';
+      const k = document.createElement('span');
+      k.className = 'fm-key';
+      k.textContent = f.key;
+      const v = document.createElement('span');
+      v.className = 'fm-value';
+      v.textContent = f.value || '\u2014';
+      v.title = f.value;
+      cell.append(k, v);
+      return cell;
+    }));
+    syncFrontmatterRow();
+  }
+  function syncFrontmatterRow(): void {
+    if (fmRow) fmRow.hidden = !(fmVisible && fmHasFields && !sourceMode);
+    if (fmBtn) {
+      fmBtn.hidden = !fmHasFields || sourceMode;
+      fmBtn.classList.toggle('active', fmVisible);
+    }
+  }
+  fmBtn?.addEventListener('click', () => {
+    fmVisible = !fmVisible;
+    syncFrontmatterRow();
+    vscode.postMessage({ type: 'saveFrontmatterVisible', value: fmVisible });
+  });
+
   function setWidth(mode: WidthMode): void {
     widthMode = mode;
     WIDTH_CLASSES.forEach(c => { editorEl.classList.remove(c); sourceEl.classList.remove(c); });
     editorEl.classList.add(`width-${mode}`);
+    fmRow?.classList.toggle('width-full', mode === 'full');
     sourceEl.classList.add(`width-${mode}`);
     fullWidthTog.classList.toggle('on', mode === 'full');
     fullWidthTog.setAttribute('aria-checked', String(mode === 'full'));
@@ -1080,6 +1121,7 @@ function init(): void {
       savedDefaults = { ...FACTORY_DEFAULTS, ...(msg.defaults ?? {}) };
       applyDefaults(msg.defaults ?? {});
       refreshDefaultsButtons();
+      fmVisible = msg.defaults?.frontmatterVisible ?? true;
       const editorInstance = createEditor(editorEl, msg.markdown, (markdown) => {
         currentMarkdown = markdown;
         rememberSent(markdown);

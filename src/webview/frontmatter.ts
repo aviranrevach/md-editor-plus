@@ -35,3 +35,57 @@ export function frontmatterInfo(md: string): {
     lines: countFrontmatterLines(split.frontmatter),
   };
 }
+
+export interface FrontmatterField {
+  key: string;
+  value: string;
+}
+
+function unquote(v: string): string {
+  const t = v.trim();
+  if (t.length >= 2 && ((t[0] === '"' && t.endsWith('"')) || (t[0] === "'" && t.endsWith("'")))) {
+    return t.slice(1, -1);
+  }
+  return t;
+}
+
+// Flat top-level key/value view of the frontmatter for display. Handles scalar
+// values, inline lists and block lists / nested maps (shown compactly). It is
+// display-only; the raw frontmatter string is what gets saved.
+export function parseFrontmatterFields(fm: string): FrontmatterField[] {
+  if (!fm) return [];
+  const inner = fm.replace(/^(?:---|\+\+\+)\r?\n/, '').replace(/\r?\n(?:---|\+\+\+)\r?\n?$/, '');
+  const fields: FrontmatterField[] = [];
+  let current: { key: string; value: string; items: string[] } | null = null;
+  const flush = () => {
+    if (!current) return;
+    const value = current.items.length
+      ? current.items.join(', ')
+      : current.value;
+    fields.push({ key: current.key, value });
+    current = null;
+  };
+  for (const line of inner.split(/\r?\n/)) {
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    const top = line.match(/^([A-Za-z0-9_][\w.\- ]*?)\s*[:=]\s*(.*)$/);
+    if (top && !/^\s/.test(line)) {
+      flush();
+      let value = top[2].trim();
+      const inlineList = value.match(/^\[(.*)\]$/);
+      if (inlineList) value = inlineList[1].split(',').map(unquote).filter(Boolean).join(', ');
+      else value = unquote(value);
+      current = { key: top[1].trim(), value, items: [] };
+      continue;
+    }
+    if (current) {
+      const item = line.match(/^\s+-\s+(.*)$/);
+      if (item) current.items.push(unquote(item[1]));
+      else if (/^\s+\S/.test(line)) {
+        const nested = line.trim();
+        current.items.push(unquote(nested));
+      }
+    }
+  }
+  flush();
+  return fields;
+}

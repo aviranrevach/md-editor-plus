@@ -5636,3 +5636,34 @@ html.source-mode-active .structure-map { display: none; }
   justify-content: center;
   font-size: 14px;
 }
+
+/* Frontmatter fields row — Notion-style properties strip above the document. */
+.frontmatter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 12px auto 0;
+  padding: 0 24px 0 64px;
+  box-sizing: border-box;
+  max-width: var(--editor-normal-width, 800px);
+}
+.frontmatter-row[hidden] { display: none; }
+.frontmatter-row.width-full { max-width: 100%; padding-left: 64px; padding-right: 32px; }
+.fm-field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.fm-key { color: var(--text-secondary); flex-shrink: 0; }
+.fm-value {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

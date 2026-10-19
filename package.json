@@ -177,6 +177,11 @@
           "default": false,
           "description": "Show the structure map (right-edge navigation rail) by default"
         },
+        "mdEditorPlus.frontmatterVisible": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the frontmatter fields row above the document by default"
+        },
         "mdEditorPlus.sourceWordWrap": {
           "type": "boolean",
           "default": false,
