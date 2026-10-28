@@ -11,3 +11,6 @@ dist-webview/
 
 # Dev-loop screenshots in the repo root (legit assets live in media/)
 /*.png
+
+# Local Claude instructions
+CLAUDE.local.md
