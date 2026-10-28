@@ -606,8 +606,9 @@ export function createBubbleMenu(editor: Editor): void {
       const vs = (window as unknown as {
         __mdViewerVscode?: { postMessage: (m: unknown) => void };
       }).__mdViewerVscode;
-      if (vs && lpHref.href) {
-        vs.postMessage({ type: 'openExternal', url: lpHref.href });
+      const rawHref = lpHref.getAttribute('href');
+      if (vs && rawHref) {
+        vs.postMessage({ type: 'openExternal', url: rawHref });
       }
       return;
     }
