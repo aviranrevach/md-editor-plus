@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import { MARKDOWN_EXTENSIONS, isMarkdownPath, resolveClipboardCandidates } from './openPath';
+import { MARKDOWN_EXTENSIONS, isMarkdownPath, localPathFromHref, resolveClipboardCandidates } from './openPath';
 import { assetsFolderName, sanitizeImageFileName, dedupeFileName, relativeAssetPath, isImageFileName } from './imageAssets';
 import { ApplyingTracker } from './applyingTracker';
 import { openFullDiff, resolveBaseForDocument } from './diffViewer';
@@ -450,6 +450,21 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
       if (msg.type === 'openExternal') {
         const url = (msg as unknown as { url?: unknown }).url;
         if (typeof url === 'string') {
+          const local = localPathFromHref(url);
+          if (local) {
+            const ws = vscode.workspace.getWorkspaceFolder(document.uri);
+            for (const c of resolveClipboardCandidates(local, path.dirname(document.uri.fsPath), ws?.uri.fsPath)) {
+              const uri = vscode.Uri.file(c);
+              try {
+                await vscode.workspace.fs.stat(uri);
+              } catch { continue; }
+              if (isMarkdownPath(c)) await openMarkdownInEditor(uri);
+              else await vscode.commands.executeCommand('vscode.open', uri);
+              return;
+            }
+            await vscode.window.showErrorMessage(`MD Editor Plus: no file found at ${local}`);
+            return;
+          }
           try { await vscode.env.openExternal(vscode.Uri.parse(url)); } catch { /* ignore */ }
         }
       }

@@ -36,3 +36,22 @@ export function resolveClipboardCandidates(
   }
   return candidates;
 }
+
+/**
+ * Split a link href into a local file path (fragment/query stripped, percent
+ * decoding applied) or null when it points elsewhere (http, mailto, #anchor...).
+ */
+export function localPathFromHref(href: string): string | null {
+  const h = href.trim();
+  if (!h || h.startsWith('#')) return null;
+  if (h.startsWith('file://')) return resolveClipboardCandidates(h.replace(/[#?].*$/, ''), '')[0] ?? null;
+  // Any other scheme (http:, mailto:, ...) is not a local path; a Windows drive letter is.
+  if (/^[a-z][a-z0-9+.-]+:/i.test(h)) return null;
+  const bare = h.replace(/[#?].*$/, '');
+  if (!bare) return null;
+  try {
+    return decodeURIComponent(bare);
+  } catch {
+    return bare;
+  }
+}
