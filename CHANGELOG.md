@@ -6,10 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.2] - 2026-09-01
+## [0.9.3] - 2026-11-01
+
+### Developer
+
+- Merging to `main` now publishes to the VS Code Marketplace and Open VSX automatically (`.github/workflows/publish.yml`): it runs the tests, bumps the patch version, publishes, tags the commit and creates a GitHub release with the `.vsix` attached. The release notes come from this file's section for the version. No user-facing changes.
+
+## [0.9.2] - 2026-11-01
 
 ### Added
 
+- **Frontmatter fields row** — a row above the document shows the frontmatter fields, with a toolbar toggle to show or hide it. The default is set by `mdEditorPlus.frontmatterVisible`.
+- **Open in VS Code's native editor** — a toolbar button opens the current file in the regular VS Code text editor.
+- **Mermaid diagram rendering** — fenced `mermaid` blocks render as diagrams. Newlines in the block's source are now encoded safely so markdown-it no longer breaks them.
 - **Notion-style math equations** — `/math`, `/latex`, `/equation`, and `/公式` now surface **Block equation**, **Inline equation**, and **Block equation · Turn into** commands with a rendered KaTeX preview beside the picker. Inline insertion works at the cursor or from selected text; conversion preserves the current block text as LaTeX. Equations also support `$$...$$`, `⌘/Ctrl+Shift+E`, and the bubble menu's **√x** action; render locally with KaTeX; support `$...$`, `$$...$$`, `\(...\)`, `\[...\]`, and mhchem `\ce` / `\pu`; and round-trip to Markdown without becoming images or HTML. Click-to-edit provides live preview, source copy, arrow-key exit, and inline-to-block conversion. Formula source is included in search and copy; rendered math also works in read-only pages, boards, rendered diffs, and standalone HTML/PDF exports.
 - **Copy & Copy as plain text (c23)** — the selection toolbar can copy your selection with formatting intact (**Copy**) or as clean unformatted text (**Copy as plain text**), fixing selections that used to paste in with the wrong styling. Both live in the ⋯ menu (see below). (c23)
 - **Delete a property from the column menu (c3)** — the board table's column **⋯** menu gained **Delete property**, so a column can be removed from where you're already looking at it instead of only from the Properties popover. It drops the column and its values on every card, and asks for confirmation first when cards actually hold data (naming how many). Unavailable for the built-in Title, Status and Description fields. (c3)
@@ -22,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Relative links open from the link popover** — clicking a relative markdown link (like `./other.md` or `docs/spec.md`) now opens the file, resolving it against the document's folder and the workspace root. Markdown files open in MD Editor Plus and other files in the default editor. A missing file shows an error instead of doing nothing.
+- **Kanban boards follow the light/dark theme** — board colours now respect the active theme instead of staying in one mode.
+- **HTML/PDF export keeps images outside the document folder** — images located outside the document's own folder are now embedded instead of dropped.
+- **Toolbar icons** — the VS Code and Copy as plain text icons now match the monochrome style of the rest of the toolbar.
 - **Pasting into a card description no longer shows raw code in board views (c9)** — a description is edited in the side panel with the *full* block editor, so it can hold headings, lists, tables, fenced code and pasted rich text. The table view's **Description** column and the kanban card preview only understood *inline* Markdown, so every block construct was printed as literal syntax — a pasted code block showed its ` ``` ` fences, a table showed its `|` pipes, a list showed its bullets. It looked correct in the panel and wrong on the board. Both previews now flatten the block layer first: a code block reads as `code`, a table as its cell values, headings and list markers drop away, and lines join with ` • `. Inline styling (bold, italic, links, color, thumbnails) still renders as before. (c9)
 - **Resized images and pasted links render in board previews (c9)** — a resized image is stored as `<img src="…" width="N">` and a pasted link can keep its `<a href="…">` tag; board cells printed both as raw tags. They now render as a thumbnail and a real link.
 - **Search scroll in Code view (c58)** — searching in Code view updated the match counter but never scrolled to the match. Its code block could silently become its own (never-scrolling) scroll container, and the jump ran before the line-number gutter finished redrawing. Find now scrolls to the match in Code view. (c58)
@@ -248,6 +261,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Visual-edit first-paint canvas race** — `createVisualEditor` no longer engages the lock before the SVG has rendered. The lock is captured lazily on the first re-render that has real content. Eliminates the "canvas inside a canvas" frame users hit on whiteboard insert.
 - **Mermaid `style.maxWidth` override** — mermaid sets an inline `style="max-width: <natural>px"` on every render that was clamping the SVG to its natural-content width after every drag. The visual-edit fit and viewBox stamp now reset `style.maxWidth = '100%'` alongside width/height.
 
+## [0.4.2] - 2026-05-17
+
+### Added
+
+- **Sync conflict banner** — when the file changes on disk while you have unsaved edits, a banner offers to keep your version or reload. Scroll position is preserved across external updates, and a **Refresh** action reloads the file on demand.
+- **Read only mode** — lock the document against edits.
+- **Word wrap toggle** for the editor.
+
+### Changed
+
+- **Read only moved into the ⋯ menu**, and the refresh icon was cleaned up.
+
+## [0.3.0] - 2026-05-11
+
+### Added
+
+- **Outline panel** — a Google Docs style outline of the document's headings with scroll-spy that highlights the section you're reading.
+- **Export to HTML and PDF** — available from a cascading Export submenu.
+
 ## [0.2.0] - 2026-05-10
 
 ### Added
@@ -323,7 +355,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `theme`, `font`, `textSize`, `pageWidth`, `fullWidth`
 - `alwaysDarkCode`, `alwaysDarkSource`, `sourceFullWidth`, `shortenCodeSnippets`
 
-[Unreleased]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.7.0...v0.7.1
@@ -334,7 +369,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.5.3]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.2.0...v0.5.0
+[0.5.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/aviranrevach/md-editor-plus/compare/v0.3.0...v0.4.2
+[0.3.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aviranrevach/md-editor-plus/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/aviranrevach/md-editor-plus/releases/tag/v0.1.0
