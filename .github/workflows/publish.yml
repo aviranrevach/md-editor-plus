@@ -39,6 +39,11 @@ jobs:
           npm version patch --no-git-tag-version
           echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
+      - name: Update changelog and release notes
+        run: |
+          node scripts/changelog.mjs roll "${{ steps.version.outputs.version }}" "$(date -u +%F)"
+          node scripts/changelog.mjs notes "${{ steps.version.outputs.version }}" > "$RUNNER_TEMP/release-notes.md"
+
       - name: Package
         run: npx vsce package -o md-editor-plus.vsix
 
@@ -66,6 +71,7 @@ jobs:
         run: |
           gh release create "v${{ steps.version.outputs.version }}" md-editor-plus.vsix \
             --title "v${{ steps.version.outputs.version }}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
             --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
