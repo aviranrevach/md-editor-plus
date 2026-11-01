@@ -43,7 +43,13 @@ You need two accounts and two tokens. Each takes ~5 minutes.
 
 ---
 
-## Publishing flow (every release)
+## Automated publishing (GitHub Actions)
+
+`.github/workflows/publish.yml` publishes to both marketplaces on every merge to `main` that touches `src/`, `media/`, `esbuild.config.js`, `package.json` or `package-lock.json`. It runs tests, bumps the patch version, publishes, then commits the bump and tag back to `main` with `[skip ci]` and creates a GitHub release (auto-generated notes from the merged PRs, `.vsix` attached). It needs the repo secrets `VSCE_PAT` and `OVSX_PAT` (tokens from the setup above). For a minor or major release, bump the version manually in your PR; the workflow still adds a patch on top.
+
+---
+
+## Publishing flow (every release, manual)
 
 1. **Bump the version** in `package.json` (semver: patch/minor/major).
    ```sh
