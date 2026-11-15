@@ -214,6 +214,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         markdown: document.getText(),
         mediaBaseUri,
         documentPath: vscode.workspace.asRelativePath(document.uri),
+        documentDir: document.uri.scheme.startsWith('file') ? vscode.Uri.joinPath(document.uri, '..').fsPath : '',
         workspaceName: vscode.workspace.getWorkspaceFolder(document.uri)?.name ?? null,
         defaults: {
           theme:               cfg.get<string>('theme', 'light'),
@@ -227,6 +228,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           sourceFullWidth:     cfg.get<boolean>('sourceFullWidth', false),
           shortenCodeSnippets: cfg.get<boolean>('shortenCodeSnippets', false),
           smartTypography:     cfg.get<boolean>('smartTypography', true),
+          showImagePaths:      cfg.get<boolean>('showImagePaths', true),
           outlineVisible:      cfg.get<boolean>('outlineVisible', false),
           structureMapVisible: cfg.get<boolean>('structureMapVisible', false),
           frontmatterVisible:  cfg.get<boolean>('frontmatterVisible', true),
@@ -302,6 +304,7 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         sourceFullWidth?: boolean;
         shortenCodeSnippets?: boolean;
         smartTypography?: boolean;
+        showImagePaths?: boolean;
       };
     }) => {
       // Webview signals it has registered its message listener. Only now is it
@@ -362,12 +365,13 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
           cfg.update('sourceFullWidth',     d.sourceFullWidth,     target),
           cfg.update('shortenCodeSnippets', d.shortenCodeSnippets, target),
           cfg.update('smartTypography',     d.smartTypography,     target),
+          cfg.update('showImagePaths',      d.showImagePaths,      target),
         ]);
         await vscode.window.showInformationMessage('MD Editor Plus: current view saved as default');
       }
       if (msg.type === 'resetDefaults') {
         const cfg = vscode.workspace.getConfiguration('mdEditorPlus');
-        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkDiagram','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets','smartTypography'];
+        const keys = ['theme','font','textSize','pageWidth','fullWidth','alwaysDarkCode','alwaysDarkDiagram','alwaysDarkSource','sourceFullWidth','shortenCodeSnippets','smartTypography','showImagePaths'];
         for (const k of keys) {
           // Clear at all scopes so the package.json defaults take over.
           await cfg.update(k, undefined, vscode.ConfigurationTarget.Global).then(() => {}, () => {});
@@ -1084,6 +1088,11 @@ export class MdEditorPlusProvider implements vscode.CustomTextEditorProvider {
         <span class="settings-row-icon">${iCode}</span>
         <span class="settings-row-label">Shorten Code Snippets</span>
         <button class="toggle-switch" id="shorten-snippets-toggle" role="switch" aria-checked="false"></button>
+      </div>
+      <div class="settings-row" data-tip="Show the file path of local images under them, with copy and reveal buttons">
+        <span class="settings-row-icon">${iLink}</span>
+        <span class="settings-row-label">Show image paths</span>
+        <button class="toggle-switch" id="show-image-paths-toggle" role="switch" aria-checked="false"></button>
       </div>
     </div>
     <div class="settings-divider"></div>

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Image paths** — local images show their absolute file path underneath, with buttons to copy the path and reveal it in the file manager. The path is never included when copying the page or exporting. Toggle it with the "Show image paths" display setting (`mdEditorPlus.showImagePaths`).
+
 ## [0.9.3] - 2026-11-01
 
 ### Developer

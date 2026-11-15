@@ -63,6 +63,7 @@ function cleanContent(editorEl: HTMLElement): string {
   // Remove drop placeholder / cursor markers
   clone.querySelectorAll('.ProseMirror-yjs-cursor, .ProseMirror-gapcursor, .ProseMirror-dropcursor')
     .forEach((el) => el.remove());
+  clone.querySelectorAll('.img-nv-path').forEach((el) => el.remove());
   clone.querySelectorAll('.math-inline-input-wrap, .math-block-source')
     .forEach((el) => el.remove());
   // Strip class="ProseMirror-trailingBreak" content used purely for caret

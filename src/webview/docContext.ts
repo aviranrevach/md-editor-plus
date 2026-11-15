@@ -22,6 +22,17 @@ export function getWorkspaceName(): string | null {
   return _workspaceName;
 }
 
+let _documentDir = '';
+
+/** Absolute filesystem folder of the open document ('' for untitled / remote). */
+export function setDocumentDir(p: string): void {
+  _documentDir = p || '';
+}
+
+export function getDocumentDir(): string {
+  return _documentDir;
+}
+
 export function copyToClipboard(text: string): void {
   const vs = (window as unknown as {
     __mdViewerVscode?: { postMessage: (m: unknown) => void };
