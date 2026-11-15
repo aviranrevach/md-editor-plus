@@ -18,7 +18,7 @@ import { createOutlinePanel, OutlinePanel } from './outlinePanel';
 import { createStructureMap } from './structureMap';
 import { createDiffMap, type DiffMap } from './diffMap';
 import { initBoardSidePanel } from './boardSidePanel';
-import { setDocumentPath, setWorkspaceName } from './docContext';
+import { setDocumentPath, setDocumentDir, setWorkspaceName } from './docContext';
 import { createSkillPanel } from './skillPanel';
 import { placeFloating, type PlacementHandle } from './menuPosition';
 import { nextSaveState, describeSaveState, SaveState, SaveEvent } from './saveState';
@@ -87,12 +87,13 @@ interface SavedDefaults {
   sourceFullWidth?: boolean;
   shortenCodeSnippets?: boolean;
   smartTypography?: boolean;
+  showImagePaths?: boolean;
   outlineVisible?: boolean;
   structureMapVisible?: boolean;
   frontmatterVisible?: boolean;
   sourceWordWrap?: boolean;
 }
-interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; workspaceName?: string | null; }
+interface InitMessage   { type: 'init';   markdown: string; defaults: SavedDefaults; mediaBaseUri?: string; documentPath?: string; documentDir?: string; workspaceName?: string | null; }
 interface UpdateMessage { type: 'update'; markdown: string; source?: 'refresh' | 'external' }
 interface SaveStateMessage { type: 'saveState'; state: 'saving' | 'saved' | 'failed'; flash?: boolean }
 interface DiffBaseMessage { type: 'diffBase'; content: string; label?: string; }
@@ -122,11 +123,12 @@ const FACTORY_DEFAULTS = {
   sourceFullWidth:     false,
   shortenCodeSnippets: false,
   smartTypography:     true,
+  showImagePaths:      true,
 };
 
 const DEFAULT_KEYS = [
   'theme', 'font', 'textSize', 'pageWidth', 'fullWidth',
-  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets', 'smartTypography',
+  'alwaysDarkCode', 'alwaysDarkDiagram', 'alwaysDarkSource', 'sourceFullWidth', 'shortenCodeSnippets', 'smartTypography', 'showImagePaths',
 ] as const;
 
 function injectStyles(): void {
@@ -194,6 +196,7 @@ function init(): void {
   const alwaysDarkSourceToggle = document.getElementById('always-dark-source-toggle') as HTMLElement;
   const sourceFullWidthToggle = document.getElementById('source-full-width-toggle') as HTMLElement;
   const shortenSnippetsToggle = document.getElementById('shorten-snippets-toggle') as HTMLElement;
+  const showImagePathsToggle = document.getElementById('show-image-paths-toggle') as HTMLElement;
   const smartTypographyToggle = document.getElementById('smart-typography-toggle') as HTMLElement;
   const readOnlyToggle = document.getElementById('readonly-toggle') as HTMLElement | null;
   const readOnlyPill   = document.getElementById('readonly-pill')   as HTMLElement | null;
@@ -256,6 +259,13 @@ function init(): void {
     refreshDefaultsButtons();
   }
 
+  function setShowImagePaths(on: boolean): void {
+    document.documentElement.classList.toggle('hide-image-paths', !on);
+    showImagePathsToggle.classList.toggle('on', on);
+    showImagePathsToggle.setAttribute('aria-checked', String(on));
+    refreshDefaultsButtons();
+  }
+
   function setSmartTypography(on: boolean): void {
     setSmartTypographyEnabled(on);
     smartTypographyToggle.classList.toggle('on', on);
@@ -277,6 +287,9 @@ function init(): void {
   });
   shortenSnippetsToggle.addEventListener('click', () => {
     setShortenSnippets(!shortenSnippetsToggle.classList.contains('on'));
+  });
+  showImagePathsToggle.addEventListener('click', () => {
+    setShowImagePaths(!showImagePathsToggle.classList.contains('on'));
   });
   smartTypographyToggle.addEventListener('click', () => {
     setSmartTypography(!smartTypographyToggle.classList.contains('on'));
@@ -1034,6 +1047,7 @@ function init(): void {
   }
 
   document.addEventListener('keydown', (e) => {
+    setShowImagePaths(d.showImagePaths ?? true);
     if (!roController.get()) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return; // shortcuts aren't edits
     const isEdit = e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete';
@@ -1095,6 +1109,7 @@ function init(): void {
   saveBtn?.addEventListener('click', () => {
     if (saveBtn.disabled) return;
     const cur = currentDefaults();
+      showImagePaths:      showImagePathsToggle.classList.contains('on'),
     vscode.postMessage({ type: 'saveDefaults', defaults: cur });
     savedDefaults = cur;
     refreshDefaultsButtons();
@@ -1123,6 +1138,7 @@ function init(): void {
       refreshDefaultsButtons();
       fmVisible = msg.defaults?.frontmatterVisible ?? true;
       const editorInstance = createEditor(editorEl, msg.markdown, (markdown) => {
+      setDocumentDir(msg.documentDir ?? '');
         currentMarkdown = markdown;
         rememberSent(markdown);
         if (sourceMode && sourceEditorReady) updateSourceContent(markdown);

@@ -9,6 +9,30 @@
 import type { Editor } from '@tiptap/core';
 import { resolveImageSrc } from './mediaResolve';
 import { clampWidth } from './imageMarkdown';
+import { getDocumentDir } from './docContext';
+import { revealImage, copyImagePath } from './imageUpload';
+
+const ICON_COPY = '<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg>';
+const ICON_FOLDER = '<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor"><path d="M216,72H131.31L104,44.69A15.86,15.86,0,0,0,92.69,40H40A16,16,0,0,0,24,56V200.62A15.4,15.4,0,0,0,39.38,216H216.89A15.13,15.13,0,0,0,232,200.89V88A16,16,0,0,0,216,72Zm0,128H40V56H92.69l27.31,27.31A15.86,15.86,0,0,0,131.31,88H216Z"/></svg>';
+
+/** Absolute filesystem path of a document-relative image src, or null when the
+ *  image is remote/inline (or the document has no folder, e.g. untitled). */
+export function absoluteImagePath(src: string, docDir: string): string | null {
+  if (!src || !docDir || /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src)) return null;
+  let rel = src;
+  try { rel = decodeURI(src); } catch { /* keep raw */ }
+  rel = rel.replace(/[?#].*$/, '');
+  const sep = docDir.includes('\\') && !docDir.includes('/') ? '\\' : '/';
+  const parts = docDir.split(/[\\/]/);
+  const root = parts[0] === '' ? '' : parts[0]; // '' for POSIX, 'C:' for Windows
+  const stack = parts.slice(1).filter(Boolean);
+  for (const seg of rel.split(/[\\/]/)) {
+    if (!seg || seg === '.') continue;
+    if (seg === '..') stack.pop();
+    else stack.push(seg);
+  }
+  return root + sep + stack.join(sep);
+}
 
 export const IMAGE_MIN_WIDTH = 80;
 // Concrete pixel widths for the bubble menu's size presets. Full = clear width.
@@ -34,6 +58,15 @@ function injectStyles(): void {
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); opacity: 0; transition: opacity .12s;
       cursor: ew-resize; z-index: 6; }
     .img-nv:hover .img-nv-grip, .img-nv.is-selected .img-nv-grip { opacity: 1; }
+    .img-nv-path { display: flex; align-items: center; gap: 4px; margin-top: 4px; line-height: 1.3;
+      font-size: 11px; color: var(--muted, #787774); user-select: none; -webkit-user-select: none; cursor: default; }
+    .img-nv-path-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      direction: rtl; text-align: left; font-family: var(--font-mono, ui-monospace, monospace); }
+    .img-nv-path-btn { flex: none; display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent;
+      color: inherit; cursor: pointer; }
+    .img-nv-path-btn:hover { background: rgba(127, 127, 127, 0.2); color: var(--fg, inherit); }
+    html.hide-image-paths .img-nv-path { display: none; }
     .img-nv-grip.left  { left: 6px; }
     .img-nv-grip.right { right: 6px; }
   `;
@@ -53,6 +86,9 @@ export function imageNodeViewFactory() {
 class ImageNodeView {
   dom: HTMLElement;
   private img: HTMLImageElement;
+  private pathRow: HTMLElement;
+  private pathText!: HTMLElement;
+  private relSrc = '';
   private node: any;
   private editor: Editor;
   private getPos: () => number | undefined;
@@ -68,6 +104,9 @@ class ImageNodeView {
     this.img = document.createElement('img');
     this.applyImg();
     this.dom.appendChild(this.img);
+    this.pathRow = this.buildPathRow();
+    this.dom.appendChild(this.pathRow);
+    this.applyPath();
     (['left', 'right'] as const).forEach((side) => this.addGrip(side));
   }
 
@@ -78,6 +117,43 @@ class ImageNodeView {
     const w = this.node.attrs.width as number | null;
     if (w) this.img.style.width = `${w}px`;
     else this.img.style.removeProperty('width');
+  }
+
+  // Path caption under the image. contenteditable=false + user-select:none keep
+  // it out of selections; ProseMirror's copy serialises the doc model (never
+  // this DOM), so Select All / copy never include it.
+  private buildPathRow(): HTMLElement {
+    const row = document.createElement('span');
+    row.className = 'img-nv-path';
+    row.contentEditable = 'false';
+    this.pathText = document.createElement('span');
+    this.pathText.className = 'img-nv-path-text';
+    row.appendChild(this.pathText);
+    const mk = (icon: string, tip: string, run: () => Promise<void>) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'img-nv-path-btn';
+      b.title = tip;
+      b.setAttribute('aria-label', tip);
+      b.innerHTML = icon;
+      b.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+      b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); void run().catch(() => undefined); });
+      row.appendChild(b);
+    };
+    mk(ICON_COPY, 'Copy path', () => copyImagePath(this.relSrc));
+    mk(ICON_FOLDER, 'Reveal in Finder', () => revealImage(this.relSrc));
+    return row;
+  }
+
+  private applyPath(): void {
+    this.relSrc = this.node.attrs.src as string;
+    const abs = absoluteImagePath(this.relSrc, getDocumentDir());
+    this.pathRow.style.display = abs ? '' : 'none';
+    if (abs) {
+      // rtl + LRM keeps the filename visible when the path is truncated
+      this.pathText.textContent = '\u200E' + abs;
+      this.pathText.title = abs;
+    }
   }
 
   private setWidth(width: number | null): void {
@@ -137,6 +213,7 @@ class ImageNodeView {
     if (node.type.name !== this.node.type.name) return false;
     this.node = node;
     this.applyImg();
+    this.applyPath();
     return true;
   }
 
