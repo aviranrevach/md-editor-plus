@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-15
+
 ### Added
 
 - **Image paths** — local images show their absolute file path underneath, with buttons to copy the path and reveal it in the file manager. The path is never included when copying the page or exporting. Toggle it with the "Show image paths" display setting (`mdEditorPlus.showImagePaths`).
@@ -359,7 +361,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `theme`, `font`, `textSize`, `pageWidth`, `fullWidth`
 - `alwaysDarkCode`, `alwaysDarkSource`, `sourceFullWidth`, `shortenCodeSnippets`
 
-[Unreleased]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/aviranrevach/md-editor-plus/compare/v0.9.0...v0.9.1
